@@ -165,7 +165,6 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
               <Label htmlFor="feedback">Your feedback</Label>
               <Input
                 id="feedback"
-                variant="premium"
                 placeholder="e.g., Make the title larger, change colors to blue, add more bullet points..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
@@ -199,7 +198,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           Back to Research
         </Button>
         <Button 
-          variant="premium" 
+          variant="notion" 
           size="lg" 
           onClick={onNext}
           disabled={!canProceed}

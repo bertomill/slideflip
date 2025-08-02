@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Navigation, NavigationBrand, NavigationMenu, NavigationItem } from "@/components/ui/navigation";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Zap, Rocket, Star, ArrowRight } from "lucide-react";
 
@@ -13,17 +14,20 @@ export default function DemoPage() {
       {/* Premium Navigation */}
       <Navigation variant="premium">
         <NavigationBrand>
-          <Sparkles className="h-6 w-6 text-primary" />
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <Sparkles className="h-6 w-6" style={{ color: "hsl(var(--notion-blue))" }} />
+          <span className="gradient-notion-blue bg-clip-text text-transparent font-semibold">
             SlideFlip
           </span>
         </NavigationBrand>
-        <NavigationMenu>
-          <NavigationItem href="#" active>Home</NavigationItem>
-          <NavigationItem href="#">Features</NavigationItem>
-          <NavigationItem href="#">Pricing</NavigationItem>
-          <NavigationItem href="#">About</NavigationItem>
-        </NavigationMenu>
+        <div className="flex items-center gap-6">
+          <NavigationMenu>
+            <NavigationItem href="#" active>Home</NavigationItem>
+            <NavigationItem href="#">Features</NavigationItem>
+            <NavigationItem href="#">Pricing</NavigationItem>
+            <NavigationItem href="#">About</NavigationItem>
+          </NavigationMenu>
+          <ThemeToggle />
+        </div>
       </Navigation>
 
       <div className="container mx-auto px-4 py-12 space-y-12">
@@ -40,11 +44,11 @@ export default function DemoPage() {
             Experience the premium feel of Cursor, Windsurf, and Palantir with our sophisticated component library.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button variant="premium" size="lg">
+            <Button variant="notion" size="lg">
               <Rocket className="h-4 w-4 mr-2" />
               Get Started
             </Button>
-            <Button variant="glass" size="lg">
+            <Button variant="outline" size="lg">
               Learn More
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
@@ -65,14 +69,14 @@ export default function DemoPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button variant="premium" className="w-full">
-                Premium Button
+              <Button variant="notion" className="w-full">
+                Notion Button
               </Button>
               <Button variant="default" className="w-full">
                 Default Button
               </Button>
-              <Button variant="glass" className="w-full">
-                Glass Button
+              <Button variant="secondary" className="w-full">
+                Secondary Button
               </Button>
               <Button variant="outline" className="w-full">
                 Outline Button
@@ -90,8 +94,8 @@ export default function DemoPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <Input placeholder="Default input" />
-              <Input variant="premium" placeholder="Premium input" />
-              <Input variant="glass" placeholder="Glass input" />
+              <Input placeholder="Focused input (try clicking)" />
+              <Input placeholder="Another input example" />
             </CardContent>
           </Card>
 
@@ -159,7 +163,7 @@ export default function DemoPage() {
           <p className="text-muted-foreground max-w-md mx-auto">
             Start creating with our premium component library inspired by the best design systems.
           </p>
-          <Button variant="premium" size="xl">
+          <Button variant="notion" size="xl">
             <Rocket className="h-5 w-5 mr-2" />
             Start Building Now
           </Button>

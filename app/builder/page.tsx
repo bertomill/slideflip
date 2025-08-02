@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Sparkles, ArrowLeft, ArrowRight } from "lucide-react";
 import { UploadStep } from "@/components/builder/upload-step";
 import { ThemeStep } from "@/components/builder/theme-step";
@@ -75,11 +76,14 @@ export default function SlideBuilder() {
     <div className="min-h-screen bg-background">
       <Navigation variant="premium">
         <NavigationBrand>
-          <Sparkles className="h-6 w-6 text-primary" />
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <Sparkles className="h-6 w-6" style={{ color: "hsl(var(--notion-blue))" }} />
+          <span className="gradient-notion-blue bg-clip-text text-transparent font-semibold">
             SlideFlip Builder
           </span>
         </NavigationBrand>
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+        </div>
       </Navigation>
 
       <div className="container mx-auto px-4 py-8">

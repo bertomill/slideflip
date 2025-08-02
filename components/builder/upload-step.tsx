@@ -148,7 +148,7 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
 
       <div className="flex justify-end">
         <Button 
-          variant="premium" 
+          variant="notion" 
           size="lg" 
           onClick={onNext}
           disabled={!canProceed}

@@ -206,7 +206,7 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: Res
           Back to Themes
         </Button>
         <Button 
-          variant="premium" 
+          variant="notion" 
           size="lg" 
           onClick={onNext}
           disabled={!canProceed || isResearching}

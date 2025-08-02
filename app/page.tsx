@@ -2,7 +2,7 @@ import { DeployButton } from "@/components/deploy-button";
 import { EnvVarWarning } from "@/components/env-var-warning";
 import { AuthButton } from "@/components/auth-button";
 import { Hero } from "@/components/hero";
-import { ThemeSwitcher } from "@/components/theme-switcher";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
 import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
 import { hasEnvVars } from "@/lib/utils";
@@ -26,7 +26,10 @@ export default function Home() {
                 <DeployButton />
               </div>
             </div>
-            {!hasEnvVars ? <EnvVarWarning /> : <AuthButton />}
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              {!hasEnvVars ? <EnvVarWarning /> : <AuthButton />}
+            </div>
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
@@ -49,7 +52,7 @@ export default function Home() {
               Supabase
             </a>
           </p>
-          <ThemeSwitcher />
+          <ThemeToggle />
         </footer>
       </div>
     </main>
