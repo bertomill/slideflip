@@ -16,9 +16,12 @@ export default function Home() {
           <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
             <div className="flex gap-5 items-center font-semibold">
               <Link href={"/"}>SlideFlip</Link>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4">
                 <Link href="/demo" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   Premium Demo
+                </Link>
+                <Link href="/builder" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                  Create Slide
                 </Link>
                 <DeployButton />
               </div>
