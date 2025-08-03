@@ -371,23 +371,21 @@ export default function Home() {
                       </div>
                     </Card>
                     
-                    {/* Additional Corporate Slides */}
-                    {Array.from({ length: 1 }).map((_, i) => (
-                      <Card key={i} className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                        <div className="h-full bg-gradient-to-br from-green-800 to-green-900 relative">
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-12 h-10 bg-white/10 rounded border border-white/20 flex items-center justify-center">
-                              <div className="text-xs text-white/60">Slide</div>
-                            </div>
-                          </div>
-                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                          </div>
+                    {/* P&G FY 2025 Results */}
+                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                      <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
+                        <img 
+                          src="/samples/slides/pg_slide_1.png" 
+                          alt="P&G FY 2025 Results" 
+                          className="w-full h-full object-contain"
+                        />
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
+                            <Eye className="h-3 w-3" />
+                          </Button>
                         </div>
-                      </Card>
-                    ))}
+                      </div>
+                    </Card>
                   </div>
                 </div>
               </div>
