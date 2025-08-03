@@ -4,47 +4,157 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, ArrowLeft, ArrowRight, Brain, CheckCircle, XCircle, Lightbulb } from "lucide-react";
-import { SlideData } from "@/app/builder/page";
+import { Search, ArrowLeft, ArrowRight, Brain, CheckCircle, XCircle, Lightbulb, Settings, Image, Clock, Shield } from "lucide-react";
+import { SlideData, ResearchOptions } from "@/app/builder/page";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
+/**
+ * Props interface for the ResearchStep component
+ * Defines the contract for data flow and navigation callbacks
+ */
 interface ResearchStepProps {
-  slideData: SlideData;
-  updateSlideData: (updates: Partial<SlideData>) => void;
-  onNext: () => void;
-  onPrev: () => void;
+  slideData: SlideData;                                    // Current slide data from parent component
+  updateSlideData: (updates: Partial<SlideData>) => void; // Callback to update slide data in parent
+  onNext: () => void;                                      // Navigation callback to proceed to next step
+  onPrev: () => void;                                      // Navigation callback to return to previous step
 }
 
+/**
+ * ResearchStep Component - Third step in the slide builder workflow
+ * Allows users to choose whether to enhance their slide with AI-powered research
+ * Provides customizable research options and handles the research API integration
+ */
 export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: ResearchStepProps) {
-  const [isResearching, setIsResearching] = useState(false);
-  const [researchComplete, setResearchComplete] = useState(false);
+  // UI State Management: Track research process status
+  const [isResearching, setIsResearching] = useState(false);        // Loading state during API call
+  const [researchComplete, setResearchComplete] = useState(false);  // Success state after research completion
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false); // Toggle for advanced configuration UI
 
-  const handleResearchChoice = async (wantsResearch: boolean) => {
+  // Research Configuration: Default options that provide good balance of quality and performance
+  const [researchOptions, setResearchOptions] = useState<ResearchOptions>({
+    maxResults: 4,              // Moderate number of results for comprehensive but focused research
+    includeImages: true,        // Visual content enhances slide presentations
+    includeAnswer: 'advanced',  // Detailed AI summaries provide better context
+    timeRange: 'month',         // Recent data is most relevant for current presentations
+    excludeSocial: true,        // Professional sources are preferred for business presentations
+  });
+
+  /**
+   * Updates research configuration options and syncs with parent component
+   * Ensures both local state and global slide data stay synchronized
+   * @param updates - Partial research options to merge with current settings
+   */
+  const updateResearchOptions = (updates: Partial<ResearchOptions>) => {
+    const newOptions = { ...researchOptions, ...updates };
+    setResearchOptions(newOptions);                    // Update local component state
+    updateSlideData({ researchOptions: newOptions }); // Sync with parent slide data
+  };
+
+  /**
+   * Handles user's choice about whether to include additional research
+   * Updates the slide data and conditionally shows advanced options
+   * @param wantsResearch - Boolean indicating if user wants AI research enhancement
+   */
+  const handleResearchChoice = (wantsResearch: boolean) => {
+    // Store the user's research preference in the global slide data
     updateSlideData({ wantsResearch });
     
     if (wantsResearch) {
-      setIsResearching(true);
-      
-      // Simulate AI research
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const mockResearchData = `
-        Additional insights found:
-        • Industry trends show 23% growth in this sector
-        • Recent studies indicate best practices include visual storytelling
-        • Competitor analysis reveals key differentiators
-        • Market data suggests focusing on ROI metrics
-      `;
-      
-      updateSlideData({ researchData: mockResearchData });
-      setIsResearching(false);
-      setResearchComplete(true);
+      // Immediately reveal research customization options when user opts for research
+      // This provides instant feedback and allows configuration before starting research
+      setShowAdvancedOptions(true);
     }
   };
 
+  /**
+   * Initiates the AI research process using the Tavily API
+   * Handles the complete research workflow: API call, success/error handling, and UI updates
+   * Separated from handleResearchChoice to allow users to configure options before starting
+   */
+  const startResearch = async () => {
+    // Show loading state to provide user feedback during API call
+    setIsResearching(true);
+    
+    try {
+      // Build research query from user's slide description with fallback
+      // Uses description as primary query since it contains the user's specific intent
+      const query = slideData.description || "business presentation insights";
+      
+      // Make API call to research endpoint with user's query and customized options
+      const response = await fetch('/api/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query,                    // Primary search term
+          description: slideData.description, // Additional context for research
+          options: researchOptions,        // User-configured research parameters
+        }),
+      });
+
+      // Check for HTTP-level errors (network issues, server errors, etc.)
+      if (!response.ok) {
+        throw new Error('Research request failed');
+      }
+
+      // Parse the JSON response from the research API
+      const data = await response.json();
+      
+      // Handle successful research results
+      if (data.success) {
+        // Store research data in global slide state for use in slide generation
+        updateSlideData({ researchData: data.researchData });
+        // Mark research as complete to show results UI and enable next step
+        setResearchComplete(true);
+      } else {
+        // Handle API-level errors (invalid query, rate limits, etc.)
+        throw new Error(data.error || 'Research failed');
+      }
+    } catch (error) {
+      // Log error details for debugging while providing user-friendly feedback
+      console.error('Research error:', error);
+      
+      // Create graceful fallback message that allows user to continue without research
+      // This ensures the slide builder workflow isn't completely blocked by research failures
+      let fallbackData = `Research temporarily unavailable. 
+      
+Your slide will be created using the uploaded documents and description provided.`;
+
+      // Provide specific guidance based on error type to help user resolve issues
+      if (error instanceof Error) {
+        if (error.message.includes('400')) {
+          // Client-side error: likely invalid or insufficient query parameters
+          fallbackData += `\n\nTip: Try providing a more detailed description for better research results.`;
+        } else if (error.message.includes('500')) {
+          // Server-side error: API service issues, rate limits, or configuration problems
+          fallbackData += `\n\nThe research service is currently unavailable. Please try again later.`;
+        } else {
+          // Generic error: network issues, timeouts, or unexpected failures
+          fallbackData += `\n\nFor enhanced content, please try the research option again later.`;
+        }
+      }
+      
+      // Store fallback message as research data so user can still proceed
+      updateSlideData({ researchData: fallbackData });
+      // Mark as complete even on error to allow workflow continuation
+      setResearchComplete(true);
+    } finally {
+      // Always clear loading state regardless of success/failure
+      // This ensures UI doesn't get stuck in loading state
+      setIsResearching(false);
+    }
+  };
+
+  // Navigation Logic: Determine if user can proceed to next step
+  // User must make a choice about research before continuing
   const canProceed = slideData.wantsResearch !== undefined;
 
   return (
     <div className="space-y-6">
+      {/* Step Header: Introduces the research enhancement option */}
       <Card variant="elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -57,8 +167,9 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: Res
         </CardHeader>
       </Card>
 
+      {/* Research Choice Cards: Two-option selection interface */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Yes Option */}
+        {/* Option 1: Enable AI Research Enhancement */}
         <Card 
           variant={slideData.wantsResearch === true ? "premium" : "glass"}
           className={`cursor-pointer transition-premium hover:scale-[1.02] ${
@@ -103,7 +214,7 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: Res
           </CardContent>
         </Card>
 
-        {/* No Option */}
+        {/* Option 2: Skip Research, Use Existing Content Only */}
         <Card 
           variant={slideData.wantsResearch === false ? "premium" : "glass"}
           className={`cursor-pointer transition-premium hover:scale-[1.02] ${
@@ -149,36 +260,201 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: Res
         </Card>
       </div>
 
-      {/* Research Progress */}
+      {/* Advanced Research Options */}
+      {slideData.wantsResearch === true && !isResearching && !researchComplete && (
+        <Card variant="glass">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Settings className="h-5 w-5 text-primary" />
+                Configure Your Research
+              </CardTitle>
+              <CardDescription>
+                Customize the research parameters to get the most relevant results for your presentation
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Quick Settings Summary */}
+            <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium">Current Settings:</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                >
+                  {showAdvancedOptions ? 'Hide Details' : 'Show Details'}
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {researchOptions.maxResults} results • {researchOptions.timeRange} timeframe • {researchOptions.includeAnswer} AI summary
+                {researchOptions.includeImages && ' • Images included'}
+                {researchOptions.excludeSocial && ' • Social media excluded'}
+              </div>
+            </div>
+
+            {/* Advanced Configuration Panel: Detailed research customization options */}
+            {/* Only visible when user expands the advanced settings section */}
+            {showAdvancedOptions && (
+              <div className="space-y-6">
+                {/* Research Parameter Grid: Two-column layout for desktop, single column on mobile */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Search Results Quantity Control: Allows users to balance comprehensiveness vs processing time */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Number of Results
+                  </Label>
+                  <Select
+                    value={researchOptions.maxResults.toString()}
+                    onValueChange={(value) => updateResearchOptions({ maxResults: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2 results</SelectItem>
+                      <SelectItem value="4">4 results</SelectItem>
+                      <SelectItem value="6">6 results</SelectItem>
+                      <SelectItem value="8">8 results</SelectItem>
+                      <SelectItem value="10">10 results</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Temporal Filtering: Control recency of search results for relevance */}
+                {/* Recent data is often more valuable for business presentations */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Time Range
+                  </Label>
+                  <Select
+                    value={researchOptions.timeRange}
+                    onValueChange={(value: 'day' | 'week' | 'month' | 'year' | 'all') => 
+                      updateResearchOptions({ timeRange: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Past Day</SelectItem>
+                      <SelectItem value="week">Past Week</SelectItem>
+                      <SelectItem value="month">Past Month</SelectItem>
+                      <SelectItem value="year">Past Year</SelectItem>
+                      <SelectItem value="all">All Time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* AI Processing Depth: Control level of analysis and summarization */}
+                {/* Advanced summaries provide more context but take longer to process */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Brain className="h-4 w-4" />
+                    AI Summary Level
+                  </Label>
+                  <Select
+                    value={researchOptions.includeAnswer}
+                    onValueChange={(value: 'basic' | 'advanced') => 
+                      updateResearchOptions({ includeAnswer: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="basic">Basic Summary</SelectItem>
+                      <SelectItem value="advanced">Advanced Summary</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Content Type and Source Quality Controls */}
+              {/* Toggle switches for additional content preferences and filtering */}
+              <div className="space-y-4">
+                {/* Visual Content Toggle: Include images and media in research results */}
+                {/* Images can enhance slide presentations but increase processing time */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Image className="h-4 w-4" />
+                    Include Images
+                  </Label>
+                  <Switch
+                    checked={researchOptions.includeImages}
+                    onCheckedChange={(checked) => updateResearchOptions({ includeImages: checked })}
+                  />
+                </div>
+
+                {/* Source Quality Filter: Exclude lower-quality social media sources */}
+                {/* Professional sources typically provide more credible data for business presentations */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Exclude Social Media
+                  </Label>
+                  <Switch
+                    checked={researchOptions.excludeSocial}
+                    onCheckedChange={(checked) => updateResearchOptions({ excludeSocial: checked })}
+                  />
+                </div>
+              </div>
+              </div>
+            )}
+
+            {/* Research Initiation: Primary action button to begin AI research process */}
+            {/* Centered button provides clear call-to-action after configuration */}
+            <div className="flex justify-center pt-4">
+              <Button 
+                onClick={startResearch}
+                size="lg"
+                className="px-8"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Start Research
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Research Progress Indicator: Loading state with animated feedback */}
+      {/* Shows detailed progress steps to keep user engaged during potentially long API call */}
+      {/* Only visible while research API request is in progress */}
       {isResearching && (
         <Card variant="glass">
           <CardContent className="p-6">
+            {/* Progress Header: Visual loading indicator with status message */}
             <div className="flex items-center gap-3 mb-4">
               <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
               <h3 className="font-semibold">AI Research in Progress</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Our AI is analyzing industry trends, gathering supporting data, and finding relevant insights to enhance your slide...
+              Searching the web for relevant industry data, trends, and insights using Tavily AI to enhance your slide content...
             </p>
+            {/* Progress Steps: Animated indicators showing research phases */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                Analyzing industry trends...
+                Searching industry databases...
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                Gathering supporting statistics...
+                Analyzing relevant sources...
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                Finding best practices...
+                Extracting key insights...
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Research Results */}
+      {/* Research Results Display: Success state showing gathered insights */}
+      {/* Only visible after successful research completion with valid data */}
+      {/* Provides preview of research content that will enhance the slide */}
       {researchComplete && slideData.researchData && (
         <Card variant="premium">
           <CardHeader>
@@ -191,22 +467,32 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: Res
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Research Data Preview: Formatted display of gathered insights */}
             <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-              <pre className="text-sm whitespace-pre-wrap text-foreground">
+              <div className="text-sm whitespace-pre-wrap text-foreground leading-relaxed">
                 {slideData.researchData}
-              </pre>
+              </div>
+            </div>
+            {/* Usage Context: Explains how research will be integrated */}
+            <div className="mt-4 text-xs text-muted-foreground">
+              This research data will be incorporated into your slide generation to provide more comprehensive and data-driven content.
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Step Navigation: Previous/Next buttons with conditional enabling */}
+      {/* Navigation is always available but next button requires user decision */}
       <div className="flex justify-between">
+        {/* Back Navigation: Return to theme selection step - always enabled */}
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Themes
         </Button>
+        {/* Forward Navigation: Proceed to preview step */}
+        {/* Disabled during active research or if user hasn't made research choice */}
         <Button 
-          variant="notion" 
+          variant="engineering" 
           size="lg" 
           onClick={onNext}
           disabled={!canProceed || isResearching}

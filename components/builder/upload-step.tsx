@@ -3,9 +3,9 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, X, ArrowRight } from "lucide-react";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles } from "lucide-react";
 import { SlideData } from "@/app/builder/page";
 
 interface UploadStepProps {
@@ -16,6 +16,9 @@ interface UploadStepProps {
 
 export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepProps) {
   const [dragActive, setDragActive] = useState(false);
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [pastedText, setPastedText] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -50,28 +53,81 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
     updateSlideData({ documents: newFiles });
   };
 
+  const handlePasteText = () => {
+    if (pastedText.trim()) {
+      // Create a virtual file from the pasted text
+      const textFile = new File([pastedText], "pasted-text.txt", { type: "text/plain" });
+      updateSlideData({ documents: [...slideData.documents, textFile] });
+      setPastedText("");
+      setShowTextInput(false);
+    }
+  };
+
+  const generateExampleDescription = async () => {
+    setIsGenerating(true);
+    
+    try {
+      const response = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          documents: slideData.documents.map(doc => ({ 
+            name: doc.name, 
+            type: doc.type,
+            size: doc.size 
+          }))
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate description');
+      }
+      
+      const data = await response.json();
+      if (data.description) {
+        updateSlideData({ description: data.description });
+      } else {
+        throw new Error('No description received');
+      }
+    } catch (error) {
+      console.error('Failed to generate description:', error);
+      
+      // Fallback to static examples if API fails
+      const fallbackExamples = [
+        "Create a professional slide summarizing quarterly financial performance with key metrics and clean charts.",
+        "Design an executive summary slide highlighting project milestones with timeline visualization.",
+        "Build a product launch slide showcasing key features and benefits with compelling visuals.",
+        "Generate a team performance slide displaying achievements and KPIs with data visualizations."
+      ];
+      
+      const randomExample = fallbackExamples[Math.floor(Math.random() * fallbackExamples.length)];
+      updateSlideData({ description: randomExample });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const canProceed = slideData.documents.length > 0 && slideData.description.trim().length > 0;
 
   return (
     <div className="space-y-6">
       <Card variant="elevated">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <Upload className="h-6 w-6 text-primary" />
             Upload Your Documents
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-base text-muted-foreground">
             Upload documents that contain the content you want to include in your slide
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* File Upload Area */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-premium cursor-pointer ${
-              dragActive 
-                ? "border-primary bg-primary/5" 
-                : "border-muted-foreground/25 hover:border-primary/50"
-            }`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-premium cursor-pointer ${dragActive
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25 hover:border-primary/50"
+              }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -79,8 +135,8 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
             onClick={() => document.getElementById('file-upload')?.click()}
           >
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">Drop files here or click to upload</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
+            <p className="text-base text-muted-foreground">
               Supports PDF, DOCX, TXT, and more
             </p>
             <input
@@ -92,6 +148,58 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
               className="hidden"
             />
           </div>
+
+          {/* Alternative: Paste Text */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 h-px bg-border"></div>
+            <span className="text-sm text-muted-foreground">or</span>
+            <div className="flex-1 h-px bg-border"></div>
+          </div>
+
+          <div className="text-center">
+            <Button
+              variant="outline"
+              onClick={() => setShowTextInput(!showTextInput)}
+              className="gap-2"
+            >
+              <Type className="h-4 w-4" />
+              Paste Text Content
+            </Button>
+          </div>
+
+          {/* Text Input Area */}
+          {showTextInput && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+              <Label htmlFor="paste-text">Paste your text content</Label>
+              <textarea
+                id="paste-text"
+                placeholder="Paste your text content here..."
+                className="w-full h-32 px-3 py-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowTextInput(false);
+                    setPastedText("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handlePasteText}
+                  disabled={!pastedText.trim()}
+                >
+                  Add Text
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Uploaded Files */}
           {slideData.documents.length > 0 && (
@@ -124,14 +232,26 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
 
       <Card variant="glass">
         <CardHeader>
-          <CardTitle>Describe Your Slide</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-semibold tracking-tight">Describe Your Slide</CardTitle>
+          <CardDescription className="text-base text-muted-foreground">
             Tell us what kind of slide you want to create and any specific requirements
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <Label htmlFor="description">Slide Description</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="description">Slide Description</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={generateExampleDescription}
+                disabled={isGenerating}
+                className="gap-2 text-xs"
+              >
+                <Sparkles className={`h-3 w-3 ${isGenerating ? 'animate-spin' : ''}`} />
+                {isGenerating ? 'Generating...' : 'Generate Example'}
+              </Button>
+            </div>
             <textarea
               id="description"
               placeholder="e.g., Create a professional slide about quarterly sales results with charts and key insights..."
@@ -147,9 +267,9 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
       </Card>
 
       <div className="flex justify-end">
-        <Button 
-          variant="notion" 
-          size="lg" 
+        <Button
+          variant="engineering"
+          size="lg"
           onClick={onNext}
           disabled={!canProceed}
         >

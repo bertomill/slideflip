@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "name": "Add Code Comments",
+  "description": "Automatically adds descriptive comments to code sections when files are modified to improve readability and make it easier to interpret when scrolling through code",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.css",
+      "**/*.mjs"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the modified code and add clear, descriptive comments that explain what each section does. Focus on making the code easy to interpret when scrolling through by adding comments that describe the purpose of functions, components, major code blocks, and complex logic. Ensure comments are concise but informative, helping developers quickly understand the code's functionality without having to read through all the implementation details."
+  }
+}

@@ -14,8 +14,10 @@ export default function DemoPage() {
       {/* Premium Navigation */}
       <Navigation variant="premium">
         <NavigationBrand>
-          <Sparkles className="h-6 w-6" style={{ color: "hsl(var(--notion-blue))" }} />
-          <span className="gradient-notion-blue bg-clip-text text-transparent font-semibold">
+          <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
+            <div className="h-3 w-3 bg-background rounded-sm"></div>
+          </div>
+          <span className="font-semibold text-foreground">
             SlideFlip
           </span>
         </NavigationBrand>
@@ -37,14 +39,14 @@ export default function DemoPage() {
             <Star className="h-3 w-3 mr-1" />
             Premium Components
           </Badge>
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
-            World-Class Design
+          <h1 className="text-4xl md:text-6xl font-bold text-foreground">
+            Engineering Simplicity
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Experience the premium feel of Cursor, Windsurf, and Palantir with our sophisticated component library.
+            Where practicality meets artistry. Clean, purposeful design that gets out of your way.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button variant="notion" size="lg">
+            <Button variant="engineering" size="lg">
               <Rocket className="h-4 w-4 mr-2" />
               Get Started
             </Button>
@@ -69,8 +71,8 @@ export default function DemoPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button variant="notion" className="w-full">
-                Notion Button
+              <Button variant="engineering" className="w-full">
+                Engineering Button
               </Button>
               <Button variant="default" className="w-full">
                 Default Button
@@ -126,12 +128,12 @@ export default function DemoPage() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Card variant="elevated" className="p-8">
             <div className="space-y-4">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
-                <Sparkles className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-lg bg-foreground flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-background" />
               </div>
-              <h3 className="text-xl font-semibold">Premium Animations</h3>
+              <h3 className="text-xl font-semibold">Purposeful Interactions</h3>
               <p className="text-muted-foreground">
-                Smooth micro-interactions and hover effects that feel responsive and delightful.
+                Every animation serves a purpose. Clean, fast, and precisely engineered.
               </p>
               <Button variant="outline" size="sm">
                 Explore Animations
@@ -142,12 +144,12 @@ export default function DemoPage() {
 
           <Card variant="glass" className="p-8">
             <div className="space-y-4">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center">
-                <Zap className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-lg bg-foreground flex items-center justify-center">
+                <Zap className="h-6 w-6 text-background" />
               </div>
-              <h3 className="text-xl font-semibold">Glass Morphism</h3>
+              <h3 className="text-xl font-semibold">Extreme Simplicity</h3>
               <p className="text-muted-foreground">
-                Beautiful frosted glass effects with backdrop blur for a modern, sophisticated look.
+                No unnecessary elements. Every pixel has a purpose. Form follows function.
               </p>
               <Button variant="ghost" size="sm">
                 See Glass Effects
@@ -163,7 +165,7 @@ export default function DemoPage() {
           <p className="text-muted-foreground max-w-md mx-auto">
             Start creating with our premium component library inspired by the best design systems.
           </p>
-          <Button variant="notion" size="xl">
+          <Button variant="engineering" size="xl">
             <Rocket className="h-5 w-5 mr-2" />
             Start Building Now
           </Button>

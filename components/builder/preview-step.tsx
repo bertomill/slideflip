@@ -198,7 +198,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           Back to Research
         </Button>
         <Button 
-          variant="notion" 
+          variant="engineering" 
           size="lg" 
           onClick={onNext}
           disabled={!canProceed}

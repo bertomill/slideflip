@@ -114,7 +114,7 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
           </CardHeader>
           <CardContent>
             <Button 
-              variant="notion" 
+              variant="engineering" 
               size="lg" 
               className="w-full"
               onClick={downloadPPTX}
@@ -176,7 +176,7 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button variant="notion" onClick={createNewSlide} className="flex-1">
+            <Button variant="engineering" onClick={createNewSlide} className="flex-1">
               Create Another Slide
             </Button>
             <Button variant="outline" className="flex-1" disabled>

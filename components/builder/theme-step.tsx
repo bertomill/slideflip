@@ -172,7 +172,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
           Back to Upload
         </Button>
         <Button 
-          variant="notion" 
+          variant="engineering" 
           size="lg" 
           onClick={onNext}
           disabled={!canProceed}

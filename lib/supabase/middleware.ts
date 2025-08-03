@@ -2,34 +2,45 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
 
+/**
+ * Middleware function that handles Supabase authentication session management
+ * This runs on every request to maintain user authentication state and handle redirects
+ */
 export async function updateSession(request: NextRequest) {
+  // Initialize the response object that will be returned at the end
+  // This preserves the original request while allowing cookie modifications
   let supabaseResponse = NextResponse.next({
     request,
   });
 
-  // If the env vars are not set, skip middleware check. You can remove this
-  // once you setup the project.
+  // Early exit if Supabase environment variables are not configured
+  // This allows the app to run without authentication during initial setup
   if (!hasEnvVars) {
     return supabaseResponse;
   }
 
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
+  // Create a new Supabase client for each request to ensure proper session handling
+  // This is required for server-side rendering and prevents session conflicts
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
+        // Read all cookies from the incoming request
         getAll() {
           return request.cookies.getAll();
         },
+        // Handle cookie updates by setting them on both request and response
         setAll(cookiesToSet) {
+          // Set cookies on the request for immediate use
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
+          // Create a fresh response object
           supabaseResponse = NextResponse.next({
             request,
           });
+          // Set cookies on the response to persist them in the browser
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
@@ -38,39 +49,28 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: If you remove getClaims() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
+  // CRITICAL: Retrieve user authentication claims immediately after client creation
+  // This call is essential for maintaining session state in server-side rendering
+  // Any code between createServerClient and getClaims() can cause authentication issues
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
+  // Redirect unauthenticated users to login page for protected routes
+  // Allows access to: home page ("/"), login pages, and all auth-related pages
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth")
   ) {
-    // no user, potentially respond by redirecting the user to the login page
+    // Create redirect URL to login page while preserving the original destination
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
-
+  // Return the response with all authentication cookies properly set
+  // This ensures the user's session is maintained across requests
+  // CRITICAL: Always return the supabaseResponse to preserve authentication state
   return supabaseResponse;
 }
