@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -9,6 +9,8 @@ import { ThemeStep } from "@/components/builder/theme-step";
 import { ResearchStep } from "@/components/builder/research-step";
 import { PreviewStep } from "@/components/builder/preview-step";
 import { DownloadStep } from "@/components/builder/download-step";
+import { BackendStatus } from "@/components/backend-status";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 // Type definition for research options that can be customized by users
 export type ResearchOptions = {
@@ -28,7 +30,11 @@ export type SlideData = {
   researchOptions?: ResearchOptions; // Customizable research parameters
   researchData?: string;    // Optional research results from external sources
   slideHtml?: string;       // Generated HTML content for the slide
+  pptFilePath?: string;     // Path to the generated PPT file for download
   userFeedback?: string;    // User's feedback for slide refinements
+  isGenerating?: boolean;   // Whether slide generation is in progress
+  generationStatus?: string; // Current status message from backend
+  generationError?: string; // Error message if generation fails
 };
 
 // Configuration for the multi-step slide builder process
@@ -47,6 +53,58 @@ const steps = [
 export default function SlideBuilder() {
   // State Management: Track current position in the 5-step builder workflow
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Use useRef to ensure client ID is stable across re-renders and avoid hydration issues
+  const clientIdRef = useRef<string | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
+
+  // Generate client ID only on the client side to avoid hydration issues
+  useEffect(() => {
+    if (!clientIdRef.current) {
+      clientIdRef.current = `client_${Date.now()}`;
+      setClientId(clientIdRef.current);
+    }
+  }, []);
+
+  // WebSocket connection for backend communication
+  const { 
+    isConnected, 
+    connectionStatus, 
+    lastMessage, 
+    ping,
+    sendFileUpload,
+    sendSlideDescription,
+    sendGenerateSlide
+  } = useWebSocket({
+    clientId: clientId || 'temp_client',
+    onMessage: (message) => {
+      console.log('Builder received:', message);
+      
+      // Handle slide generation messages
+      if (message.type === 'slide_generation_started') {
+        console.log('Slide generation started');
+        updateSlideData({ isGenerating: true, generationError: undefined });
+      } else if (message.type === 'slide_generation_status') {
+        console.log('Slide generation status:', message.data.message);
+        updateSlideData({ generationStatus: message.data.message });
+      } else if (message.type === 'slide_generation_complete') {
+        console.log('Slide generation completed');
+        updateSlideData({ 
+          slideHtml: message.data.slide_html, 
+          pptFilePath: message.data.ppt_file_path,
+          isGenerating: false, 
+          generationError: undefined,
+          generationStatus: undefined 
+        });
+      } else if (message.type === 'slide_generation_error') {
+        console.error('Slide generation error:', message.data.error);
+        updateSlideData({ 
+          isGenerating: false, 
+          generationError: message.data.error 
+        });
+      }
+    }
+  });
 
   // State Management: Centralized storage for all slide data that accumulates across steps
   // Initialized with empty values that get populated as user progresses
@@ -93,19 +151,42 @@ export default function SlideBuilder() {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <UploadStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} />;
+        return (
+          <UploadStep 
+            slideData={slideData} 
+            updateSlideData={updateSlideData} 
+            onNext={nextStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendFileUpload={sendFileUpload}
+            sendSlideDescription={sendSlideDescription}
+            lastMessage={lastMessage}
+          />
+        );
       case 2:
         return <ThemeStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
       case 3:
-        return <ResearchStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return <ResearchStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} sendGenerateSlide={sendGenerateSlide} />;
       case 4:
-        return <PreviewStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return <PreviewStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} sendGenerateSlide={sendGenerateSlide} />;
       case 5:
         return <DownloadStep slideData={slideData} onPrev={prevStep} />;
       default:
         return null;
     }
   };
+
+  // Don't render until client ID is generated to avoid hydration issues
+  if (!clientId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -172,6 +253,17 @@ export default function SlideBuilder() {
         <div className="max-w-4xl mx-auto">
           {renderStep()}
         </div>
+
+        {/* Backend Status (for testing) */}
+        {/* <div className="fixed bottom-4 right-4">
+          <BackendStatus 
+            clientId={clientId}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            lastMessage={lastMessage}
+            onPing={ping}
+          />
+        </div> */}
       </div>
     </div>
   );

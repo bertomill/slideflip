@@ -19,6 +19,7 @@ interface ResearchStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void; // Callback to update slide data in parent
   onNext: () => void;                                      // Navigation callback to proceed to next step
   onPrev: () => void;                                      // Navigation callback to return to previous step
+  sendGenerateSlide?: (description: string, theme?: string, wantsResearch?: boolean) => boolean; // WebSocket function to send slide generation request
 }
 
 /**
@@ -26,7 +27,7 @@ interface ResearchStepProps {
  * Allows users to choose whether to enhance their slide with AI-powered research
  * Provides customizable research options and handles the research API integration
  */
-export function ResearchStep({ slideData, updateSlideData, onNext, onPrev }: ResearchStepProps) {
+export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendGenerateSlide }: ResearchStepProps) {
   // UI State Management: Track research process status
   const [isResearching, setIsResearching] = useState(false);        // Loading state during API call
   const [researchComplete, setResearchComplete] = useState(false);  // Success state after research completion
@@ -151,6 +152,32 @@ Your slide will be created using the uploaded documents and description provided
   // Navigation Logic: Determine if user can proceed to next step
   // User must make a choice about research before continuing
   const canProceed = slideData.wantsResearch !== undefined;
+
+  // Handle slide generation when user clicks "Continue to Preview"
+  const handleContinueToPreview = async () => {
+    if (sendGenerateSlide) {
+      try {
+        console.log('Sending slide generation request before proceeding to preview');
+        const success = sendGenerateSlide(
+          slideData.description,
+          slideData.selectedTheme || "default",
+          slideData.wantsResearch || false
+        );
+        
+        if (!success) {
+          console.error('Failed to send slide generation request');
+        } else {
+          console.log('Slide generation request sent successfully');
+        }
+        
+        // Add a small delay to ensure the message is sent before proceeding
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Error sending slide generation request:', error);
+      }
+    }
+    onNext();
+  };
 
   return (
     <div className="space-y-6">
@@ -494,7 +521,7 @@ Your slide will be created using the uploaded documents and description provided
         <Button 
           variant="engineering" 
           size="lg" 
-          onClick={onNext}
+          onClick={handleContinueToPreview}
           disabled={!canProceed || isResearching}
         >
           Continue to Preview

@@ -1,0 +1,676 @@
+#!/usr/bin/env python3
+"""
+Main entry point for the SlideFlip Backend
+Handles WebSocket connections and file processing for slide generation
+"""
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from typing import Dict, List
+import json
+import os
+from pathlib import Path
+
+# Import our custom modules
+from src.core.config import Settings
+from src.core.websocket_manager import WebSocketManager
+from src.handlers.file_handler import FileHandler
+from src.handlers.slide_handler import SlideHandler
+from src.models.message_models import (
+    ClientMessage, 
+    ServerMessage, 
+    FileUploadMessage, 
+    SlideDescriptionMessage,
+    SlideGenerationMessage,
+    ProcessingStatus
+)
+from src.services.file_service import FileService
+from src.services.slide_service import SlideService
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Global settings
+settings = Settings()
+
+# Initialize services
+file_service = FileService()
+slide_service = SlideService()
+
+# WebSocket connection manager
+websocket_manager = WebSocketManager()
+
+# Background task for cleaning up stale connections
+async def cleanup_stale_connections():
+    """Periodically clean up stale WebSocket connections"""
+    while True:
+        try:
+            await asyncio.sleep(30)  # Run every 30 seconds instead of 60
+            await websocket_manager.cleanup_stale_connections()
+            
+            # Log connection statistics
+            stats = websocket_manager.get_connection_stats()
+            if stats["total_connections"] > 0:
+                logger.info(f"Connection stats: {stats}")
+        except Exception as e:
+            logger.error(f"Error in cleanup task: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    logger.info("Starting SlideFlip Backend...")
+    
+    # Create necessary directories
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    os.makedirs(settings.TEMP_DIR, exist_ok=True)
+    os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+    
+    # Start background cleanup task
+    cleanup_task = asyncio.create_task(cleanup_stale_connections())
+    
+    logger.info("Backend started successfully")
+    yield
+    
+    # Cancel cleanup task
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    
+    logger.info("Shutting down SlideFlip Backend...")
+
+# Create FastAPI app
+app = FastAPI(
+    title="SlideFlip Backend",
+    description="Backend API for SlideFlip presentation generator",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"message": "SlideFlip Backend is running", "status": "healthy"}
+
+@app.get("/health")
+async def health_check():
+    """Detailed health check"""
+    stats = websocket_manager.get_connection_stats()
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "services": {
+            "file_service": "running",
+            "slide_service": "running",
+            "websocket_manager": "running"
+        },
+        "websocket_stats": stats
+    }
+
+@app.get("/debug/connections")
+async def debug_connections():
+    """Debug endpoint to show current WebSocket connections"""
+    stats = websocket_manager.get_connection_stats()
+    connections = websocket_manager.get_all_connection_info()
+    return {
+        "stats": stats,
+        "connections": connections
+    }
+
+@app.get("/debug/client-folders")
+async def debug_client_folders():
+    """Debug endpoint to show client folders and their contents"""
+    client_folders = file_service.list_client_folders()
+    folder_details = {}
+    
+    for client_id in client_folders:
+        folder_path = file_service.get_client_folder_path(client_id)
+        folder_size = file_service.get_client_folder_size(client_id)
+        files = await file_service.get_client_files(client_id)
+        
+        # List all files in the folder (including generated PPT and HTML files)
+        all_files = []
+        if folder_path.exists():
+            for file_path in folder_path.rglob('*'):
+                if file_path.is_file():
+                    all_files.append({
+                        "name": file_path.name,
+                        "path": str(file_path),
+                        "size": file_path.stat().st_size,
+                        "type": "generated" if file_path.suffix in ['.pptx', '.html'] else "uploaded"
+                    })
+        
+        folder_details[client_id] = {
+            "folder_path": str(folder_path),
+            "folder_size": folder_size,
+            "file_count": len(files),
+            "uploaded_files": [{"filename": f.filename, "file_path": f.file_path, "file_size": f.file_size} for f in files],
+            "all_files": all_files
+        }
+    
+    return {
+        "client_folders": client_folders,
+        "folder_details": folder_details,
+        "storage_stats": file_service.get_storage_stats()
+    }
+
+@app.get("/download/{file_path:path}")
+async def download_file(file_path: str):
+    """Download endpoint for generated PPT files"""
+    try:
+        import os
+        from pathlib import Path
+        
+        logger.info(f"Download request for file path: {file_path}")
+        
+        # Handle different path formats
+        if file_path.startswith("uploads/"):
+            # Remove the uploads/ prefix and handle as client folder
+            relative_path = file_path[8:]  # Remove "uploads/"
+            if relative_path.startswith("client_"):
+                upload_dir = Path(file_service.settings.UPLOAD_DIR)
+                requested_file = upload_dir / relative_path
+                
+                # Prevent directory traversal attacks
+                if not requested_file.resolve().is_relative_to(upload_dir.resolve()):
+                    raise HTTPException(status_code=403, detail="Access denied")
+            else:
+                raise HTTPException(status_code=404, detail="Invalid file path")
+        elif file_path.startswith("client_"):
+            # Direct client folder path
+            upload_dir = Path(file_service.settings.UPLOAD_DIR)
+            requested_file = upload_dir / file_path
+            
+            # Prevent directory traversal attacks
+            if not requested_file.resolve().is_relative_to(upload_dir.resolve()):
+                raise HTTPException(status_code=403, detail="Access denied")
+        else:
+            # File is in the output directory (backward compatibility)
+            output_dir = Path("output")
+            requested_file = output_dir / file_path
+            
+            # Prevent directory traversal attacks
+            if not requested_file.resolve().is_relative_to(output_dir.resolve()):
+                raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Check if file exists
+        if not requested_file.exists():
+            logger.error(f"File not found: {requested_file}")
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Get file info
+        file_size = requested_file.stat().st_size
+        file_name = requested_file.name
+        
+        logger.info(f"Serving file: {requested_file} (size: {file_size} bytes)")
+        
+        # Return file as downloadable response
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=str(requested_file),
+            filename=file_name,
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving file {file_path}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/debug/check-file/{file_path:path}")
+async def check_file_exists(file_path: str):
+    """Debug endpoint to check if a file exists"""
+    try:
+        import os
+        from pathlib import Path
+        
+        logger.info(f"Checking file existence for: {file_path}")
+        
+        # Handle different path formats (same logic as download endpoint)
+        if file_path.startswith("uploads/"):
+            relative_path = file_path[8:]  # Remove "uploads/"
+            if relative_path.startswith("client_"):
+                upload_dir = Path(file_service.settings.UPLOAD_DIR)
+                requested_file = upload_dir / relative_path
+            else:
+                return {"exists": False, "error": "Invalid file path"}
+        elif file_path.startswith("client_"):
+            upload_dir = Path(file_service.settings.UPLOAD_DIR)
+            requested_file = upload_dir / file_path
+        else:
+            output_dir = Path("output")
+            requested_file = output_dir / file_path
+        
+        exists = requested_file.exists()
+        size = requested_file.stat().st_size if exists else 0
+        
+        return {
+            "file_path": str(requested_file),
+            "exists": exists,
+            "size": size,
+            "parent_exists": requested_file.parent.exists() if requested_file.parent else False
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking file {file_path}: {e}")
+        return {"exists": False, "error": str(e)}
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    """WebSocket endpoint for real-time communication with frontend"""
+    try:
+        # Connect the client with better error handling
+        await websocket_manager.connect(websocket, client_id)
+        
+        # Main message loop
+        while True:
+            try:
+                # Receive message from client with timeout
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
+                message_data = json.loads(data)
+            except asyncio.TimeoutError:
+                logger.warning(f"Client {client_id} connection timed out")
+                break
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON from client {client_id}: {e}")
+                try:
+                    error_message = ServerMessage(
+                        type="error",
+                        data={"error": "Invalid JSON format", "details": str(e)}
+                    )
+                    await websocket.send_text(error_message.model_dump_json())
+                except Exception as send_error:
+                    logger.error(f"Error sending JSON error message: {send_error}")
+                    break
+                continue
+            except Exception as e:
+                logger.error(f"Error receiving message from client {client_id}: {e}")
+                break
+            
+            # Parse the message
+            try:
+                message = ClientMessage(**message_data)
+                await asyncio.wait_for(
+                    handle_client_message(websocket, client_id, message),
+                    timeout=60.0
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Message handling timed out for client {client_id}")
+                try:
+                    timeout_message = ServerMessage(
+                        type="error",
+                        data={"error": "Message processing timed out"}
+                    )
+                    await websocket.send_text(timeout_message.model_dump_json())
+                except Exception as send_error:
+                    logger.error(f"Error sending timeout message: {send_error}")
+                break
+            except Exception as e:
+                logger.error(f"Error parsing message: {e}")
+                try:
+                    error_message = ServerMessage(
+                        type="error",
+                        data={"error": "Invalid message format", "details": str(e)}
+                    )
+                    await asyncio.wait_for(
+                        websocket.send_text(error_message.model_dump_json()),
+                        timeout=10.0
+                    )
+                except Exception as send_error:
+                    logger.error(f"Error sending error message: {send_error}")
+                    break
+                    
+    except WebSocketDisconnect:
+        logger.info(f"Client {client_id} disconnected normally")
+        websocket_manager.disconnect(client_id)
+    except Exception as e:
+        logger.error(f"WebSocket error for client {client_id}: {e}")
+        websocket_manager.disconnect(client_id)
+
+async def handle_client_message(websocket: WebSocket, client_id: str, message: ClientMessage):
+    """Handle different types of client messages"""
+    try:
+        if message.type == "file_upload":
+            await handle_file_upload(websocket, client_id, message.data)
+        elif message.type == "slide_description":
+            logger.info(f"Received slide description from client {client_id}")
+            await handle_slide_description(websocket, client_id, message.data)
+        elif message.type == "generate_slide":
+            logger.info(f"Received slide generation request from client {client_id}")
+            await handle_generate_slide(websocket, client_id, message.data)
+        elif message.type == "process_slide":
+            logger.info(f"Received slide processing request from client {client_id}")
+            await handle_process_slide(websocket, client_id, message.data)
+        elif message.type == "ping":
+            # Respond to ping with pong
+            pong_message = ServerMessage(type="pong", data={})
+            await asyncio.wait_for(
+                websocket.send_text(pong_message.model_dump_json()),
+                timeout=5.0
+            )
+        else:
+            logger.warning(f"Unknown message type: {message.type}")
+            error_message = ServerMessage(
+                type="error",
+                data={"error": f"Unknown message type: {message.type}"}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=5.0
+            )
+            
+    except Exception as e:
+        logger.error(f"Error handling message: {e}")
+        try:
+            error_message = ServerMessage(
+                type="error",
+                data={"error": "Internal server error", "details": str(e)}
+            )
+            await websocket.send_text(error_message.model_dump_json())
+        except Exception as send_error:
+            logger.error(f"Error sending error message: {send_error}")
+            raise
+
+async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
+    """Handle file upload from client"""
+    try:
+        # Send acknowledgment
+        ack_message = ServerMessage(
+            type="file_upload_ack",
+            data={"status": "received", "message": "File upload request received"}
+        )
+        await asyncio.wait_for(
+            websocket.send_text(ack_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Process the file upload
+        file_data = FileUploadMessage(**data)
+        
+        logger.info(f"Saving file {file_data.filename} for client {client_id}")
+        
+        # Save file to disk
+        file_path = await file_service.save_uploaded_file(
+            file_data.filename,
+            file_data.content,
+            file_data.file_type,
+            client_id
+        )
+        
+        # Send success message
+        success_message = ServerMessage(
+            type="file_upload_success",
+            data={
+                "filename": file_data.filename,
+                "file_path": str(file_path),
+                "file_size": len(file_data.content),
+                "file_type": file_data.file_type
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(success_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        logger.info(f"File uploaded successfully: {file_data.filename}")
+        
+    except Exception as e:
+        logger.error(f"Error handling file upload: {e}")
+        try:
+            error_message = ServerMessage(
+                type="file_upload_error",
+                data={"error": "Failed to process file upload", "details": str(e)}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+        except Exception as send_error:
+            logger.error(f"Error sending file upload error: {send_error}")
+            raise
+
+async def handle_slide_description(websocket: WebSocket, client_id: str, data: dict):
+    """Handle slide description from client"""
+    try:
+        # Send acknowledgment
+        ack_message = ServerMessage(
+            type="slide_description_ack",
+            data={"status": "received", "message": "Slide description received"}
+        )
+        await asyncio.wait_for(
+            websocket.send_text(ack_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Process the slide description
+        description_data = SlideDescriptionMessage(**data)
+        
+        # Store the description
+        await slide_service.store_slide_description(client_id, description_data.description)
+        
+        # Send success message
+        success_message = ServerMessage(
+            type="slide_description_success",
+            data={
+                "description": description_data.description,
+                "length": len(description_data.description)
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(success_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        logger.info(f"Slide description stored for client {client_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling slide description: {e}")
+        try:
+            error_message = ServerMessage(
+                type="slide_description_error",
+                data={"error": "Failed to process slide description", "details": str(e)}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+        except Exception as send_error:
+            logger.error(f"Error sending slide description error: {send_error}")
+            raise
+
+async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict):
+    """Handle slide generation request from client"""
+    try:
+        # Send processing started message
+        processing_message = ServerMessage(
+            type="slide_generation_started",
+            data={
+                "status": ProcessingStatus.STARTED,
+                "message": "Starting slide generation process..."
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(processing_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Parse the generation request
+        generation_data = SlideGenerationMessage(**data)
+        
+        # Get stored files for this client
+        files = await file_service.get_client_files(client_id)
+        
+        logger.info(f"Retrieved {len(files)} files for client {client_id}")
+        
+        if not files:
+            error_message = ServerMessage(
+                type="slide_generation_error",
+                data={"error": "No files found for processing. Please upload files first."}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+            return
+        
+        # Update processing status
+        processing_message = ServerMessage(
+            type="slide_generation_status",
+            data={
+                "status": ProcessingStatus.ANALYZING,
+                "message": "Analyzing uploaded files and generating slide content..."
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(processing_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Generate the slide with the provided parameters
+        slide_result = await slide_service.generate_slide_with_params(
+            files, 
+            generation_data.description,
+            generation_data.theme,
+            generation_data.wants_research,
+            client_id
+        )
+        
+        # Send completion message with the generated slide HTML and PPT file path
+        completion_message = ServerMessage(
+            type="slide_generation_complete",
+            data={
+                "status": ProcessingStatus.COMPLETED,
+                "slide_html": slide_result.get("slide_html", ""),
+                "ppt_file_path": slide_result.get("ppt_file_path", ""),
+                "slide_data": slide_result.get("slide_data", {}),
+                "processing_time": slide_result.get("processing_time", 0),
+                "message": "Slide generation completed successfully"
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(completion_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        logger.info(f"Slide generation completed for client {client_id}")
+        
+    except Exception as e:
+        logger.error(f"Error generating slide: {e}")
+        try:
+            error_message = ServerMessage(
+                type="slide_generation_error",
+                data={"error": "Failed to generate slide", "details": str(e)}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+        except Exception as send_error:
+            logger.error(f"Error sending slide generation error: {send_error}")
+            raise
+
+async def handle_process_slide(websocket: WebSocket, client_id: str, data: dict):
+    """Handle slide processing request"""
+    try:
+        # Send processing started message
+        processing_message = ServerMessage(
+            type="processing_status",
+            data={
+                "status": ProcessingStatus.STARTED,
+                "message": "Starting slide generation process..."
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(processing_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Get stored data for this client
+        files = await file_service.get_client_files(client_id)
+        description = await slide_service.get_slide_description(client_id)
+        
+        if not files or not description:
+            error_message = ServerMessage(
+                type="processing_error",
+                data={"error": "Missing files or description for processing"}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+            return
+        
+        # Update processing status
+        processing_message = ServerMessage(
+            type="processing_status",
+            data={
+                "status": ProcessingStatus.ANALYZING,
+                "message": "Analyzing uploaded files..."
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(processing_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Process the slide
+        slide_result = await slide_service.generate_slide(files, description)
+        
+        # Send completion message
+        completion_message = ServerMessage(
+            type="processing_complete",
+            data={
+                "status": ProcessingStatus.COMPLETED,
+                "slide_data": slide_result,
+                "message": "Slide generation completed successfully"
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(completion_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        logger.info(f"Slide processing completed for client {client_id}")
+        
+    except Exception as e:
+        logger.error(f"Error processing slide: {e}")
+        try:
+            error_message = ServerMessage(
+                type="processing_error",
+                data={"error": "Failed to process slide", "details": str(e)}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+        except Exception as send_error:
+            logger.error(f"Error sending processing error: {send_error}")
+            raise
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    ) 

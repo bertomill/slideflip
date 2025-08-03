@@ -19,22 +19,72 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
   const downloadPPTX = async () => {
     setIsExporting(true);
     
-    // Simulate PPTX generation
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // In a real app, this would generate and download the actual PPTX file
-    const blob = new Blob(['Mock PPTX content'], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'slideflip-presentation.pptx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    setIsExporting(false);
-    setExportComplete(true);
+    try {
+      if (slideData.pptFilePath) {
+        console.log('Downloading PPT file from:', slideData.pptFilePath);
+        
+        // First, let's check if the file exists using the debug endpoint
+        const checkUrl = `http://localhost:8000/debug/check-file/${slideData.pptFilePath}`;
+        console.log('Checking file existence at:', checkUrl);
+        
+        try {
+          const checkResponse = await fetch(checkUrl);
+          const checkResult = await checkResponse.json();
+          console.log('File check result:', checkResult);
+        } catch (checkError) {
+          console.log('File check failed:', checkError);
+        }
+        
+        // Download the actual PPT file from the backend
+        const downloadUrl = `http://localhost:8000/download/${slideData.pptFilePath}`;
+        console.log('Downloading from URL:', downloadUrl);
+        
+        const response = await fetch(downloadUrl, {
+          method: 'GET',
+        });
+        
+        console.log('Download response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to download PPT file: ${response.status} ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = slideData.pptFilePath.split('/').pop() || 'slideflip-presentation.pptx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log('PPT file downloaded successfully');
+        setExportComplete(true);
+      } else {
+        throw new Error('No PPT file available for download. Please regenerate the slide.');
+      }
+    } catch (error) {
+      console.error('Error downloading PPT file:', error);
+      
+      // Show user-friendly error message
+      alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}. Using fallback download.`);
+      
+      // Fallback to mock download for now
+      const blob = new Blob(['Mock PPTX content'], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'slideflip-presentation.pptx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setExportComplete(true);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const createNewSlide = () => {
@@ -100,6 +150,39 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
             <p className="text-sm font-medium mb-2">Slide Description:</p>
             <p className="text-sm text-muted-foreground italic">"{slideData.description}"</p>
           </div>
+          
+          {/* Generation Summary */}
+          <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+            <p className="text-sm font-medium mb-2">Generated Content:</p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm">
+                {slideData.slideHtml ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>HTML preview generated</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-3 w-3 border border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                    <span>HTML preview pending</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                {slideData.pptFilePath ? (
+                  <>
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>PPT file generated</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-3 w-3 border border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                    <span>PPT file pending</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -113,6 +196,32 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* File Status Indicator */}
+            <div className="mb-4 p-3 rounded-lg border">
+              <div className="flex items-center gap-2">
+                {slideData.pptFilePath ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-700 dark:text-green-400">
+                      PPT file ready for download
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-4 w-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-yellow-700 dark:text-yellow-400">
+                      PPT file not available
+                    </span>
+                  </>
+                )}
+              </div>
+              {slideData.pptFilePath && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  File: {slideData.pptFilePath.split('/').pop()}
+                </p>
+              )}
+            </div>
+            
             <Button 
               variant="engineering" 
               size="lg" 
@@ -123,7 +232,7 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
               {isExporting ? (
                 <>
                   <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                  Generating PPTX...
+                  Downloading...
                 </>
               ) : (
                 <>

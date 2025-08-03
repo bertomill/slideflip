@@ -1,24 +1,64 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, X, ArrowRight, Type, Sparkles } from "lucide-react";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles, Wifi, WifiOff } from "lucide-react";
 import { SlideData } from "@/app/builder/page";
+import { BackendFileInfo } from "@/types/backend";
 
 interface UploadStepProps {
   slideData: SlideData;
   updateSlideData: (updates: Partial<SlideData>) => void;
   onNext: () => void;
+  // WebSocket props
+  isConnected?: boolean;
+  connectionStatus?: string;
+  sendFileUpload?: (file: File) => Promise<boolean>;
+  sendSlideDescription?: (description: string) => boolean;
+  lastMessage?: any;
 }
 
-export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepProps) {
+export function UploadStep({ 
+  slideData, 
+  updateSlideData, 
+  onNext,
+  isConnected = false,
+  connectionStatus = 'disconnected',
+  sendFileUpload,
+  sendSlideDescription,
+  lastMessage
+}: UploadStepProps) {
   const [dragActive, setDragActive] = useState(false);
   const [showTextInput, setShowTextInput] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [backendFiles, setBackendFiles] = useState<BackendFileInfo[]>([]);
+
+  // Handle backend messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('Backend message received:', lastMessage);
+      switch (lastMessage.type) {
+        case 'file_upload_success':
+          setUploadStatus('File uploaded successfully');
+          setBackendFiles(prev => [...prev, lastMessage.data]);
+          break;
+        case 'file_upload_error':
+          setUploadStatus(`Upload error: ${lastMessage.data.error}`);
+          break;
+        case 'slide_description_success':
+          setUploadStatus('Description saved to backend');
+          break;
+        case 'slide_description_error':
+          setUploadStatus(`Description error: ${lastMessage.data.error}`);
+          break;
+      }
+    }
+  }, [lastMessage]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -30,21 +70,61 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const files = Array.from(e.dataTransfer.files);
+      
+      // Update local state
       updateSlideData({ documents: [...slideData.documents, ...files] });
+      
+      // Upload to backend if connected
+      if (isConnected && sendFileUpload) {
+        for (const file of files) {
+          try {
+            console.log('Starting file upload for:', file.name);
+            setUploadStatus(`Uploading ${file.name}...`);
+            const result = await sendFileUpload(file);
+            console.log('File upload result:', result);
+            setUploadStatus(`Successfully uploaded ${file.name}`);
+          } catch (error) {
+            console.error('Failed to upload file to backend:', error);
+            setUploadStatus(`Failed to upload ${file.name}: ${error}`);
+          }
+        }
+      } else {
+        console.log('Not connected or sendFileUpload not available:', { isConnected, sendFileUpload });
+      }
     }
-  }, [slideData.documents, updateSlideData]);
+  }, [slideData.documents, updateSlideData, sendFileUpload, isConnected]);
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
+      
+      // Update local state
       updateSlideData({ documents: [...slideData.documents, ...files] });
+      
+      // Upload to backend if connected
+      if (isConnected && sendFileUpload) {
+        for (const file of files) {
+          try {
+            console.log('Starting file upload for:', file.name);
+            setUploadStatus(`Uploading ${file.name}...`);
+            const result = await sendFileUpload(file);
+            console.log('File upload result:', result);
+            setUploadStatus(`Successfully uploaded ${file.name}`);
+          } catch (error) {
+            console.error('Failed to upload file to backend:', error);
+            setUploadStatus(`Failed to upload ${file.name}: ${error}`);
+          }
+        }
+      } else {
+        console.log('Not connected or sendFileUpload not available:', { isConnected, sendFileUpload });
+      }
     }
   };
 
@@ -53,11 +133,28 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
     updateSlideData({ documents: newFiles });
   };
 
-  const handlePasteText = () => {
+  const handlePasteText = async () => {
     if (pastedText.trim()) {
       // Create a virtual file from the pasted text
       const textFile = new File([pastedText], "pasted-text.txt", { type: "text/plain" });
       updateSlideData({ documents: [...slideData.documents, textFile] });
+      
+      // Upload to backend if connected
+      if (isConnected && sendFileUpload) {
+        try {
+          console.log('Starting pasted text upload');
+          setUploadStatus('Uploading pasted text...');
+          const result = await sendFileUpload(textFile);
+          console.log('Pasted text upload result:', result);
+          setUploadStatus('Successfully uploaded pasted text');
+        } catch (error) {
+          console.error('Failed to upload pasted text to backend:', error);
+          setUploadStatus('Failed to upload pasted text');
+        }
+      } else {
+        console.log('Not connected or sendFileUpload not available for pasted text');
+      }
+      
       setPastedText("");
       setShowTextInput(false);
     }
@@ -109,8 +206,44 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
 
   const canProceed = slideData.documents.length > 0 && slideData.description.trim().length > 0;
 
+  // Send description to backend when user clicks "Continue to Themes"
+  const handleContinueToThemes = async () => {
+    if (slideData.description.trim() && isConnected && sendSlideDescription) {
+      try {
+        console.log('Sending slide description to backend before proceeding to themes');
+        sendSlideDescription(slideData.description);
+        // Add a small delay to ensure the message is sent before proceeding
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Failed to send description to backend:', error);
+      }
+    }
+    onNext();
+  };
+
   return (
     <div className="space-y-6">
+      {/* Backend Connection Status */}
+      <Card variant="glass" className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <Wifi className="h-4 w-4 text-green-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-500" />
+              )}
+              <span className="text-sm font-medium">
+                Backend Connection: {connectionStatus}
+              </span>
+            </div>
+            {uploadStatus && (
+              <span className="text-sm text-muted-foreground">{uploadStatus}</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card variant="elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
@@ -270,7 +403,7 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
         <Button
           variant="engineering"
           size="lg"
-          onClick={onNext}
+          onClick={handleContinueToThemes}
           disabled={!canProceed}
         >
           Continue to Themes

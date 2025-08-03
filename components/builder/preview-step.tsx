@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowLeft, ArrowRight, RefreshCw, MessageSquare, Sparkles } from "lucide-react";
+import { Eye, ArrowLeft, ArrowRight, RefreshCw, MessageSquare, Sparkles, CheckCircle } from "lucide-react";
 import { SlideData } from "@/app/builder/page";
 
 interface PreviewStepProps {
@@ -14,63 +14,43 @@ interface PreviewStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void;
   onNext: () => void;
   onPrev: () => void;
+  sendGenerateSlide: (description: string, theme?: string, wantsResearch?: boolean) => boolean;
 }
 
-export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: PreviewStepProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
+export function PreviewStep({ slideData, updateSlideData, onNext, onPrev, sendGenerateSlide }: PreviewStepProps) {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
 
+  // Remove automatic slide generation - will be triggered manually by user action
+
+  // Watch for slide HTML updates to know when regeneration is complete
   useEffect(() => {
-    if (!slideData.slideHtml) {
-      generateSlide();
+    if (slideData.slideHtml && isRegenerating) {
+      setIsRegenerating(false);
     }
-  }, []);
+  }, [slideData.slideHtml, isRegenerating]);
 
   const generateSlide = async () => {
-    setIsGenerating(true);
-    
-    // Simulate AI slide generation
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    const mockSlideHtml = `
-      <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; position: relative; overflow: hidden;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>'); opacity: 0.3;"></div>
-        
-        <div style="position: relative; z-index: 1;">
-          <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-            ${slideData.description.split(' ').slice(0, 4).join(' ')}
-          </h1>
-          
-          <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 40px 0;">
-            <h2 style="font-size: 24px; margin-bottom: 20px; color: #f0f0f0;">Key Insights</h2>
-            <ul style="list-style: none; padding: 0;">
-              <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #4ade80; border-radius: 50%;"></span>
-                Document analysis reveals key trends
-              </li>
-              <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #60a5fa; border-radius: 50%;"></span>
-                ${slideData.selectedTheme} theme applied for optimal impact
-              </li>
-              ${slideData.wantsResearch ? `
-              <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span>
-                Enhanced with AI research insights
-              </li>
-              ` : ''}
-            </ul>
-          </div>
-          
-          <div style="position: absolute; bottom: 40px; right: 60px; font-size: 14px; opacity: 0.8;">
-            Created with SlideFlip AI
-          </div>
-        </div>
-      </div>
-    `;
-    
-    updateSlideData({ slideHtml: mockSlideHtml });
-    setIsGenerating(false);
+    // This function is now only used for regeneration with feedback
+    // The main slide generation is handled by the research step
+    try {
+      // Send slide generation request via websocket
+      const success = sendGenerateSlide(
+        slideData.description,
+        slideData.selectedTheme || "default",
+        slideData.wantsResearch || false
+      );
+      
+      if (!success) {
+        throw new Error("Failed to send generation request");
+      } else {
+        console.log('Slide generation request sent');
+      }
+      
+    } catch (error) {
+      console.error('Error generating slide:', error);
+      updateSlideData({ generationError: error instanceof Error ? error.message : 'Failed to generate slide' });
+    }
   };
 
   const regenerateWithFeedback = async () => {
@@ -79,21 +59,40 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     setIsRegenerating(true);
     updateSlideData({ userFeedback: feedback });
     
-    // Simulate AI regeneration with feedback
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // Update the slide HTML based on feedback (mock)
-    const updatedHtml = slideData.slideHtml?.replace(
-      'Document analysis reveals key trends',
-      `Updated based on your feedback: "${feedback.slice(0, 50)}..."`
-    );
-    
-    updateSlideData({ slideHtml: updatedHtml });
-    setIsRegenerating(false);
-    setFeedback("");
+    try {
+      // Send regeneration request with feedback
+      const success = sendGenerateSlide(
+        `${slideData.description}\n\nUser feedback: ${feedback}`,
+        slideData.selectedTheme || "default",
+        slideData.wantsResearch || false
+      );
+      
+      if (!success) {
+        throw new Error("Failed to send regeneration request");
+      }
+      
+      // Set timeout for regeneration
+      setTimeout(() => {
+        if (isRegenerating) {
+          updateSlideData({ generationError: "Slide regeneration timed out. Please try again." });
+          setIsRegenerating(false);
+        }
+      }, 30000);
+      
+    } catch (error) {
+      console.error('Error regenerating slide:', error);
+      updateSlideData({ generationError: error instanceof Error ? error.message : 'Failed to regenerate slide' });
+      setIsRegenerating(false);
+    }
   };
 
-  const canProceed = slideData.slideHtml && !isGenerating && !isRegenerating;
+  // Button is enabled when not generating/regenerating, regardless of slide existence
+  // The button will handle slide generation if needed
+
+  // Handle proceeding to download - slide should already be generated from research step
+  const handleContinueToDownload = () => {
+    onNext();
+  };
 
   return (
     <div className="space-y-6">
@@ -109,6 +108,30 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
         </CardHeader>
       </Card>
 
+      {/* Error Display */}
+      {slideData.generationError && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <MessageSquare className="h-4 w-4" />
+              <p className="font-medium">Generation Error</p>
+            </div>
+            <p className="text-sm mt-2">{slideData.generationError}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                updateSlideData({ generationError: undefined });
+                generateSlide();
+              }}
+              className="mt-3"
+            >
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Slide Preview */}
       <Card variant="glass">
         <CardHeader>
@@ -119,20 +142,42 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 Based on your documents, theme, and {slideData.wantsResearch ? 'research' : 'content'}
               </CardDescription>
             </div>
-            <Badge variant="secondary">
-              <Sparkles className="h-3 w-3 mr-1" />
-              AI Generated
-            </Badge>
+            <div className="flex items-center gap-2">
+              {slideData.slideHtml ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Ready
+                </Badge>
+              ) : (
+                <Badge variant="secondary">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  AI Generated
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {isGenerating ? (
+          {slideData.isGenerating ? (
             <div className="flex items-center justify-center h-96 bg-muted/30 rounded-lg">
               <div className="text-center space-y-4">
                 <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                 <div>
                   <p className="font-medium">Generating your slide...</p>
+                  {slideData.generationStatus && (
+                    <p className="text-sm text-muted-foreground">{slideData.generationStatus}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">This may take a few moments</p>
+                </div>
+              </div>
+            </div>
+          ) : !slideData.slideHtml ? (
+            <div className="flex items-center justify-center h-96 bg-muted/30 rounded-lg">
+              <div className="text-center space-y-4">
+                <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+                <div>
+                  <p className="font-medium">Preparing your slide...</p>
+                  <p className="text-sm text-muted-foreground">Slide generation was initiated from the previous step</p>
                 </div>
               </div>
             </div>
@@ -200,8 +245,8 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
         <Button 
           variant="engineering" 
           size="lg" 
-          onClick={onNext}
-          disabled={!canProceed}
+          onClick={handleContinueToDownload}
+          disabled={slideData.isGenerating || isRegenerating || !slideData.slideHtml}
         >
           Continue to Download
           <ArrowRight className="h-4 w-4 ml-2" />
