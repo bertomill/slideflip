@@ -33,9 +33,9 @@ Images in this folder can be accessed via:
 
 ## Recommended Image Specifications
 
-- **Slides**: 1920x1080px (16:9 aspect ratio)
-- **Deck Previews**: 800x600px (4:3 aspect ratio)
-- **Templates**: 1200x800px (3:2 aspect ratio)
+- **Slides**: 1920x1200px (16:10 aspect ratio - MacBook standard)
+- **Deck Previews**: 800x500px (16:10 aspect ratio)
+- **Templates**: 1200x750px (16:10 aspect ratio)
 - **Format**: PNG or JPG
 - **File Size**: Keep under 2MB for optimal loading
 

@@ -238,7 +238,7 @@ export default function Home() {
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     {/* Uber Slide - First Card */}
-                    <Card className="aspect-video overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full relative">
                         <img 
                           src="/samples/slides/uber_slide_1.png" 
@@ -261,7 +261,7 @@ export default function Home() {
 
                     {/* Remaining placeholder cards */}
                     {Array.from({ length: 3 }).map((_, i) => (
-                      <Card key={i} className="aspect-video overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                      <Card key={i} className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                         <div className="h-full bg-gradient-to-br from-primary to-primary/80 relative">
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-12 h-10 bg-background/10 rounded border border-background/20 flex items-center justify-center">
@@ -286,7 +286,7 @@ export default function Home() {
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     {Array.from({ length: 4 }).map((_, i) => (
-                      <Card key={i} className="aspect-video overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                      <Card key={i} className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                         <div className="h-full bg-gradient-to-br from-green-800 to-green-900 relative">
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-12 h-10 bg-white/10 rounded border border-white/20 flex items-center justify-center">
