@@ -19,6 +19,7 @@ class SlideService:
     def __init__(self):
         self.file_service = FileService()
         self.client_descriptions: Dict[str, str] = {}
+        self.client_content: Dict[str, List[Dict]] = {}  # Store extracted content for each client
         self.processing_results: Dict[str, ProcessingResult] = {}
     
     async def store_slide_description(self, client_id: str, description: str) -> bool:
@@ -35,51 +36,62 @@ class SlideService:
         """Get stored slide description for a client"""
         return self.client_descriptions.get(client_id)
     
-    async def generate_slide(self, files: List[FileInfo], description: str) -> Dict:
-        """Generate slide content based on files and description"""
-        start_time = datetime.now()
-        
+    async def store_extracted_content(self, client_id: str, content_data: Dict) -> bool:
+        """Store extracted content (text and images) for a client"""
         try:
-            logger.info(f"Starting slide generation with {len(files)} files")
+            if client_id not in self.client_content:
+                self.client_content[client_id] = []
             
-            # Extract text content from all files
-            file_contents = []
-            for file_info in files:
-                content = await self.file_service.extract_text_from_file(file_info.file_path)
-                if content:
-                    file_contents.append({
-                        "filename": file_info.filename,
-                        "content": content,
-                        "file_type": file_info.file_type
-                    })
-            
-            # Analyze content and generate slide
-            slide_data = await self._analyze_content_and_generate_slide(
-                file_contents, 
-                description
-            )
-            
-            processing_time = (datetime.now() - start_time).total_seconds()
-            
-            result = {
-                "slide_data": slide_data,
-                "processing_time": processing_time,
-                "files_processed": len(files),
-                "content_extracted": len(file_contents)
-            }
-            
-            logger.info(f"Slide generation completed in {processing_time:.2f} seconds")
-            return result
-            
+            self.client_content[client_id].append(content_data)
+            logger.info(f"Stored extracted content for client {client_id}: {content_data.get('filename', 'unknown')}")
+            return True
         except Exception as e:
-            processing_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"Error generating slide: {e}")
+            logger.error(f"Error storing extracted content for client {client_id}: {e}")
+            return False
+    
+    async def get_extracted_content(self, client_id: str) -> List[Dict]:
+        """Get all stored extracted content for a client"""
+        return self.client_content.get(client_id, [])
+    
+    async def get_client_files_content(self, client_id: str) -> List[Dict]:
+        """Get content from all files uploaded by a client"""
+        try:
+            # Get all files for the client
+            files = await self.file_service.get_client_files(client_id)
+            content_list = []
             
-            return {
-                "error": str(e),
-                "processing_time": processing_time,
-                "status": "error"
-            }
+            for file_info in files:
+                # Extract content from each file
+                content = await self.file_service.extract_content_from_file(file_info.file_path)
+                if content:
+                    content['file_info'] = file_info.model_dump()
+                    content_list.append(content)
+            
+            return content_list
+        except Exception as e:
+            logger.error(f"Error getting client files content for {client_id}: {e}")
+            return []
+    
+    async def store_file_content(self, client_id: str, file_path: str, filename: str) -> bool:
+        """Extract and store content from a specific file"""
+        try:
+            # Extract content from the file
+            content = await self.file_service.extract_content_from_file(file_path)
+            logger.info(f"Content: {content['text'][:100]}")
+            if content:
+                content['client_id'] = client_id
+                content['upload_time'] = datetime.now().isoformat()
+                
+                # Store the content
+                await self.store_extracted_content(client_id, content)
+                logger.info(f"Stored content from file {filename} for client {client_id}")
+                return True
+            else:
+                logger.warning(f"No content extracted from file {filename} for client {client_id}")
+                return False
+        except Exception as e:
+            logger.error(f"Error storing file content for client {client_id}, file {filename}: {e}")
+            return False
     
     async def generate_slide_with_params(
         self, 
@@ -95,16 +107,21 @@ class SlideService:
         try:
             logger.info(f"Starting slide generation with {len(files)} files, theme: {theme}, research: {wants_research}")
             
-            # Extract text content from all files
-            file_contents = []
-            for file_info in files:
-                content = await self.file_service.extract_text_from_file(file_info.file_path)
-                if content:
-                    file_contents.append({
-                        "filename": file_info.filename,
-                        "content": content,
-                        "file_type": file_info.file_type
-                    })
+            # Get stored content if client_id is provided, otherwise extract from files
+            if client_id:
+                file_contents = await self.get_extracted_content(client_id)
+                logger.info(f"Using stored content for client {client_id}: {len(file_contents)} items")
+            else:
+                # Extract text content from all files (fallback for backward compatibility)
+                file_contents = []
+                for file_info in files:
+                    content = await self.file_service.extract_text_from_file(file_info.file_path)
+                    if content:
+                        file_contents.append({
+                            "filename": file_info.filename,
+                            "content": content,
+                            "file_type": file_info.file_type
+                        })
             
             # Generate slide HTML for preview
             slide_html = await self._generate_slide_html(
@@ -170,11 +187,25 @@ class SlideService:
     ) -> SlideData:
         """Analyze content and generate slide data"""
         try:
-            # Combine all text content
-            combined_content = "\n\n".join([
-                f"--- {content['filename']} ---\n{content['content']}"
-                for content in file_contents
-            ])
+            # Handle both old format (text only) and new format (text + images)
+            combined_content = ""
+            total_images = 0
+            
+            for content in file_contents:
+                if isinstance(content, dict):
+                    # New format with text and images
+                    if 'text' in content:
+                        combined_content += f"--- {content.get('file_name', 'unknown')} ---\n{content['text']}\n\n"
+                    elif 'content' in content:
+                        # Old format with just content
+                        combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
+                    
+                    # Count images if available
+                    if 'images' in content:
+                        total_images += len(content['images'])
+                else:
+                    # Fallback for string content
+                    combined_content += f"--- Content ---\n{str(content)}\n\n"
             
             # Extract key information from description
             slide_title = self._extract_title_from_description(description)
@@ -183,6 +214,15 @@ class SlideService:
             
             # Generate slide elements based on content and description
             elements = await self._generate_slide_elements(combined_content, description)
+            
+            # Add image information to slide data if available
+            if total_images > 0:
+                elements.append({
+                    "type": "image_summary",
+                    "content": f"Found {total_images} images in uploaded content",
+                    "position": {"x": 50, "y": 90},
+                    "style": {"fontSize": "12px", "color": "#666", "fontStyle": "italic"}
+                })
             
             # Create slide data
             slide_data = SlideData(
@@ -215,11 +255,25 @@ class SlideService:
     ) -> str:
         """Generate actual HTML content for the slide"""
         try:
-            # Combine all text content
-            combined_content = "\n\n".join([
-                f"--- {content['filename']} ---\n{content['content']}"
-                for content in file_contents
-            ])
+            # Handle both old format (text only) and new format (text + images)
+            combined_content = ""
+            total_images = 0
+            
+            for content in file_contents:
+                if isinstance(content, dict):
+                    # New format with text and images
+                    if 'text' in content:
+                        combined_content += f"--- {content.get('file_name', 'unknown')} ---\n{content['text']}\n\n"
+                    elif 'content' in content:
+                        # Old format with just content
+                        combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
+                    
+                    # Count images if available
+                    if 'images' in content:
+                        total_images += len(content['images'])
+                else:
+                    # Fallback for string content
+                    combined_content += f"--- Content ---\n{str(content)}\n\n"
             
             # Extract key information
             slide_title = self._extract_title_from_description(description)
@@ -229,6 +283,15 @@ class SlideService:
             
             # Generate content sections
             content_sections = self._generate_content_sections(combined_content, wants_research)
+            
+            # Add image information if available
+            if total_images > 0:
+                content_sections += f"""
+                <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #ec4899; border-radius: 50%;"></span>
+                {total_images} images extracted from uploaded content
+                </li>
+                """
             
             # Create the HTML slide
             slide_html = f"""
@@ -382,6 +445,9 @@ class SlideService:
             if client_id in self.client_descriptions:
                 del self.client_descriptions[client_id]
             
+            if client_id in self.client_content:
+                del self.client_content[client_id]
+            
             if client_id in self.processing_results:
                 del self.processing_results[client_id]
             
@@ -401,7 +467,39 @@ class SlideService:
             "processing_results": len(self.processing_results),
             "total_descriptions_stored": len(self.client_descriptions),
             "total_results_stored": len(self.processing_results)
-        } 
+        }
+    
+    async def get_client_content_stats(self, client_id: str) -> Dict:
+        """Get content statistics for a specific client"""
+        try:
+            content_list = await self.get_extracted_content(client_id)
+            
+            total_files = len(content_list)
+            total_text_length = sum(len(content.get('text', '')) for content in content_list)
+            total_images = sum(len(content.get('images', [])) for content in content_list)
+            
+            # Count by file type
+            file_types = {}
+            for content in content_list:
+                file_name = content.get('file_name', 'unknown')
+                file_ext = file_name.split('.')[-1].lower() if '.' in file_name else 'unknown'
+                file_types[file_ext] = file_types.get(file_ext, 0) + 1
+            
+            return {
+                "client_id": client_id,
+                "total_files": total_files,
+                "total_text_length": total_text_length,
+                "total_images": total_images,
+                "file_types": file_types,
+                "has_description": client_id in self.client_descriptions,
+                "description_length": len(self.client_descriptions.get(client_id, ''))
+            }
+        except Exception as e:
+            logger.error(f"Error getting content stats for client {client_id}: {e}")
+            return {
+                "client_id": client_id,
+                "error": str(e)
+            }
     
     def _get_theme_styles(self, theme: str) -> Dict[str, str]:
         """Get CSS styles for different themes"""
