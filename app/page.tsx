@@ -190,7 +190,7 @@ export default function Home() {
                       <div key={template.id} className="flex-shrink-0 w-64">
                         {template.type === 'create' ? (
                           /* Create New Card */
-                          <Link href="/build">
+                          <Link href={user ? "/build" : "/auth/sign-up"}>
                             <Card className="h-48 border-2 border-dashed border-primary/30 hover:border-primary/60 transition-all cursor-pointer group">
                               <CardContent className="flex flex-col items-center justify-center h-full p-6">
                                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
@@ -369,7 +369,7 @@ export default function Home() {
 
             {/* CTA Section */}
             <div className="mb-8">
-              <Link href="/auth/sign-up">
+              <Link href="/">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl text-lg px-8 py-4 rounded-xl">
                   <Sparkles className="h-5 w-5 mr-2" />
                   Start Creating Now
