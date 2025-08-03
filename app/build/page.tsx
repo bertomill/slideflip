@@ -153,7 +153,7 @@ export default function Build() {
       />
       
       {/* Main content area */}
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-0'} md:ml-0`}>
+      <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
         {/* Top navigation bar with branding and theme toggle */}
         <Navigation variant="premium">
           <NavigationBrand>
