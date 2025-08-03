@@ -25,7 +25,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     if (!slideData.slideHtml) {
       generateSlide();
     }
-  }, []);
+  }, [slideData.slideHtml]);
 
   const generateSlide = async () => {
     setIsGenerating(true);
@@ -102,7 +102,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     }
   };
 
-  const canProceed = slideData.slideHtml && !isGenerating && !isRegenerating;
+  const canProceed = (slideData.slideHtml || slideData.slideHtml === 'cat-slide-placeholder') && !isGenerating && !isRegenerating;
 
   return (
     <div className="space-y-6">
@@ -145,7 +145,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 </div>
               </div>
             </div>
-          ) : (
+          ) : slideData.slideHtml === 'cat-slide-placeholder' ? (
             <div className="border rounded-lg overflow-hidden shadow-lg">
               <img 
                 src="/samples/slides/cat_slide_1.png" 
@@ -153,7 +153,15 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 className="w-full h-auto object-contain"
               />
             </div>
-          )}
+          ) : slideData.slideHtml ? (
+            <div className="border rounded-lg overflow-hidden shadow-lg">
+              <div 
+                dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
+                className="transform scale-75 origin-top-left"
+                style={{ width: '133.33%', height: '133.33%' }}
+              />
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
