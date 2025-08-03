@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Sidebar } from "@/components/ui/sidebar";
+import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { UploadStep } from "@/components/builder/upload-step";
 import { ThemeStep } from "@/components/builder/theme-step";
 import { ResearchStep } from "@/components/builder/research-step";
 import { PreviewStep } from "@/components/builder/preview-step";
 import { DownloadStep } from "@/components/builder/download-step";
+import { createClient } from "@/lib/supabase/client";
 
 // Type definition for research options that can be customized by users
 export type ResearchOptions = {
@@ -44,9 +47,15 @@ const steps = [
  * Main SlideBuilder component that orchestrates the multi-step slide creation process
  * Manages state flow between upload, theme selection, research, preview, and download steps
  */
-export default function SlideBuilder() {
+export default function Build() {
   // State Management: Track current position in the 5-step builder workflow
   const [currentStep, setCurrentStep] = useState(1);
+  // State Management: User authentication state
+  const [user, setUser] = useState<any>(null);
+  // State Management: Sidebar collapse state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // State Management: Mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // State Management: Centralized storage for all slide data that accumulates across steps
   // Initialized with empty values that get populated as user progresses
@@ -56,6 +65,25 @@ export default function SlideBuilder() {
     selectedTheme: "",
     wantsResearch: false,
   });
+
+  // Effect: Load user authentication state on component mount
+  useEffect(() => {
+    const supabase = createClient();
+    
+    // Get initial user session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    // Listen for authentication state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Data Flow: Helper function to update slide data from child step components
   // Uses partial updates to preserve existing data while adding new information
@@ -108,23 +136,39 @@ export default function SlideBuilder() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top navigation bar with branding and theme toggle */}
-      <Navigation variant="premium">
-        <NavigationBrand>
-          <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-            <div className="h-3 w-3 bg-background rounded-sm"></div>
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar with user profile */}
+      <Sidebar 
+        user={user} 
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+        isOpen={mobileMenuOpen}
+        onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+      />
+      
+      {/* Main content area */}
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+        {/* Top navigation bar with branding and theme toggle */}
+        <Navigation variant="premium">
+          <NavigationBrand>
+            <MobileMenuButton 
+              isOpen={mobileMenuOpen} 
+              onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="mr-2"
+            />
+            <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
+              <div className="h-3 w-3 bg-background rounded-sm"></div>
+            </div>
+            <span className="font-semibold text-foreground">
+              SlideFlip Builder
+            </span>
+          </NavigationBrand>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
           </div>
-          <span className="font-semibold text-foreground">
-            SlideFlip Builder
-          </span>
-        </NavigationBrand>
-        <div className="flex items-center gap-4">
-          <ThemeToggle />
-        </div>
-      </Navigation>
+        </Navigation>
 
-      <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8">
         {/* Progress indicator showing all steps and current position */}
         <Card variant="glass" className="mb-8">
           <CardContent className="p-6">
@@ -168,9 +212,10 @@ export default function SlideBuilder() {
           </CardContent>
         </Card>
 
-        {/* Main content area for the current step */}
-        <div className="max-w-4xl mx-auto">
-          {renderStep()}
+          {/* Main content area for the current step */}
+          <div className="max-w-4xl mx-auto">
+            {renderStep()}
+          </div>
         </div>
       </div>
     </div>

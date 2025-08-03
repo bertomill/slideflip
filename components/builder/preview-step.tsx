@@ -30,47 +30,46 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   const generateSlide = async () => {
     setIsGenerating(true);
     
-    // Simulate AI slide generation
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    const mockSlideHtml = `
-      <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; position: relative; overflow: hidden;">
-        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>'); opacity: 0.3;"></div>
-        
-        <div style="position: relative; z-index: 1;">
-          <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-            ${slideData.description.split(' ').slice(0, 4).join(' ')}
-          </h1>
-          
-          <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 40px 0;">
-            <h2 style="font-size: 24px; margin-bottom: 20px; color: #f0f0f0;">Key Insights</h2>
-            <ul style="list-style: none; padding: 0;">
-              <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #4ade80; border-radius: 50%;"></span>
-                Document analysis reveals key trends
-              </li>
-              <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #60a5fa; border-radius: 50%;"></span>
-                ${slideData.selectedTheme} theme applied for optimal impact
-              </li>
-              ${slideData.wantsResearch ? `
-              <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></span>
-                Enhanced with AI research insights
-              </li>
-              ` : ''}
-            </ul>
-          </div>
-          
-          <div style="position: absolute; bottom: 40px; right: 60px; font-size: 14px; opacity: 0.8;">
-            Created with SlideFlip AI
+    try {
+      const response = await fetch('/api/generate-slide', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: slideData.description,
+          theme: slideData.selectedTheme,
+          researchData: slideData.researchData,
+          documents: slideData.uploadedFiles
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate slide');
+      }
+
+      const result = await response.json();
+      updateSlideData({ slideHtml: result.slideHtml });
+    } catch (error) {
+      console.error('Error generating slide:', error);
+      // Fallback to mock slide on error
+      const mockSlideHtml = `
+        <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; position: relative; overflow: hidden;">
+          <div style="position: relative; z-index: 1;">
+            <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+              ${slideData.description.split(' ').slice(0, 4).join(' ')}
+            </h1>
+            <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 40px 0;">
+              <h2 style="font-size: 24px; margin-bottom: 20px; color: #f0f0f0;">Generated Content</h2>
+              <p style="font-size: 18px; line-height: 1.6;">AI slide generation temporarily unavailable. Using fallback design.</p>
+            </div>
           </div>
         </div>
-      </div>
-    `;
-    
-    updateSlideData({ slideHtml: mockSlideHtml });
-    setIsGenerating(false);
+      `;
+      updateSlideData({ slideHtml: mockSlideHtml });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const regenerateWithFeedback = async () => {
@@ -79,18 +78,38 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     setIsRegenerating(true);
     updateSlideData({ userFeedback: feedback });
     
-    // Simulate AI regeneration with feedback
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // Update the slide HTML based on feedback (mock)
-    const updatedHtml = slideData.slideHtml?.replace(
-      'Document analysis reveals key trends',
-      `Updated based on your feedback: "${feedback.slice(0, 50)}..."`
-    );
-    
-    updateSlideData({ slideHtml: updatedHtml });
-    setIsRegenerating(false);
-    setFeedback("");
+    try {
+      const response = await fetch('/api/generate-slide', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: `${slideData.description}\n\nUser feedback: ${feedback}`,
+          theme: slideData.selectedTheme,
+          researchData: slideData.researchData,
+          documents: slideData.uploadedFiles
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to regenerate slide');
+      }
+
+      const result = await response.json();
+      updateSlideData({ slideHtml: result.slideHtml });
+    } catch (error) {
+      console.error('Error regenerating slide:', error);
+      // Fallback to basic update on error
+      const updatedHtml = slideData.slideHtml?.replace(
+        'Generated Content',
+        `Updated with feedback: "${feedback.slice(0, 50)}..."`
+      );
+      updateSlideData({ slideHtml: updatedHtml });
+    } finally {
+      setIsRegenerating(false);
+      setFeedback("");
+    }
   };
 
   const canProceed = slideData.slideHtml && !isGenerating && !isRegenerating;
