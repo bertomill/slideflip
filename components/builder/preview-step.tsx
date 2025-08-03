@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowLeft, ArrowRight, RefreshCw, MessageSquare, Sparkles } from "lucide-react";
-import { SlideData } from "@/app/builder/page";
+import { SlideData } from "@/app/build/page";
 
 interface PreviewStepProps {
   slideData: SlideData;
@@ -30,6 +30,9 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   const generateSlide = async () => {
     setIsGenerating(true);
     
+    // Simulate 5-second loading time
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
     try {
       const response = await fetch('/api/generate-slide', {
         method: 'POST',
@@ -40,7 +43,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           description: slideData.description,
           theme: slideData.selectedTheme,
           researchData: slideData.researchData,
-          documents: slideData.uploadedFiles
+          documents: slideData.documents
         }),
       });
 
@@ -52,21 +55,8 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       updateSlideData({ slideHtml: result.slideHtml });
     } catch (error) {
       console.error('Error generating slide:', error);
-      // Fallback to mock slide on error
-      const mockSlideHtml = `
-        <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; position: relative; overflow: hidden;">
-          <div style="position: relative; z-index: 1;">
-            <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
-              ${slideData.description.split(' ').slice(0, 4).join(' ')}
-            </h1>
-            <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 40px 0;">
-              <h2 style="font-size: 24px; margin-bottom: 20px; color: #f0f0f0;">Generated Content</h2>
-              <p style="font-size: 18px; line-height: 1.6;">AI slide generation temporarily unavailable. Using fallback design.</p>
-            </div>
-          </div>
-        </div>
-      `;
-      updateSlideData({ slideHtml: mockSlideHtml });
+      // For now, we'll just show the cat slide instead of the fallback
+      updateSlideData({ slideHtml: 'cat-slide-placeholder' });
     } finally {
       setIsGenerating(false);
     }
@@ -88,7 +78,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           description: `${slideData.description}\n\nUser feedback: ${feedback}`,
           theme: slideData.selectedTheme,
           researchData: slideData.researchData,
-          documents: slideData.uploadedFiles
+          documents: slideData.documents
         }),
       });
 
@@ -155,15 +145,15 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 </div>
               </div>
             </div>
-          ) : slideData.slideHtml ? (
+          ) : (
             <div className="border rounded-lg overflow-hidden shadow-lg">
-              <div 
-                dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
-                className="transform scale-75 origin-top-left"
-                style={{ width: '133.33%', height: '133.33%' }}
+              <img 
+                src="/samples/slides/cat_slide_1.png" 
+                alt="Generated Slide Preview" 
+                className="w-full h-auto object-contain"
               />
             </div>
-          ) : null}
+          )}
         </CardContent>
       </Card>
 
@@ -176,7 +166,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
               Provide Feedback
             </CardTitle>
             <CardDescription>
-              Tell us what you'd like to change or improve about the slide
+              Tell us what you&apos;d like to change or improve about the slide
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
