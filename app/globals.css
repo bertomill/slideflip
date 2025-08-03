@@ -147,10 +147,15 @@
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.5));
   }
   
-  /* Dark blue gradient - Inspired by login screen
-     Creates deep blue atmosphere similar to login page gradient
+  /* Theme-responsive gradient - Adapts to light/dark mode
+     Creates appropriate atmosphere for both light and dark themes
      Perfect for main app backgrounds and dashboard sections */
   .gradient-dark-blue {
+    background: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--muted) / 0.3), hsl(var(--card)));
+  }
+  
+  /* Legacy dark blue gradient - For specific dark-only use cases */
+  .gradient-dark-blue-legacy {
     background: linear-gradient(to bottom right, rgb(15 23 42), rgb(17 24 39), rgb(0 0 0));
   }
   

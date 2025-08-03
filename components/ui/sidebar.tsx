@@ -6,20 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  User, 
   Settings, 
   FileText, 
   History, 
   Crown, 
   LogOut,
-  Menu,
-  X,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   user?: {
@@ -69,8 +66,8 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
         <div
           ref={ref}
           className={cn(
-            "fixed left-0 top-0 z-40 h-full transform bg-background border-r border-border transition-all duration-300 ease-in-out",
-            "md:translate-x-0 md:static md:z-0",
+            "fixed left-0 top-0 z-40 h-screen transform bg-background border-r border-border transition-all duration-300 ease-in-out",
+            "md:translate-x-0 md:static md:z-0 md:h-screen",
             collapsed ? "w-16" : "w-64",
             isOpen ? "translate-x-0" : "-translate-x-full",
             className
@@ -80,14 +77,14 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
           <div className="flex flex-col h-full">
             {/* Header */}
             <div className="p-6 border-b border-border relative">
-              <div className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                 <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
                   <div className="h-3 w-3 bg-background rounded-sm"></div>
                 </div>
                 {!collapsed && (
                   <span className="font-semibold text-foreground">SlideFlip</span>
                 )}
-              </div>
+              </Link>
               
               {/* Collapse button for desktop */}
               <Button
@@ -169,12 +166,12 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                     collapsed ? "justify-center px-2" : "justify-start"
                   )}
                   onClick={() => {
-                    router.push("/projects");
+                    router.push("/presentations");
                     onToggle?.();
                   }}
                 >
                   <FileText className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                  {!collapsed && "My Projects"}
+                  {!collapsed && "My Presentations"}
                 </Button>
                 <Button
                   variant="ghost"
@@ -193,7 +190,10 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                     "w-full text-left",
                     collapsed ? "justify-center px-2" : "justify-start"
                   )}
-                  onClick={() => onToggle?.()}
+                  onClick={() => {
+                    router.push("/settings");
+                    onToggle?.();
+                  }}
                 >
                   <Settings className={cn("h-4 w-4", !collapsed && "mr-3")} />
                   {!collapsed && "Settings"}

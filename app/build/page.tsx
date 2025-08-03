@@ -36,11 +36,11 @@ export type SlideData = {
 
 // Configuration for the multi-step slide builder process
 const steps = [
-  { id: 1, name: "Upload", description: "Upload documents & describe your slide" },
-  { id: 2, name: "Theme", description: "Choose a visual theme" },
-  { id: 3, name: "Research", description: "Additional research options" },
-  { id: 4, name: "Preview", description: "Review and refine your slide" },
-  { id: 5, name: "Download", description: "Export your presentation" },
+  { id: 1, name: "Upload", description: "Upload & describe" },
+  { id: 2, name: "Theme", description: "Choose theme" },
+  { id: 3, name: "Research", description: "Research options" },
+  { id: 4, name: "Preview", description: "Review & refine" },
+  { id: 5, name: "Download", description: "Export slide" },
 ];
 
 /**
@@ -51,7 +51,13 @@ export default function Build() {
   // State Management: Track current position in the 5-step builder workflow
   const [currentStep, setCurrentStep] = useState(1);
   // State Management: User authentication state
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{
+    email?: string;
+    user_metadata?: {
+      avatar_url?: string;
+      full_name?: string;
+    };
+  } | null>(null);
   // State Management: Sidebar collapse state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // State Management: Mobile menu state
@@ -136,7 +142,7 @@ export default function Build() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen gradient-dark-blue flex">
       {/* Sidebar with user profile */}
       <Sidebar 
         user={user} 
@@ -147,7 +153,7 @@ export default function Build() {
       />
       
       {/* Main content area */}
-      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-0'} md:ml-0`}>
         {/* Top navigation bar with branding and theme toggle */}
         <Navigation variant="premium">
           <NavigationBrand>
@@ -159,23 +165,23 @@ export default function Build() {
             <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
               <div className="h-3 w-3 bg-background rounded-sm"></div>
             </div>
-            <span className="font-semibold text-foreground">
+            <span className="font-semibold text-foreground text-sm sm:text-base">
               SlideFlip Builder
             </span>
           </NavigationBrand>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
           </div>
         </Navigation>
 
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-full px-2 sm:px-4 py-2 sm:py-8">
         {/* Progress indicator showing all steps and current position */}
-        <Card variant="glass" className="mb-8">
-          <CardContent className="p-6">
+        <Card variant="glass" className="mb-3 sm:mb-8">
+          <CardContent className="p-2 sm:p-6">
             {/* Horizontal step progress bar with clickable navigation */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-center gap-1 sm:gap-2 lg:gap-4">
               {steps.map((step, index) => (
-                <div key={step.id} className="flex items-center">
+                <div key={step.id} className="flex items-center flex-shrink-0">
                   {/* Clickable step container - allows navigation to completed/current steps only */}
                   <button
                     onClick={() => goToStep(step.id)}
@@ -185,25 +191,25 @@ export default function Build() {
                   >
                     {/* Circular step number indicator with visual state based on completion */}
                     <div
-                      className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-premium ${currentStep >= step.id
+                      className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-full border-2 transition-premium ${currentStep >= step.id
                         ? "bg-primary border-primary text-primary-foreground"
                         : "border-muted-foreground text-muted-foreground"
-                        }`}
+                        } text-xs sm:text-sm lg:text-base`}
                     >
                       {step.id}
                     </div>
-                    {/* Step details - responsive text that hides on mobile screens */}
-                    <div className="ml-3 hidden sm:block text-left">
-                      <p className={`text-sm font-medium ${currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
+                    {/* Step details - responsive text that shows on larger screens */}
+                    <div className="ml-1 sm:ml-2 lg:ml-3 text-left min-w-0">
+                      <p className={`text-xs sm:text-sm font-medium truncate ${currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
                         }`}>
                         {step.name}
                       </p>
-                      <p className="text-xs text-muted-foreground">{step.description}</p>
+                      <p className="text-xs text-muted-foreground truncate hidden lg:block">{step.description}</p>
                     </div>
                   </button>
                   {/* Connecting line between steps */}
                   {index < steps.length - 1 && (
-                    <div className={`w-12 h-0.5 mx-4 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                    <div className={`w-2 sm:w-4 lg:w-8 h-0.5 mx-1 sm:mx-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
                       }`} />
                   )}
                 </div>
@@ -213,7 +219,7 @@ export default function Build() {
         </Card>
 
           {/* Main content area for the current step */}
-          <div className="max-w-4xl mx-auto">
+          <div className="w-full max-w-4xl mx-auto px-1 sm:px-0">
             {renderStep()}
           </div>
         </div>

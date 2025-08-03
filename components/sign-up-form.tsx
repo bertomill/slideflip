@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PrivacyAgreementModal } from "@/components/privacy-agreement-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -25,19 +26,27 @@ export function SignUpForm({
   const [repeatPassword, setRepeatPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const router = useRouter();
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
     setError(null);
 
     if (password !== repeatPassword) {
       setError("Passwords do not match");
-      setIsLoading(false);
       return;
     }
+
+    // Show privacy modal before proceeding with sign up
+    setShowPrivacyModal(true);
+  };
+
+  const handlePrivacyAccept = async () => {
+    setShowPrivacyModal(false);
+    setIsLoading(true);
+    
+    const supabase = createClient();
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -66,6 +75,10 @@ export function SignUpForm({
     }
   };
 
+  const handlePrivacyDecline = () => {
+    setShowPrivacyModal(false);
+  };
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -74,7 +87,7 @@ export function SignUpForm({
           <CardDescription>Create a new account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignUp}>
+          <form onSubmit={handleSignUpSubmit}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
@@ -125,6 +138,12 @@ export function SignUpForm({
           </form>
         </CardContent>
       </Card>
+      
+      <PrivacyAgreementModal
+        isOpen={showPrivacyModal}
+        onAccept={handlePrivacyAccept}
+        onDecline={handlePrivacyDecline}
+      />
     </div>
   );
 }

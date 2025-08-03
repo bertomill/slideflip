@@ -110,21 +110,21 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
   const canProceed = slideData.documents.length > 0 && slideData.description.trim().length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card variant="elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <Upload className="h-6 w-6 text-primary" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-semibold tracking-tight">
+            <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             Upload Your Documents
           </CardTitle>
-          <CardDescription className="text-base text-muted-foreground">
+          <CardDescription className="text-sm sm:text-base text-muted-foreground">
             Upload documents that contain the content you want to include in your slide
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6">
           {/* File Upload Area */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-premium cursor-pointer ${dragActive
+            className={`border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-premium cursor-pointer ${dragActive
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
               }`}
@@ -134,9 +134,9 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
             onDrop={handleDrop}
             onClick={() => document.getElementById('file-upload')?.click()}
           >
-            <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
-            <p className="text-base text-muted-foreground">
+            <Upload className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+            <p className="text-lg sm:text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Supports PDF, DOCX, TXT, and more
             </p>
             <input
@@ -231,22 +231,22 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
       </Card>
 
       <Card variant="glass">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold tracking-tight">Describe Your Slide</CardTitle>
-          <CardDescription className="text-base text-muted-foreground">
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="text-xl sm:text-2xl font-semibold tracking-tight">Describe Your Slide</CardTitle>
+          <CardDescription className="text-sm sm:text-base text-muted-foreground">
             Tell us what kind of slide you want to create and any specific requirements
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3 sm:space-y-4">
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <Label htmlFor="description">Slide Description</Label>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={generateExampleDescription}
                 disabled={isGenerating}
-                className="gap-2 text-xs"
+                className="gap-2 text-xs self-start sm:self-auto"
               >
                 <Sparkles className={`h-3 w-3 ${isGenerating ? 'animate-spin' : ''}`} />
                 {isGenerating ? 'Generating...' : 'Generate Example'}
@@ -255,7 +255,7 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
             <textarea
               id="description"
               placeholder="e.g., Create a professional slide about quarterly sales results with charts and key insights..."
-              className="w-full h-32 px-3 py-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
+              className="w-full h-24 sm:h-32 px-3 py-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
               value={slideData.description}
               onChange={(e) => updateSlideData({ description: e.target.value })}
             />
@@ -266,10 +266,11 @@ export function UploadStep({ slideData, updateSlideData, onNext }: UploadStepPro
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end pt-2">
         <Button
           variant="engineering"
-          size="lg"
+          size="default"
+          className="w-full sm:w-auto"
           onClick={onNext}
           disabled={!canProceed}
         >
