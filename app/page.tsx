@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { createClient } from "@/lib/supabase/client";
@@ -142,17 +142,7 @@ export default function Home() {
               </Link>
             </NavigationBrand>
             <div className="flex items-center gap-2 sm:gap-4">
-              <ThemeToggle />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
+              {/* Theme toggle removed - using fixed one in top right corner */}
             </div>
           </Navigation>
 
@@ -326,7 +316,6 @@ export default function Home() {
         </div>
         
         <div className="flex items-center gap-4">
-          <ThemeToggle />
           <Link href="/auth/login">
             <Button variant="ghost" className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100">
               Sign In
