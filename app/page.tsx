@@ -124,7 +124,7 @@ export default function Home() {
           onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
         
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-0'} md:ml-0`}>
+        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
           <Navigation variant="premium">
             <NavigationBrand>
               <MobileMenuButton 

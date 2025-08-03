@@ -103,7 +103,7 @@ export default function PresentationsPage() {
       />
       
       {/* Main content area */}
-      <div className="flex-1 transition-all duration-300">
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
         {/* Top navigation bar with branding and theme toggle */}
         <Navigation variant="premium">
                       <NavigationBrand>
