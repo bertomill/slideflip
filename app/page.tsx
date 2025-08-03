@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
@@ -76,7 +76,7 @@ const slideExamples = [
 ];
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string; email?: string; user_metadata?: { full_name?: string } } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [promptText, setPromptText] = useState("");
@@ -237,7 +237,30 @@ export default function Home() {
                     Pitch Decks
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {Array.from({ length: 4 }).map((_, i) => (
+                    {/* Uber Slide - First Card */}
+                    <Card className="aspect-[4/3] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                      <div className="h-full relative">
+                        <img 
+                          src="/samples/slides/uber_slide_1.png" 
+                          alt="Uber Problem Slide" 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                        <div className="absolute bottom-2 left-2">
+                          <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
+                            <div className="text-xs font-medium text-foreground">Uber Problem</div>
+                          </div>
+                        </div>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Remaining placeholder cards */}
+                    {Array.from({ length: 3 }).map((_, i) => (
                       <Card key={i} className="aspect-[4/3] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                         <div className="h-full bg-gradient-to-br from-primary to-primary/80 relative">
                           <div className="absolute inset-0 flex items-center justify-center">
@@ -330,7 +353,7 @@ export default function Home() {
             </div>
             
             <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight">
-              It's{" "}
+              It&apos;s{" "}
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 stunning
               </span>{" "}
