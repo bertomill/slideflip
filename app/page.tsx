@@ -317,13 +317,30 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* General */}
+                {/* Corporate */}
                 <div>
                   <h3 className="text-lg font-semibold text-foreground mb-4 text-center">
-                    General
+                    Corporate
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {Array.from({ length: 4 }).map((_, i) => (
+                    {/* JPMorgan Chase Financial Highlights */}
+                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                      <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
+                        <img 
+                          src="/samples/slides/jpm_slide_1.png" 
+                          alt="JPMorgan Chase Financial Highlights" 
+                          className="w-full h-full object-contain"
+                        />
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                    
+                    {/* Additional Corporate Slides */}
+                    {Array.from({ length: 3 }).map((_, i) => (
                       <Card key={i} className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                         <div className="h-full bg-gradient-to-br from-green-800 to-green-900 relative">
                           <div className="absolute inset-0 flex items-center justify-center">
