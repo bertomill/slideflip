@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent horizontal scrolling globally */
+html, body {
+  overflow-x: hidden;
+}
+
 @layer base {
   :root {
     /* Engineering-focused Light Theme - Practicality & Simplicity */

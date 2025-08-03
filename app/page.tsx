@@ -100,8 +100,8 @@ export default function Home() {
 
   // If user is authenticated, show dashboard
   if (user) {
-    return (
-      <div className="min-h-screen gradient-dark-blue flex">
+      return (
+    <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
         {/* Fixed theme toggle in top right corner */}
         <div className="fixed top-4 right-4 z-50">
           <Button 
@@ -124,7 +124,7 @@ export default function Home() {
           onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
         
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+        <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
           <Navigation variant="premium">
             <NavigationBrand>
               <MobileMenuButton 
@@ -156,7 +156,7 @@ export default function Home() {
             </div>
           </Navigation>
 
-          <div className="py-4 px-2 sm:py-8 sm:px-8">
+          <div className="py-4 px-2 sm:py-8 sm:px-8 overflow-x-hidden">
             <div>
               {/* Welcome Header */}
               <div className="mb-8">

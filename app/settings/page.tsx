@@ -49,7 +49,7 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen gradient-dark-blue flex">
+    <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
       {/* Fixed theme toggle in top right corner */}
       <div className="fixed top-4 right-4 z-50">
         <Button 
@@ -74,7 +74,7 @@ export default function SettingsPage() {
       />
       
       {/* Main content area */}
-              <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+              <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
         {/* Top navigation bar with branding and theme toggle */}
         <Navigation variant="premium">
           <NavigationBrand>
