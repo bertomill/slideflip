@@ -28,12 +28,8 @@ export async function GET(request: Request) {
       }
       
       if (data.session) {
-        // Successful authentication
-        const forwardedHost = request.headers.get('x-forwarded-host')
-        const redirectUrl = forwardedHost 
-          ? `https://${forwardedHost}${next}`
-          : `${origin}${next}`
-        return NextResponse.redirect(redirectUrl)
+        // Successful authentication - redirect to root page
+        return NextResponse.redirect(`${origin}${next}`)
       }
     } catch (err) {
       console.error('Unexpected error in callback:', err)
