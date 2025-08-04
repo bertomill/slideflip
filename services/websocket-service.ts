@@ -307,6 +307,13 @@ class WebSocketService {
     });
   }
 
+  sendThemeSelection(themeData: any): boolean {
+    return this.sendMessage({
+      type: 'theme_selection',
+      data: themeData
+    });
+  }
+
   sendProcessSlide(options?: any): boolean {
     return this.sendMessage({
       type: 'process_slide',

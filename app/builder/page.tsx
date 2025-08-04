@@ -35,6 +35,7 @@ export type SlideData = {
   isGenerating?: boolean;   // Whether slide generation is in progress
   generationStatus?: string; // Current status message from backend
   generationError?: string; // Error message if generation fails
+  generationProgress?: number; // Progress of the generation process (0-100)
 };
 
 // Configuration for the multi-step slide builder process
@@ -74,21 +75,57 @@ export default function SlideBuilder() {
     ping,
     sendFileUpload,
     sendSlideDescription,
-    sendGenerateSlide
+    sendGenerateSlide,
+    sendThemeSelection
   } = useWebSocket({
     clientId: clientId || 'temp_client',
     onMessage: (message) => {
-      console.log('Builder received:', message);
+      // Debug logging to see all messages
+      console.log('Builder received message:', {
+        type: message.type,
+        data: message.data,
+        timestamp: new Date().toISOString()
+      });
       
       // Handle slide generation messages
       if (message.type === 'slide_generation_started') {
-        console.log('Slide generation started');
+        console.log('Slide generation started - setting isGenerating to true');
         updateSlideData({ isGenerating: true, generationError: undefined });
       } else if (message.type === 'slide_generation_status') {
-        console.log('Slide generation status:', message.data.message);
-        updateSlideData({ generationStatus: message.data.message });
+        console.log('Status update received:', {
+          message: message.data.message,
+          progress: message.data.progress,
+          status: message.data.status
+        });
+        updateSlideData({ 
+          generationStatus: message.data.message,
+          generationProgress: message.data.progress || 0
+        });
       } else if (message.type === 'slide_generation_complete') {
-        console.log('Slide generation completed');
+        console.log('Slide generation completed - setting isGenerating to false');
+        
+        // Check if HTML content is valid
+        if (message.data.slide_html) {
+          try {
+            // Basic validation - check if it contains HTML tags
+            if (!message.data.slide_html.includes('<') || !message.data.slide_html.includes('>')) {
+              console.error('Invalid HTML content received');
+              updateSlideData({ 
+                isGenerating: false, 
+                generationError: 'Invalid HTML content received from server'
+              });
+              return;
+            }
+          } catch (error) {
+            console.error('Error validating HTML content:', error);
+            updateSlideData({ 
+              isGenerating: false, 
+              generationError: 'Error processing HTML content'
+            });
+            return;
+          }
+        }
+        
         updateSlideData({ 
           slideHtml: message.data.slide_html, 
           pptFilePath: message.data.ppt_file_path,
@@ -103,6 +140,20 @@ export default function SlideBuilder() {
           generationError: message.data.error 
         });
       }
+    },
+    onError: (error) => {
+      console.error('WebSocket error in builder:', error);
+      updateSlideData({ 
+        isGenerating: false, 
+        generationError: 'WebSocket connection error'
+      });
+    },
+    onClose: () => {
+      console.warn('WebSocket connection closed in builder');
+      updateSlideData({ 
+        isGenerating: false, 
+        generationError: 'WebSocket connection lost'
+      });
     }
   });
 
@@ -164,7 +215,7 @@ export default function SlideBuilder() {
           />
         );
       case 2:
-        return <ThemeStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return <ThemeStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} sendThemeSelection={sendThemeSelection} />;
       case 3:
         return <ResearchStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} sendGenerateSlide={sendGenerateSlide} />;
       case 4:

@@ -158,6 +158,19 @@ Your slide will be created using the uploaded documents and description provided
     if (sendGenerateSlide) {
       try {
         console.log('Sending slide generation request before proceeding to preview');
+        console.log('Generation parameters:', {
+          description: slideData.description,
+          theme: slideData.selectedTheme || "default",
+          wantsResearch: slideData.wantsResearch || false
+        });
+        
+        // Get theme details from slideData
+        const selectedTheme = slideData.selectedTheme;
+        const themeDetails = selectedTheme ? {
+          theme_id: selectedTheme,
+          // You can add more theme details here if needed
+        } : undefined;
+        
         const success = sendGenerateSlide(
           slideData.description,
           slideData.selectedTheme || "default",
@@ -175,6 +188,8 @@ Your slide will be created using the uploaded documents and description provided
       } catch (error) {
         console.error('Error sending slide generation request:', error);
       }
+    } else {
+      console.error('sendGenerateSlide function is not available');
     }
     onNext();
   };
@@ -508,25 +523,37 @@ Your slide will be created using the uploaded documents and description provided
         </Card>
       )}
 
-      {/* Step Navigation: Previous/Next buttons with conditional enabling */}
-      {/* Navigation is always available but next button requires user decision */}
+      {/* Navigation Buttons */}
       <div className="flex justify-between">
-        {/* Back Navigation: Return to theme selection step - always enabled */}
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Themes
+          Back to Theme
         </Button>
-        {/* Forward Navigation: Proceed to preview step */}
-        {/* Disabled during active research or if user hasn't made research choice */}
-        <Button 
-          variant="engineering" 
-          size="lg" 
-          onClick={handleContinueToPreview}
-          disabled={!canProceed || isResearching}
-        >
-          Continue to Preview
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+        
+        {/* Show progress when generating slide */}
+        {slideData.isGenerating ? (
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              {slideData.generationStatus || "Generating slide..."}
+            </div>
+            <div className="w-32 bg-muted rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${slideData.generationProgress || 0}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <Button 
+            variant="engineering" 
+            size="lg" 
+            onClick={handleContinueToPreview}
+            disabled={!canProceed || isResearching}
+          >
+            Continue to Preview
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        )}
       </div>
     </div>
   );

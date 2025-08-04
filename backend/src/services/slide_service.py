@@ -4,12 +4,15 @@ Slide service for handling slide generation and processing
 
 import asyncio
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 import json
+import re
 
 from src.models.message_models import FileInfo, SlideData, ProcessingResult, ProcessingStatus
 from src.services.file_service import FileService
+from src.services.llm_service import LLMService
+from src.services.ppt_service import PPTService
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,10 @@ class SlideService:
     
     def __init__(self):
         self.file_service = FileService()
+        self.llm_service = LLMService()
+        self.ppt_service = PPTService()
         self.client_descriptions: Dict[str, str] = {}
+        self.client_themes: Dict[str, Dict] = {}  # Store theme information for each client
         self.client_content: Dict[str, List[Dict]] = {}  # Store extracted content for each client
         self.processing_results: Dict[str, ProcessingResult] = {}
     
@@ -35,6 +41,26 @@ class SlideService:
     async def get_slide_description(self, client_id: str) -> Optional[str]:
         """Get stored slide description for a client"""
         return self.client_descriptions.get(client_id)
+    
+    async def store_theme_selection(self, client_id: str, theme_data) -> bool:
+        """Store theme selection for a client"""
+        try:
+            self.client_themes[client_id] = {
+                "theme_id": theme_data.theme_id,
+                "theme_name": theme_data.theme_name,
+                "theme_description": theme_data.theme_description,
+                "color_palette": theme_data.color_palette,
+                "preview_text": theme_data.preview_text
+            }
+            logger.info(f"Stored theme selection for client {client_id}: {theme_data.theme_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error storing theme selection for client {client_id}: {e}")
+            return False
+    
+    async def get_theme_selection(self, client_id: str) -> Optional[Dict]:
+        """Get stored theme selection for a client"""
+        return self.client_themes.get(client_id)
     
     async def store_extracted_content(self, client_id: str, content_data: Dict) -> bool:
         """Store extracted content (text and images) for a client"""
@@ -99,7 +125,8 @@ class SlideService:
         description: str, 
         theme: str = "default",
         wants_research: bool = False,
-        client_id: str = None
+        client_id: str = None,
+        status_callback = None
     ) -> Dict:
         """Generate slide content with specific parameters and return both HTML and PPT file"""
         start_time = datetime.now()
@@ -107,14 +134,29 @@ class SlideService:
         try:
             logger.info(f"Starting slide generation with {len(files)} files, theme: {theme}, research: {wants_research}")
             
+            # Send initial status
+            if status_callback:
+                logger.info(f"Calling status callback: Starting slide generation process... (5%)")
+                await status_callback("Starting slide generation process...", 5)
+            
             # Get stored content if client_id is provided, otherwise extract from files
             if client_id:
+                if status_callback:
+                    logger.info(f"Calling status callback: Retrieving stored content... (10%)")
+                    await status_callback("Retrieving stored content...", 10)
                 file_contents = await self.get_extracted_content(client_id)
                 logger.info(f"Using stored content for client {client_id}: {len(file_contents)} items")
             else:
                 # Extract text content from all files (fallback for backward compatibility)
+                if status_callback:
+                    logger.info(f"Calling status callback: Extracting content from uploaded files... (15%)")
+                    await status_callback("Extracting content from uploaded files...", 15)
                 file_contents = []
-                for file_info in files:
+                for i, file_info in enumerate(files):
+                    if status_callback:
+                        progress = 15 + (i * 5)
+                        logger.info(f"Calling status callback: Processing file {i+1}/{len(files)}: {file_info.filename} ({progress}%)")
+                        await status_callback(f"Processing file {i+1}/{len(files)}: {file_info.filename}", progress)
                     content = await self.file_service.extract_text_from_file(file_info.file_path)
                     if content:
                         file_contents.append({
@@ -123,22 +165,62 @@ class SlideService:
                             "file_type": file_info.file_type
                         })
             
-            # Generate slide HTML for preview
-            slide_html = await self._generate_slide_html(
-                file_contents, 
-                description,
-                theme,
-                wants_research
+            # Combine all content into a single string for LLM processing
+            if status_callback:
+                logger.info(f"Calling status callback: Combining content from all files... (40%)")
+                await status_callback("Combining content from all files...", 40)
+            combined_content = ""
+            has_images = False
+            
+            for content in file_contents:
+                if isinstance(content, dict):
+                    if 'text' in content:
+                        combined_content += f"--- {content.get('file_name', 'unknown')} ---\n{content['text']}\n\n"
+                    elif 'content' in content:
+                        combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
+                    
+                    # Check if images are available
+                    if 'images' in content and content['images']:
+                        has_images = True
+                else:
+                    combined_content += f"--- Content ---\n{str(content)}\n\n"
+            
+            # Generate slide layout using LLM
+            if status_callback:
+                logger.info(f"Calling status callback: Generating slide layout with AI... (50%)")
+                await status_callback("Generating slide layout with AI...", 50)
+            logger.info("Generating slide layout using LLM...")
+            
+            # Get stored theme information if available
+            theme_info = None
+            if client_id:
+                theme_info = await self.get_theme_selection(client_id)
+            
+            layout = await self.llm_service.generate_slide_layout(
+                combined_content, 
+                description, 
+                theme, 
+                has_images,
+                theme_info
             )
             
-            # Save HTML content to client folder if client_id is provided
-            html_file_path = None
-            if client_id:
-                html_file_path = await self._save_html_to_client_folder(
-                    slide_html, description, client_id
-                )
+            # Generate slide content using LLM
+            if status_callback:
+                logger.info(f"Calling status callback: Creating slide content with AI... (60%)")
+                await status_callback("Creating slide content with AI...", 60)
+            logger.info("Generating slide content using LLM...")
+            content = await self.llm_service.generate_slide_content(
+                combined_content, 
+                description, 
+                layout,
+                theme_info
+            )
             
-            # Generate PPT file for download
+            # Generate PPT file using the layout and content
+            if status_callback:
+                logger.info(f"Calling status callback: Creating PowerPoint presentation... (75%)")
+                await status_callback("Creating PowerPoint presentation...", 75)
+            logger.info("Generating PPT file...")
             ppt_file_path = await self._generate_ppt_file(
                 file_contents,
                 description,
@@ -147,11 +229,32 @@ class SlideService:
                 client_id
             )
             
-            # Create slide data for reference
-            slide_data = await self._analyze_content_and_generate_slide(
-                file_contents, 
-                description
+            # Generate HTML based on the same layout and content
+            if status_callback:
+                logger.info(f"Calling status callback: Generating HTML preview... (85%)")
+                await status_callback("Generating HTML preview...", 85)
+            logger.info("Generating HTML preview...")
+            slide_html = await self._generate_html_from_layout(
+                layout,
+                content,
+                theme,
+                wants_research,
+                theme_info
             )
+            
+            # Save HTML content to client folder if client_id is provided
+            if status_callback:
+                logger.info(f"Calling status callback: Saving files... (90%)")
+                await status_callback("Saving files...", 90)
+            html_file_path = None
+            if client_id:
+                html_file_path = await self._save_html_to_client_folder(
+                    slide_html, description, client_id
+                )
+            
+            if status_callback:
+                logger.info(f"Calling status callback: Finalizing slide generation... (95%)")
+                await status_callback("Finalizing slide generation...", 95)
             
             processing_time = (datetime.now() - start_time).total_seconds()
             
@@ -159,7 +262,6 @@ class SlideService:
                 "slide_html": slide_html,
                 "html_file_path": html_file_path,
                 "ppt_file_path": ppt_file_path,
-                "slide_data": slide_data.model_dump(),
                 "processing_time": processing_time,
                 "files_processed": len(files),
                 "content_extracted": len(file_contents),
@@ -246,71 +348,258 @@ class SlideService:
                 elements=[]
             )
     
-    async def _generate_slide_html(
-        self, 
-        file_contents: List[Dict], 
-        description: str,
+    async def _generate_html_from_layout(
+        self,
+        layout: Dict[str, Any],
+        content: Dict[str, Any],
         theme: str = "default",
-        wants_research: bool = False
+        wants_research: bool = False,
+        theme_info: Optional[Dict] = None
     ) -> str:
-        """Generate actual HTML content for the slide"""
+        """Generate HTML content based on LLM-generated layout and content"""
         try:
-            # Handle both old format (text only) and new format (text + images)
-            combined_content = ""
-            total_images = 0
+            # Use LLM to generate HTML based on the layout and content
+            if self.llm_service.is_available():
+                return await self._generate_html_with_llm(layout, content, theme, wants_research, theme_info)
+            else:
+                return await self._generate_html_fallback(layout, content, theme, wants_research, theme_info)
+                
+        except Exception as e:
+            logger.error(f"Error generating HTML from layout: {e}")
+            return self._generate_error_html()
+    
+    async def _generate_html_with_llm(
+        self,
+        layout: Dict[str, Any],
+        content: Dict[str, Any],
+        theme: str,
+        wants_research: bool,
+        theme_info: Optional[Dict] = None
+    ) -> str:
+        """Generate HTML using LLM based on layout and content"""
+        try:
+            # Build theme context for the prompt
+            theme_context = ""
+            if theme_info:
+                theme_context = f"""
+THEME INFORMATION:
+- Theme Name: {theme_info.get('theme_name', theme)}
+- Theme Description: {theme_info.get('theme_description', '')}
+- Color Palette: {', '.join(theme_info.get('color_palette', []))}
+- Preview Text: {theme_info.get('preview_text', '')}
+
+Please incorporate this theme's visual style, color palette, and design philosophy into the HTML design.
+"""
             
-            for content in file_contents:
-                if isinstance(content, dict):
-                    # New format with text and images
-                    if 'text' in content:
-                        combined_content += f"--- {content.get('file_name', 'unknown')} ---\n{content['text']}\n\n"
-                    elif 'content' in content:
-                        # Old format with just content
-                        combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
-                    
-                    # Count images if available
-                    if 'images' in content:
-                        total_images += len(content['images'])
-                else:
-                    # Fallback for string content
-                    combined_content += f"--- Content ---\n{str(content)}\n\n"
+            system_prompt = """You are a senior frontend developer and UI/UX expert specializing in creating stunning, professional slide presentations in HTML and CSS. You have 10+ years of experience creating presentations for Fortune 500 companies, TED talks, and high-profile events.
+
+Your task is to convert a slide layout and content into a beautiful, modern HTML slide that rivals the best presentation software.
+
+DESIGN REQUIREMENTS:
+- Create a slide with dimensions 1200px x 800px for better visibility
+- Use modern CSS with advanced gradients, shadows, and smooth animations
+- Implement professional typography with proper hierarchy
+- Create visually stunning designs that match the theme perfectly
+- Include interactive elements and hover effects
+- Ensure excellent readability and visual appeal
+- Use CSS Grid and Flexbox for responsive layouts
+- Include subtle animations and transitions
+
+THEME SUPPORT:
+- Professional: Clean, corporate style with blue/gray color schemes
+- Creative: Vibrant colors with artistic gradients and patterns
+- Minimal: Clean, simple design with lots of white space
+- Colorful: Bright, energetic colors with dynamic gradients
+- Corporate: Formal, business-focused design
+- Academic: Scholarly, research-oriented design
+- Modern: Contemporary design with bold typography
+
+HTML STRUCTURE REQUIREMENTS:
+- Use semantic HTML5 elements
+- Include proper meta tags and viewport settings
+- Implement responsive design principles
+- Use CSS custom properties for theming
+- Include smooth animations and transitions
+- Ensure accessibility standards are met
+
+Return only the complete HTML code with embedded CSS, no explanations or markdown formatting."""
+
+            user_prompt = f"""SLIDE DESIGN SPECIFICATIONS:
+
+LAYOUT STRUCTURE:
+{json.dumps(layout, indent=2)}
+
+CONTENT DATA:
+{json.dumps(content, indent=2)}
+
+DESIGN PARAMETERS:
+- Theme: {theme}
+- Research Integration: {wants_research}
+- Slide Dimensions: 1200px x 800px
+{theme_context}
+
+HTML GENERATION TASK:
+Create a stunning, professional HTML slide that:
+1. Accurately represents the layout structure and positioning
+2. Displays all content sections with proper formatting
+3. Implements the specified theme with beautiful styling
+4. Uses modern CSS with gradients, shadows, and animations
+5. Includes interactive elements and smooth transitions
+6. Ensures excellent readability and visual hierarchy
+7. Creates a memorable, engaging presentation experience
+
+CONTENT FORMATTING REQUIREMENTS:
+- Format bullet lists with proper styling and icons
+- Style text sections with appropriate typography
+- Create highlight boxes for key insights
+- Format quotes with proper attribution styling
+- Style timelines and process steps clearly
+- Ensure all content is visually appealing and readable
+
+Generate a complete, production-ready HTML slide that transforms this layout and content into a beautiful, professional presentation."""
+
+            response = self.llm_service.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=4000,
+                temperature=0.8
+            )
             
-            # Extract key information
-            slide_title = self._extract_title_from_description(description)
+            html_content = response.choices[0].message.content.strip()
             
-            # Generate theme-specific styling
+            # Log the raw response for debugging
+            logger.info(f"LLM HTML Response (first 500 chars): {html_content[:500]}...")
+            logger.info(f"HTML content size: {len(html_content)} characters")
+            
+            # Clean up the response to extract just the HTML
+            if html_content.startswith("```html"):
+                html_content = html_content[7:]
+            if html_content.endswith("```"):
+                html_content = html_content[:-3]
+            
+            # Validate HTML content
+            if len(html_content) > 50000:  # 50KB limit
+                logger.warning(f"HTML content too large ({len(html_content)} chars), truncating")
+                html_content = html_content[:50000]
+            
+            # Basic HTML validation
+            if not html_content.strip():
+                logger.error("Empty HTML content generated")
+                return self._generate_error_html()
+            
+            if not ('<' in html_content and '>' in html_content):
+                logger.error("Invalid HTML content - missing tags")
+                return self._generate_error_html()
+            
+            # Sanitize HTML content to prevent issues
+            # Remove any script tags that might cause issues
+            html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+            # Remove any on* attributes that might cause JavaScript errors
+            html_content = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html_content, flags=re.IGNORECASE)
+            # Remove any javascript: URLs
+            html_content = re.sub(r'javascript:', '', html_content, flags=re.IGNORECASE)
+            
+            logger.info("✅ Generated HTML using LLM successfully")
+            return html_content
+            
+        except Exception as e:
+            logger.error(f"Error generating HTML with LLM: {e}")
+            return await self._generate_html_fallback(layout, content, theme, wants_research, theme_info)
+    
+    async def _generate_html_fallback(
+        self,
+        layout: Dict[str, Any],
+        content: Dict[str, Any],
+        theme: str,
+        wants_research: bool,
+        theme_info: Optional[Dict] = None
+    ) -> str:
+        """Generate HTML using fallback method when LLM is not available"""
+        try:
+            # Extract title from layout
+            title = layout.get("title", "Generated Slide")
+            
+            # Get theme styles - use stored theme info if available
             theme_styles = self._get_theme_styles(theme)
+            if theme_info:
+                # Override theme styles with stored theme information
+                color_palette = theme_info.get('color_palette', [])
+                if color_palette:
+                    primary_color = color_palette[0]
+                    secondary_color = color_palette[1] if len(color_palette) > 1 else primary_color
+                    accent_color = color_palette[2] if len(color_palette) > 2 else secondary_color
+                    
+                    theme_styles = {
+                        'background': f'background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);',
+                        'text_color': 'white',
+                        'overlay': f'background: linear-gradient(45deg, {accent_color} 0%, transparent 100%);',
+                        'content_bg': 'rgba(255,255,255,0.15)',
+                        'title_style': f'color: {primary_color};'
+                    }
             
-            # Generate content sections
-            content_sections = self._generate_content_sections(combined_content, wants_research)
+            # Generate content sections from the layout
+            content_sections = ""
+            sections = layout.get("sections", [])
             
-            # Add image information if available
-            if total_images > 0:
-                content_sections += f"""
-                <li style="margin-bottom: 15px; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #ec4899; border-radius: 50%;"></span>
-                {total_images} images extracted from uploaded content
-                </li>
+            for i, section in enumerate(sections):
+                section_content = content.get(f"section_{i}", {})
+                section_text = section_content.get("content", "Content not available")
+                
+                if section.get("type") == "bullet_list":
+                    # Convert to bullet points
+                    lines = section_text.split('\n')
+                    bullet_points = ""
+                    for line in lines:
+                        if line.strip():
+                            bullet_points += f"""
+                            <li style="margin-bottom: 10px; padding-left: 20px; position: relative;">
+                            <span style="position: absolute; left: 0; top: 5px; width: 6px; height: 6px; background: #4ade80; border-radius: 50%;"></span>
+                            {line.strip()}
+                            </li>
+                            """
+                    content_sections += f"""
+                    <div style="margin-bottom: 20px;">
+                        <ul style="list-style: none; padding: 0;">
+                            {bullet_points}
+                        </ul>
+                    </div>
+                    """
+                else:
+                    # Regular text content
+                    content_sections += f"""
+                    <div style="margin-bottom: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                        <p style="margin: 0; line-height: 1.6;">{section_text}</p>
+                    </div>
+                    """
+            
+            # Add research indicator if enabled
+            if wants_research:
+                content_sections += """
+                <div style="margin-top: 20px; padding: 10px; background: rgba(245, 158, 11, 0.2); border-radius: 8px; border-left: 4px solid #f59e0b;">
+                    <p style="margin: 0; font-size: 14px; color: #f59e0b;">
+                        <strong>🔍 Enhanced with AI Research</strong>
+                    </p>
+                </div>
                 """
             
             # Create the HTML slide
             slide_html = f"""
-            <div style="width: 800px; height: 600px; {theme_styles['background']}; padding: 60px; color: {theme_styles['text_color']}; font-family: 'Arial', sans-serif; position: relative; overflow: hidden;">
+            <div style="width: 800px; height: 600px; {theme_styles['background']}; padding: 60px; color: {theme_styles['text_color']}; font-family: 'Arial', sans-serif; position: relative; overflow: hidden; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
                 <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; {theme_styles['overlay']}; opacity: 0.3;"></div>
                 
                 <div style="position: relative; z-index: 1;">
-                    <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); {theme_styles['title_style']}">
-                        {slide_title}
+                    <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); {theme_styles['title_style']}; text-align: center;">
+                        {title}
                     </h1>
                     
-                    <div style="background: {theme_styles['content_bg']}; backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 40px 0;">
-                        <h2 style="font-size: 24px; margin-bottom: 20px; color: {theme_styles['subtitle_color']};">Key Insights</h2>
-                        <ul style="list-style: none; padding: 0;">
-                            {content_sections}
-                        </ul>
+                    <div style="background: {theme_styles['content_bg']}; backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 20px 0; max-height: 400px; overflow-y: auto;">
+                        {content_sections}
                     </div>
                     
-                    <div style="position: absolute; bottom: 40px; right: 60px; font-size: 14px; opacity: 0.8;">
+                    <div style="position: absolute; bottom: 20px; right: 60px; font-size: 12px; opacity: 0.7;">
                         Created with SlideFlip AI
                     </div>
                 </div>
@@ -320,16 +609,19 @@ class SlideService:
             return slide_html
             
         except Exception as e:
-            logger.error(f"Error generating slide HTML: {e}")
-            # Return a basic error slide
-            return f"""
-            <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; display: flex; align-items: center; justify-content: center;">
-                <div style="text-align: center;">
-                    <h1 style="font-size: 36px; margin-bottom: 20px;">Slide Generation Error</h1>
-                    <p style="font-size: 18px;">Unable to generate slide content. Please try again.</p>
-                </div>
+            logger.error(f"Error generating fallback HTML: {e}")
+            return self._generate_error_html()
+    
+    def _generate_error_html(self) -> str:
+        """Generate error HTML slide"""
+        return """
+        <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; display: flex; align-items: center; justify-content: center; border-radius: 15px;">
+            <div style="text-align: center;">
+                <h1 style="font-size: 36px; margin-bottom: 20px;">Slide Generation Error</h1>
+                <p style="font-size: 18px;">Unable to generate slide content. Please try again.</p>
             </div>
-            """
+        </div>
+        """
     
     def _extract_title_from_description(self, description: str) -> str:
         """Extract slide title from description"""
@@ -611,45 +903,76 @@ class SlideService:
         client_id: str = None
     ) -> str:
         """
-        Generate a PPT file from the content and return the file path
-        This is a placeholder function that will be implemented with actual PPT generation logic
+        Generate a PPT file from the content using LLM for layout and content generation
         """
         try:
             logger.info(f"Generating PPT file with theme: {theme}, research: {wants_research}, client: {client_id}")
             
-            # TODO: Implement actual PPT generation logic
-            # For now, we'll create a placeholder file path
-            import os
-            from datetime import datetime
+            # Combine all content into a single string
+            combined_content = ""
+            has_images = False
             
-            # Create a unique filename based on timestamp and description
+            for content in file_contents:
+                if isinstance(content, dict):
+                    if 'text' in content:
+                        combined_content += f"--- {content.get('file_name', 'unknown')} ---\n{content['text']}\n\n"
+                    elif 'content' in content:
+                        combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
+                    
+                    # Check if images are available
+                    if 'images' in content and content['images']:
+                        has_images = True
+                else:
+                    combined_content += f"--- Content ---\n{str(content)}\n\n"
+            
+            # Generate slide layout using LLM
+            logger.info("Generating slide layout using LLM...")
+            layout = await self.llm_service.generate_slide_layout(
+                combined_content, 
+                description, 
+                theme, 
+                has_images
+            )
+            
+            # Generate slide content using LLM
+            logger.info("Generating slide content using LLM...")
+            content = await self.llm_service.generate_slide_content(
+                combined_content, 
+                description, 
+                layout
+            )
+            
+            # Create output file path
+            from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_description = "".join(c for c in description[:30] if c.isalnum() or c in (' ', '-', '_')).rstrip()
             safe_description = safe_description.replace(' ', '_')
             
-            # Use client-specific folder if client_id is provided
             if client_id:
-                # Get client folder path from file service
                 client_folder = self.file_service.get_client_folder_path(client_id)
                 client_folder.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Using client folder for PPT generation: {client_folder}")
-                
-                # Generate filename within client folder
                 filename = f"slide_{timestamp}_{safe_description}.pptx"
                 file_path = client_folder / filename
             else:
-                # Fallback to output directory for backward compatibility
+                import os
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
                 filename = f"slide_{timestamp}_{safe_description}.pptx"
                 file_path = os.path.join(output_dir, filename)
             
-            # TODO: Replace this with actual PPT generation
-            # For now, create a placeholder file with some content
-            self._create_placeholder_ppt_file(str(file_path), file_contents, description, theme, wants_research)
+            # Generate PPT file using the layout and content
+            logger.info("Generating PPT file...")
+            logger.info(f"Layout sections: {len(layout.get('sections', []))}")
+            logger.info(f"Content sections: {list(content.keys())}")
+            ppt_path = await self.ppt_service.generate_ppt_from_layout(
+                layout, 
+                content, 
+                str(file_path), 
+                theme
+            )
             
-            logger.info(f"PPT file generated: {file_path}")
-            return str(file_path)
+            logger.info(f"PPT file generated: {ppt_path}")
+            return ppt_path
             
         except Exception as e:
             logger.error(f"Error generating PPT file: {e}")
@@ -660,44 +983,7 @@ class SlideService:
             else:
                 return "output/error_slide.pptx"
     
-    def _create_placeholder_ppt_file(self, file_path: str, file_contents: List[Dict], description: str, theme: str, wants_research: bool):
-        """
-        Create a placeholder PPT file for testing
-        This will be replaced with actual PPT generation logic
-        """
-        try:
-            # Create a simple text file as placeholder for now
-            # In the future, this will be replaced with actual PPT generation using libraries like python-pptx
-            
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write("# SlideFlip Generated Presentation\n\n")
-                f.write(f"## Description: {description}\n")
-                f.write(f"## Theme: {theme}\n")
-                f.write(f"## Research Enabled: {wants_research}\n\n")
-                f.write("## Content Summary:\n")
-                
-                for i, content in enumerate(file_contents, 1):
-                    f.write(f"### File {i}: {content['filename']}\n")
-                    f.write(f"Type: {content['file_type']}\n")
-                    f.write(f"Content Length: {len(content['content'])} characters\n\n")
-                
-                f.write("## Generated Content:\n")
-                f.write("- This is a placeholder PPT file\n")
-                f.write("- Actual PPT generation will be implemented\n")
-                f.write("- Will include proper formatting and styling\n")
-                f.write("- Will support themes and layouts\n")
-            
-            # Rename to .pptx extension for consistency
-            pptx_path = file_path.replace('.txt', '.pptx')
-            os.rename(file_path, pptx_path)
-            
-            logger.info(f"Placeholder PPT file created: {pptx_path}")
-            
-        except Exception as e:
-            logger.error(f"Error creating placeholder PPT file: {e}")
-            # Create a minimal error file
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write("Error: Could not generate PPT file")
+
     
     async def _save_html_to_client_folder(self, html_content: str, description: str, client_id: str) -> str:
         """

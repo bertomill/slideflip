@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, X, ArrowRight, Type, Sparkles, Wifi, WifiOff } from "lucide-react";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles, Wifi, WifiOff, Globe } from "lucide-react";
 import { SlideData } from "@/app/builder/page";
 import { BackendFileInfo } from "@/types/backend";
 
@@ -32,30 +32,36 @@ export function UploadStep({
   lastMessage
 }: UploadStepProps) {
   const [dragActive, setDragActive] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [pastedText, setPastedText] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<string>("");
   const [backendFiles, setBackendFiles] = useState<BackendFileInfo[]>([]);
+  const [extractedImages, setExtractedImages] = useState<{[key: string]: any[]}>({});
 
   // Handle backend messages
   useEffect(() => {
     if (lastMessage) {
-      console.log('Backend message received:', lastMessage);
-      switch (lastMessage.type) {
-        case 'file_upload_success':
-          setUploadStatus('File uploaded successfully');
-          setBackendFiles(prev => [...prev, lastMessage.data]);
-          break;
-        case 'file_upload_error':
-          setUploadStatus(`Upload error: ${lastMessage.data.error}`);
-          break;
-        case 'slide_description_success':
-          setUploadStatus('Description saved to backend');
-          break;
-        case 'slide_description_error':
-          setUploadStatus(`Description error: ${lastMessage.data.error}`);
-          break;
+      console.log('Received message from backend:', lastMessage);
+      
+      if (lastMessage.type === 'file_upload_success') {
+        setUploadStatus(`Successfully uploaded ${lastMessage.data.filename}`);
+        
+        // Handle content information for HTML files
+        if (lastMessage.data.content_info) {
+          const contentInfo = lastMessage.data.content_info;
+          if (contentInfo.images && contentInfo.images.length > 0) {
+            setExtractedImages(prev => ({
+              ...prev,
+              [lastMessage.data.filename]: contentInfo.images
+            }));
+            setUploadStatus(`Successfully uploaded ${lastMessage.data.filename} with ${contentInfo.images_count} images`);
+          }
+        }
+      } else if (lastMessage.type === 'file_upload_error') {
+        setUploadStatus(`Failed to upload: ${lastMessage.data.error}`);
       }
     }
   }, [lastMessage]);
@@ -157,6 +163,40 @@ export function UploadStep({
       
       setPastedText("");
       setShowTextInput(false);
+    }
+  };
+
+  const handleUrlInput = async () => {
+    if (urlInput.trim()) {
+      try {
+        setUploadStatus('Fetching content from URL...');
+        
+        // Create a virtual HTML file from the URL
+        const htmlFile = new File([`<!-- Content from: ${urlInput} -->`], "webpage.html", { type: "text/html" });
+        updateSlideData({ documents: [...slideData.documents, htmlFile] });
+        
+        // Upload to backend if connected
+        if (isConnected && sendFileUpload) {
+          try {
+            console.log('Starting URL content upload');
+            setUploadStatus('Uploading URL content...');
+            const result = await sendFileUpload(htmlFile);
+            console.log('URL content upload result:', result);
+            setUploadStatus('Successfully uploaded URL content');
+          } catch (error) {
+            console.error('Failed to upload URL content to backend:', error);
+            setUploadStatus('Failed to upload URL content');
+          }
+        } else {
+          console.log('Not connected or sendFileUpload not available for URL content');
+        }
+        
+        setUrlInput("");
+        setShowUrlInput(false);
+      } catch (error) {
+        console.error('Failed to process URL:', error);
+        setUploadStatus('Failed to process URL');
+      }
     }
   };
 
@@ -270,13 +310,13 @@ export function UploadStep({
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
             <p className="text-base text-muted-foreground">
-              Supports PDF, DOCX, TXT, and more
+              Supports PDF, DOCX, TXT, HTML, and more
             </p>
             <input
               id="file-upload"
               type="file"
               multiple
-              accept=".pdf,.docx,.txt,.md"
+              accept=".pdf,.docx,.txt,.md,.html,.htm"
               onChange={handleFileInput}
               className="hidden"
             />
@@ -289,7 +329,7 @@ export function UploadStep({
             <div className="flex-1 h-px bg-border"></div>
           </div>
 
-          <div className="text-center">
+          <div className="text-center space-y-4">
             <Button
               variant="outline"
               onClick={() => setShowTextInput(!showTextInput)}
@@ -297,6 +337,15 @@ export function UploadStep({
             >
               <Type className="h-4 w-4" />
               Paste Text Content
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => setShowUrlInput(!showUrlInput)}
+              className="gap-2"
+            >
+              <Globe className="h-4 w-4" />
+              Add Webpage URL
             </Button>
           </div>
 
@@ -334,30 +383,102 @@ export function UploadStep({
             </div>
           )}
 
+          {/* URL Input Area */}
+          {showUrlInput && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+              <Label htmlFor="url-input">Enter webpage URL</Label>
+              <input
+                id="url-input"
+                type="url"
+                placeholder="https://example.com"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowUrlInput(false);
+                    setUrlInput("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleUrlInput}
+                  disabled={!urlInput.trim()}
+                >
+                  Add Webpage
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Uploaded Files */}
           {slideData.documents.length > 0 && (
-            <div className="space-y-2">
-              <Label>Uploaded Files ({slideData.documents.length})</Label>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Uploaded Files</h3>
               <div className="space-y-2">
                 {slideData.documents.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">{file.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {(file.size / 1024).toFixed(1)} KB
+                        </p>
+                        {extractedImages[file.name] && extractedImages[file.name].length > 0 && (
+                          <p className="text-sm text-blue-600">
+                            {extractedImages[file.name].length} image(s) found
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFile(index)}
+                      className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
+              
+              {/* Display extracted images */}
+              {Object.keys(extractedImages).length > 0 && (
+                <div className="space-y-4">
+                  <h4 className="text-md font-semibold">Extracted Images</h4>
+                  {Object.entries(extractedImages).map(([fileName, images]) => (
+                    <div key={fileName} className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        From {fileName}:
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {images.map((img, imgIndex) => (
+                          <div key={imgIndex} className="p-2 border rounded bg-background">
+                            <div className="text-xs space-y-1">
+                              <p className="font-medium truncate">{img.alt || 'No alt text'}</p>
+                              <p className="text-muted-foreground truncate">{img.src}</p>
+                              {img.width && img.height && (
+                                <p className="text-muted-foreground">
+                                  {img.width} × {img.height}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -400,15 +521,30 @@ export function UploadStep({
       </Card>
 
       <div className="flex justify-end">
-        <Button
-          variant="engineering"
-          size="lg"
-          onClick={handleContinueToThemes}
-          disabled={!canProceed}
-        >
-          Continue to Themes
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+        {/* Show progress when generating slide */}
+        {slideData.isGenerating ? (
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              {slideData.generationStatus || "Generating slide..."}
+            </div>
+            <div className="w-32 bg-muted rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${slideData.generationProgress || 0}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <Button
+            variant="engineering"
+            size="lg"
+            onClick={handleContinueToThemes}
+            disabled={!canProceed}
+          >
+            Continue to Themes
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        )}
       </div>
     </div>
   );
