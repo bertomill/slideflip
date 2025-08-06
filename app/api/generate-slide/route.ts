@@ -142,6 +142,19 @@ Please create a slide that follows similar structural patterns, CSS scoping prac
 6. Use a clean, readable design suitable for presentations
 7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
 8. Make it responsive and well-structured
+9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
+
+ASPECT RATIO REQUIREMENTS:
+// ============================================================================
+// 16:9 ASPECT RATIO OPTIMIZATION: Critical design constraints for slide display
+// ============================================================================
+// The generated slide must work perfectly within a 16:9 aspect ratio container
+// This ensures consistency between web preview and PowerPoint export formats
+- Design the slide content to work optimally in a 16:9 aspect ratio container
+- This matches standard PowerPoint slide dimensions (1920x1080, 1280x720, etc.)
+- Content should be well-proportioned and not cramped when displayed in this format
+- Use appropriate font sizes and spacing that work well in the 16:9 format
+- Consider that the slide will be viewed at various sizes but always maintain 16:9 proportions
 
 OUTPUT FORMAT:
 Return a complete, self-contained HTML slide that can be embedded safely. You can choose either:
@@ -162,10 +175,10 @@ STYLE GUIDELINES:
 - Main headings should be #1a1a1a or #000000 for maximum readability
 - Body text should be #333333 minimum, never lighter than #555555
 - Background colors should provide strong contrast with text
-- Include appropriate margins, padding, and spacing
+- Include appropriate margins, padding, and spacing optimized for 16:9 viewing
 - Use bullet points, headings, and visual hierarchy effectively
 - Incorporate any statistics or data points from the research prominently
-- Make the layout clean and uncluttered
+- Make the layout clean and uncluttered, suitable for 16:9 presentation format
 - Test color combinations for WCAG accessibility standards
 
 PREFERRED STRUCTURE (Option 1 - Complete HTML):
@@ -173,7 +186,17 @@ PREFERRED STRUCTURE (Option 1 - Complete HTML):
 <html>
 <head>
 <style>
-.slide-main { width: 100%; height: 100vh; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; }
+.slide-main { 
+  width: 100%; 
+  height: 100%; 
+  background: white; 
+  padding: 40px; 
+  box-sizing: border-box; 
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .slide-main h1 { color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }
 .slide-main p { color: #333333; font-size: 1.1rem; line-height: 1.6; }
 </style>
@@ -186,7 +209,7 @@ PREFERRED STRUCTURE (Option 1 - Complete HTML):
 </html>
 
 ALTERNATIVE STRUCTURE (Option 2 - Container div):
-<div class="slide-container" style="width: 100%; height: 500px; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif;">
+<div class="slide-container" style="width: 100%; height: 100%; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center;">
   <style>
     .slide-container h1 { color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }
     .slide-container p { color: #333333; font-size: 1.1rem; line-height: 1.6; }

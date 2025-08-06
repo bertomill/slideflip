@@ -53,13 +53,13 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   // ============================================================================
   // COMPONENT STATE: Loading states and user input management
   // ============================================================================
-  
+
   // Loading state for initial slide generation when component first loads
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   // Loading state for slide regeneration when user provides feedback
   const [isRegenerating, setIsRegenerating] = useState(false);
-  
+
   // User's feedback text input for slide improvements and refinements
   const [feedback, setFeedback] = useState("");
 
@@ -207,47 +207,83 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           </div>
         </CardHeader>
         <CardContent>
-          {/* LOADING STATE: Show spinner while generating slide */}
+          {/* LOADING STATE: Show spinner while generating slide in 16:9 aspect ratio */}
           {isGenerating ? (
-            <div className="flex items-center justify-center h-96 bg-muted/30 rounded-lg">
-              <div className="text-center space-y-4">
-                <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-                <div>
-                  <p className="font-medium">Generating your slide...</p>
-                  <p className="text-sm text-muted-foreground">This may take a few moments</p>
+            <div className="border rounded-lg overflow-hidden shadow-lg">
+              {/* 16:9 ASPECT RATIO CONTAINER: Consistent loading state */}
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' /* 16:9 aspect ratio */ }}>
+                <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+                  <div className="text-center space-y-4">
+                    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+                    <div>
+                      <p className="font-medium">Generating your slide...</p>
+                      <p className="text-sm text-muted-foreground">This may take a few moments</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           ) : slideData.slideHtml === 'cat-slide-placeholder' ? (
-            // FALLBACK STATE: Show placeholder cat slide image when AI generation fails
+            // FALLBACK STATE: Show placeholder cat slide image in 16:9 aspect ratio
             <div className="border rounded-lg overflow-hidden shadow-lg">
-              <img
-                src="/samples/slides/cat_slide_1.png"
-                alt="Generated Slide Preview"
-                className="w-full h-auto object-contain"
-              />
+              {/* 16:9 ASPECT RATIO CONTAINER: Consistent with generated slides */}
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' /* 16:9 aspect ratio */ }}>
+                <img
+                  src="/samples/slides/cat_slide_1.png"
+                  alt="Generated Slide Preview"
+                  className="absolute inset-0 w-full h-full object-contain bg-white"
+                />
+              </div>
             </div>
           ) : slideData.slideHtml ? (
-            // SUCCESS STATE: Render actual generated HTML slide with complete style isolation
+            // SUCCESS STATE: Render actual generated HTML slide with proper aspect ratio and styling
+            // This displays the AI-generated slide content in a PowerPoint-compatible format
             <div className="border rounded-lg overflow-hidden shadow-lg">
-              <div className="bg-white relative">
-                {/* Debug info */}
-                <div className="p-2 bg-gray-100 text-xs text-gray-600 border-b">
-                  Debug: HTML length: {slideData.slideHtml.length} chars | Type: {typeof slideData.slideHtml}
-                </div>
+              {/* 
+                ASPECT RATIO CONTAINER: Creates a responsive 16:9 container that maintains PowerPoint proportions
+                - Uses padding-bottom technique to create intrinsic aspect ratio
+                - 56.25% = (9/16) * 100% for perfect 16:9 ratio
+                - Ensures slide preview matches final PowerPoint export dimensions
+              */}
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' /* 16:9 aspect ratio */ }}>
                 {/* 
-                  SLIDE RENDERING: Display AI-generated HTML content with simplified rendering
-                  - dangerouslySetInnerHTML: Renders HTML from OpenAI API response
-                  - Simplified styling to avoid rendering conflicts
+                  SLIDE VIEWPORT: Absolute positioned container that fills the aspect ratio box
+                  - White background provides clean canvas for slide content
+                  - Absolute positioning allows content to fill the entire 16:9 area
                 */}
-                <div
-                  dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
-                  style={{ 
-                    minHeight: '400px',
-                    maxHeight: '600px',
-                    overflow: 'auto'
-                  }}
-                />
+                <div className="absolute inset-0 bg-white">
+                  {/* 
+                    DEBUG HEADER: Development information bar for troubleshooting slide generation
+                    - Shows HTML content length and data type for debugging
+                    - Fixed position at top with high z-index to stay visible
+                    - Helps developers verify AI content generation is working correctly
+                  */}
+                  <div className="absolute top-0 left-0 right-0 p-2 bg-gray-100 text-xs text-gray-600 border-b z-10">
+                    Debug: HTML length: {slideData.slideHtml.length} chars | Type: {typeof slideData.slideHtml}
+                  </div>
+                  {/* 
+                    SLIDE CONTENT RENDERER: Displays the AI-generated HTML slide content
+                    
+                    SECURITY NOTE: Uses dangerouslySetInnerHTML to render OpenAI-generated HTML
+                    - This is necessary to display formatted slide content with styling
+                    - Content comes from trusted OpenAI API, not user input
+                    - HTML is scoped to prevent affecting parent page styles
+                    
+                    LAYOUT FEATURES:
+                    - pt-8: Top padding to account for debug header
+                    - overflow-auto: Allows scrolling if content exceeds container
+                    - Responsive font scaling using CSS clamp() for optimal readability
+                    - 16:9 aspect ratio maintained regardless of parent container size
+                  */}
+                  <div
+                    className="absolute inset-0 pt-8 overflow-auto"
+                    dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
+                    style={{
+                      fontSize: 'clamp(0.75rem, 1.5vw, 1rem)', // Responsive font scaling: min 12px, max 16px, scales with viewport
+                      lineHeight: '1.4' // Optimal line height for slide readability
+                    }}
+                  />
+                </div>
               </div>
             </div>
           ) : null}
@@ -307,7 +343,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Content Planning
         </Button>
-        
+
         <div className="flex gap-2">
           {/* DEBUG BUTTON: Developer tool to inspect generated HTML code */}
           {/* Opens generated HTML in new window and logs details to console */}
@@ -320,7 +356,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 console.log('Generated HTML:', slideData.slideHtml);
                 console.log('HTML type:', typeof slideData.slideHtml);
                 console.log('HTML length:', slideData.slideHtml?.length);
-                
+
                 // Open HTML in new browser window for visual inspection
                 if (slideData.slideHtml) {
                   const newWindow = window.open('', '_blank');
@@ -334,7 +370,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
               Debug: View HTML
             </Button>
           )}
-          
+
           {/* Next button to download step - disabled until slide is ready */}
           <Button
             variant="engineering"
