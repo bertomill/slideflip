@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,12 +63,42 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   // User's feedback text input for slide improvements and refinements
   const [feedback, setFeedback] = useState("");
 
+  // RESPONSIVE SCALING: Container width tracking for adaptive slide display
+  // Monitors the slide container's width to calculate appropriate scaling factors
+  // Used in the slide content renderer to adjust font sizes and transforms based on available space
+  const [containerWidth, setContainerWidth] = useState(800);
+  const slideContainerRef = useRef<HTMLDivElement>(null);
+
   // LIFECYCLE: Auto-generate slide when component mounts if no slide exists yet
   // This ensures users see their slide immediately upon reaching the preview step
   useEffect(() => {
     if (!slideData.slideHtml) {
       generateSlide();
     }
+  }, [slideData.slideHtml]);
+
+  // CONTAINER WIDTH TRACKING: Monitor container size changes for responsive scaling
+  useEffect(() => {
+    const container = slideContainerRef.current;
+    if (!container) return;
+
+    // RESIZE OBSERVER: Watches for container dimension changes (sidebar collapse/expand, window resize)
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        // Update container width state when dimensions change
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+
+    // Start observing the slide container for size changes
+    resizeObserver.observe(container);
+
+    // INITIAL WIDTH: Set the starting container width on component mount
+    setContainerWidth(container.offsetWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [slideData.slideHtml]);
 
   /**
@@ -236,14 +266,15 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
               </div>
             </div>
           ) : slideData.slideHtml ? (
-            // SUCCESS STATE: Render actual generated HTML slide with proper aspect ratio and styling
-            // This displays the AI-generated slide content in a PowerPoint-compatible format
-            <div className="border rounded-lg overflow-hidden shadow-lg">
+            // SUCCESS STATE: Render HTML slide with responsive container width tracking
+            // The slideContainerRef enables real-time monitoring of container dimensions for adaptive scaling
+            <div className="border rounded-lg overflow-hidden shadow-lg" ref={slideContainerRef}>
               {/* 
                 ASPECT RATIO CONTAINER: Creates a responsive 16:9 container that maintains PowerPoint proportions
                 - Uses padding-bottom technique to create intrinsic aspect ratio
                 - 56.25% = (9/16) * 100% for perfect 16:9 ratio
                 - Ensures slide preview matches final PowerPoint export dimensions
+                - Container width is tracked via slideContainerRef for responsive scaling calculations
               */}
               <div className="relative w-full" style={{ paddingBottom: '56.25%' /* 16:9 aspect ratio */ }}>
                 {/* 
@@ -259,10 +290,10 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                     - Helps developers verify AI content generation is working correctly
                   */}
                   <div className="absolute top-0 left-0 right-0 p-2 bg-gray-100 text-xs text-gray-600 border-b z-10">
-                    Debug: HTML length: {slideData.slideHtml.length} chars | Type: {typeof slideData.slideHtml}
+                    Debug: HTML length: {slideData.slideHtml.length} chars | Container: {containerWidth}px
                   </div>
                   {/* 
-                    SLIDE CONTENT RENDERER: Displays the AI-generated HTML slide content
+                    SLIDE CONTENT RENDERER: Displays the AI-generated HTML slide content with responsive container-based scaling
                     
                     SECURITY NOTE: Uses dangerouslySetInnerHTML to render OpenAI-generated HTML
                     - This is necessary to display formatted slide content with styling
@@ -270,19 +301,37 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                     - HTML is scoped to prevent affecting parent page styles
                     
                     LAYOUT FEATURES:
-                    - pt-8: Top padding to account for debug header
-                    - overflow-auto: Allows scrolling if content exceeds container
-                    - Responsive font scaling using CSS clamp() for optimal readability
-                    - 16:9 aspect ratio maintained regardless of parent container size
+                    - pt-8: Top padding to account for debug header above
+                    - overflow-auto: Allows scrolling if content exceeds container bounds
+                    - absolute inset-0: Fills entire 16:9 aspect ratio container
+                    - slide-content-scaler: Custom class that enables container query scaling
+                    
+                    SCALING APPROACH:
+                    - Uses CSS Container Queries for responsive font scaling
+                    - Adapts to container width changes (sidebar collapse/expand)
+                    - Maintains readability across all screen sizes
+                    - Preserves slide proportions and visual hierarchy
                   */}
                   <div
                     className="absolute inset-0 pt-8 overflow-auto"
                     dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
                     style={{
-                      fontSize: 'clamp(0.75rem, 1.5vw, 1rem)', // Responsive font scaling: min 12px, max 16px, scales with viewport
-                      lineHeight: '1.4' // Optimal line height for slide readability
+                      // RESPONSIVE FONT SCALING: Calculate scale factor based on container width
+                      // 800px = 1.0 scale baseline, with bounds 0.6-1.3 for readability
+                      fontSize: `${Math.max(0.6, Math.min(1.3, containerWidth / 800))}rem`,
+                      lineHeight: '1.4',
+                      // TRANSFORM SCALING: Apply proportional scaling for consistent visual hierarchy
+                      // Uses slightly tighter bounds (0.7-1.2) to prevent extreme scaling
+                      transform: `scale(${Math.max(0.7, Math.min(1.2, containerWidth / 800))})`,
+                      transformOrigin: 'top left',
+                      // CONTAINER COMPENSATION: Adjust container dimensions to account for transform scaling
+                      // Prevents content from being cut off when scaled down
+                      width: `${100 / Math.max(0.7, Math.min(1.2, containerWidth / 800))}%`,
+                      height: `${100 / Math.max(0.7, Math.min(1.2, containerWidth / 800))}%`,
                     }}
                   />
+
+
                 </div>
               </div>
             </div>

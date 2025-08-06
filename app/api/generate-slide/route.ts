@@ -98,7 +98,7 @@ ${researchData}
     // This provides the actual content from uploaded documents for AI to use
     if (documents && documents.length > 0) {
       prompt += `DOCUMENT CONTENT:\n`;
-      
+
       // If we have parsed document content, include the actual text
       if (Array.isArray(documents) && documents[0] && typeof documents[0] === 'object' && 'content' in documents[0]) {
         // documents contains parsed content
@@ -115,10 +115,11 @@ ${researchData}
       }
     }
 
-    // Fetch example templates (Supabase first, local fallback) to show OpenAI what good slides look like
-    // This significantly improves the quality and consistency of generated slides
+    // TEMPLATE EXAMPLES: Fetch example templates (Supabase first, local fallback) to show OpenAI what good slides look like
+    // This significantly improves the quality and consistency of generated slides by providing concrete examples
+    // of proper CSS scoping, 16:9 aspect ratio optimization, and professional styling patterns
     const templatesContent = await getTemplatesForAI(theme, 2);
-    
+
     if (templatesContent.trim()) {
       prompt += `EXAMPLE TEMPLATES TO FOLLOW:
 Here are examples of well-designed slides that you should use as inspiration for structure, styling, and layout:
@@ -193,9 +194,9 @@ PREFERRED STRUCTURE (Option 1 - Complete HTML):
   padding: 40px; 
   box-sizing: border-box; 
   font-family: Arial, sans-serif;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: flex;                    /* Enable flexbox layout for vertical centering */
+  flex-direction: column;           /* Stack content vertically */
+  justify-content: center;          /* Center content vertically in 16:9 container */
 }
 .slide-main h1 { color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }
 .slide-main p { color: #333333; font-size: 1.1rem; line-height: 1.6; }
