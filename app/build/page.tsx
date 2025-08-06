@@ -1,17 +1,32 @@
 "use client";
 
+// ============================================================================
+// IMPORTS: Dependencies for the multi-step slide builder interface
+// ============================================================================
+
+// React hooks for component state management and lifecycle
 import { useState, useEffect } from "react";
+
+// UI components for layout, navigation, and user interface elements
 import { Card, CardContent } from "@/components/ui/card";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-import { UploadStep } from "@/components/builder/upload-step";
-import { ThemeStep } from "@/components/builder/theme-step";
-import { ResearchStep } from "@/components/builder/research-step";
-import { ContentStep } from "@/components/builder/content-step";
-import { PreviewStep } from "@/components/builder/preview-step";
-import { DownloadStep } from "@/components/builder/download-step";
+import { Button } from "@/components/ui/button";
+
+// Lucide icons for navigation and progress indicators
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+// Step components that make up the slide builder workflow
+import { UploadStep } from "@/components/builder/upload-step";      // Step 1: Document upload and description
+import { ThemeStep } from "@/components/builder/theme-step";        // Step 2: Visual theme selection
+import { ResearchStep } from "@/components/builder/research-step";  // Step 3: Research options and data gathering
+import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback
+import { PreviewStep } from "@/components/builder/preview-step";    // Step 5: AI slide generation and preview
+import { DownloadStep } from "@/components/builder/download-step";  // Step 6: Final export and download
+
+// Supabase client for user authentication and session management
 import { createClient } from "@/lib/supabase/client";
 
 // ============================================================================
@@ -87,35 +102,57 @@ export default function Build() {
     };
   } | null>(null);
 
-  // UI state management for responsive navigation
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop sidebar collapse state
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);     // Mobile menu visibility state
+  // ============================================================================
+  // UI STATE MANAGEMENT: Controls responsive navigation and sidebar visibility
+  // ============================================================================
+  // These state variables manage the various collapsible UI elements in the builder
+  // to provide optimal user experience across different screen sizes and preferences
 
-  // State Management: Centralized storage for all slide data that accumulates across steps
-  // Initialized with empty values that get populated as user progresses
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);         // Main navigation sidebar collapse state (desktop)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);             // Mobile hamburger menu visibility toggle
+  const [progressSidebarCollapsed, setProgressSidebarCollapsed] = useState(false); // Progress tracker sidebar collapse state (reserved for future enhancement)
+
+  // ============================================================================
+  // SLIDE DATA MANAGEMENT: Centralized storage for all user inputs and AI outputs
+  // ============================================================================
+  // This state object accumulates data as users progress through the 6-step workflow:
+  // 1. Upload: documents[], description
+  // 2. Theme: selectedTheme
+  // 3. Research: wantsResearch, researchOptions, researchData
+  // 4. Content: contentPlan, userFeedback
+  // 5. Preview: slideHtml (AI-generated)
+  // 6. Download: Final PPTX export
+
   const [slideData, setSlideData] = useState<SlideData>({
-    documents: [],
-    description: "",
-    selectedTheme: "",
-    wantsResearch: false,
+    documents: [],           // User-uploaded files for slide content
+    description: "",         // User's description of desired slide content
+    selectedTheme: "",       // Visual theme choice (Professional, Modern, etc.)
+    wantsResearch: false,    // Whether to include external research data
   });
 
-  // Effect: Load user authentication state on component mount
+  // ============================================================================
+  // AUTHENTICATION LIFECYCLE: Load and monitor user authentication state
+  // ============================================================================
+  // Sets up Supabase auth listener and loads initial user state on component mount
+  // Ensures the slide builder is only accessible to authenticated users
   useEffect(() => {
     const supabase = createClient();
 
-    // Get initial user session
+    // Load initial user session when component first mounts
+    // This provides immediate access to user data for the builder interface
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
     });
 
-    // Listen for authentication state changes
+    // Set up real-time listener for authentication state changes
+    // Handles login/logout events, session refresh, and token updates
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setUser(session?.user ?? null);
       }
     );
 
+    // Cleanup: Remove auth listener when component unmounts to prevent memory leaks
     return () => subscription.unsubscribe();
   }, []);
 
@@ -171,9 +208,129 @@ export default function Build() {
     }
   };
 
+  // Progress Sidebar Component - Collapsible right sidebar for step navigation
+  const ProgressSidebar = () => (
+    <div
+      className={`fixed right-0 top-0 z-30 h-screen transform bg-background border-l border-border transition-all duration-300 ease-in-out ${progressSidebarCollapsed ? "w-16" : "w-80"
+        }`}
+    >
+      <div className="flex flex-col h-full">
+        {/* Header with collapse button */}
+        <div className="p-4 border-b border-border relative flex items-center justify-between">
+          {!progressSidebarCollapsed && (
+            <h3 className="text-lg font-semibold text-foreground">Progress</h3>
+          )}
+
+          {/* Collapse button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 rounded-full border border-border bg-background shadow-md hover:bg-accent p-0"
+            onClick={() => setProgressSidebarCollapsed(!progressSidebarCollapsed)}
+          >
+            {progressSidebarCollapsed ? (
+              <ChevronLeft className="h-3 w-3" />
+            ) : (
+              <ChevronRight className="h-3 w-3" />
+            )}
+          </Button>
+        </div>
+
+        {/* Progress content */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          {progressSidebarCollapsed ? (
+            // Collapsed view - just step numbers
+            <div className="space-y-3">
+              {steps.map((step) => (
+                <button
+                  key={step.id}
+                  onClick={() => goToStep(step.id)}
+                  disabled={step.id > currentStep}
+                  className={`w-full flex justify-center transition-premium ${step.id <= currentStep ? "cursor-pointer" : "cursor-not-allowed"
+                    } ${step.id < currentStep ? "hover:scale-[1.02]" : ""}`}
+                >
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
+                      ? "bg-primary border-primary text-primary-foreground"
+                      : "border-muted-foreground text-muted-foreground"
+                      } text-sm font-medium`}
+                  >
+                    {step.id}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            // Expanded view - full step details
+            <div className="space-y-4">
+              {steps.map((step, index) => (
+                <div key={step.id} className="flex items-start">
+                  <button
+                    onClick={() => goToStep(step.id)}
+                    disabled={step.id > currentStep}
+                    className={`flex items-start w-full text-left transition-premium ${step.id <= currentStep ? "cursor-pointer" : "cursor-not-allowed"
+                      } ${step.id < currentStep ? "hover:scale-[1.02]" : ""}`}
+                  >
+                    {/* Step indicator column */}
+                    <div className="flex flex-col items-center mr-3 flex-shrink-0">
+                      <div
+                        className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "border-muted-foreground text-muted-foreground"
+                          } text-sm font-medium`}
+                      >
+                        {step.id}
+                      </div>
+                      {/* Connecting line */}
+                      {index < steps.length - 1 && (
+                        <div
+                          className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                            }`}
+                        />
+                      )}
+                    </div>
+
+                    {/* Step details column */}
+                    <div className="flex-1 min-w-0 pt-1">
+                      <p className={`text-sm font-medium ${currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
+                        }`}>
+                        {step.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {step.description}
+                      </p>
+                      {/* Current step indicator */}
+                      {currentStep === step.id && (
+                        <div className="flex items-center mt-2">
+                          <div className="w-2 h-2 bg-primary rounded-full mr-2"></div>
+                          <span className="text-xs text-primary font-medium">Current step</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================================
+  // MAIN COMPONENT RENDER: Multi-step slide builder interface
+  // ============================================================================
+  // Renders a full-screen layout with collapsible sidebars and dynamic step content
+  // Layout adapts responsively between desktop (dual sidebars) and mobile (single column)
   return (
     <div className="min-h-screen gradient-dark-blue flex">
-      {/* Sidebar with user profile */}
+      {/* ========================================================================
+          LEFT SIDEBAR: User profile and main navigation
+          ========================================================================
+          - Collapsible sidebar with user authentication info
+          - Navigation links to other app sections (presentations, settings)
+          - Mobile-responsive with overlay behavior on small screens
+          ======================================================================== */}
       <Sidebar
         user={user}
         collapsed={sidebarCollapsed}
@@ -182,154 +339,132 @@ export default function Build() {
         onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
 
-      {/* Main content area */}
-      <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
-        {/* Top navigation bar with branding and theme toggle */}
+      {/* ========================================================================
+          RIGHT SIDEBAR: Progress tracker (Desktop only)
+          ========================================================================
+          - Shows step-by-step progress through the slide builder workflow
+          - Allows direct navigation to completed steps
+          - Hidden on mobile devices to save screen space
+          ======================================================================== */}
+      <div className="hidden lg:block">
+        <ProgressSidebar />
+      </div>
+
+      {/* ========================================================================
+          MAIN CONTENT AREA: Dynamic step rendering with responsive margins
+          ========================================================================
+          - Adjusts margins based on sidebar collapse states
+          - Contains the active step component and top navigation
+          - Responsive design adapts to different screen sizes
+          ======================================================================== */}
+      <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'
+        } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-80'
+        }`}>
+        {/* ====================================================================
+            TOP NAVIGATION: Branding and controls
+            ====================================================================
+            - Mobile menu toggle for responsive navigation
+            - SlideFlip Builder branding with logo
+            - Theme toggle for light/dark mode switching
+            ==================================================================== */}
         <Navigation variant="premium">
           <NavigationBrand>
+            {/* Mobile menu toggle - only visible on small screens */}
             <MobileMenuButton
               isOpen={mobileMenuOpen}
               onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="mr-2"
             />
+            {/* App logo - simple geometric design */}
             <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
               <div className="h-3 w-3 bg-background rounded-sm"></div>
             </div>
+            {/* App name with responsive text sizing */}
             <span className="font-semibold text-foreground text-sm sm:text-base">
               SlideFlip Builder
             </span>
           </NavigationBrand>
+          {/* Right side controls */}
           <div className="flex items-center gap-2 sm:gap-4">
             <ThemeToggle />
           </div>
         </Navigation>
 
-        {/* MAIN CONTAINER: Full-width container with responsive padding and minimum height */}
-        {/* - min-h-screen: 🔧 CRITICAL for sticky positioning - ensures enough height to scroll */}
-        {/* - Responsive padding: Smaller on mobile (px-2 py-2), larger on desktop (px-4 py-8) */}
+        {/* MAIN CONTAINER: Full-width container with responsive padding */}
         <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">
           {/* ============================================================================
-              MAIN LAYOUT: Two-column responsive layout for slide builder interface
+              MAIN LAYOUT: Single column layout with fixed sidebars
               ============================================================================
-              - Mobile: Single column with progress sidebar below main content
-              - Desktop: Two columns with main content (flex-1) and fixed-width sidebar (320px)
-              - Sidebar is sticky positioned to remain visible during scrolling
-              - relative: 🔧 Creates positioning context to support sticky behavior
+              - Desktop: Content area adjusts between left and right sidebars
+              - Mobile: Full width with mobile progress card below content
               ============================================================================ */}
-          <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 relative">
-
+          <div className="flex flex-col lg:block">
             {/* ========================================================================
                 PRIMARY CONTENT AREA: Dynamic step component rendering
                 ========================================================================
-                - flex-1: Takes remaining space after sidebar allocation
-                - min-w-0: Prevents flex item from overflowing container
+                - Full width on mobile, constrained by sidebars on desktop
                 - Contains the active step component (Upload, Theme, Research, etc.)
                 ======================================================================== */}
-            <div className="flex-1 min-w-0">
+            <div className="w-full">
               {renderStep()}
             </div>
 
             {/* ========================================================================
-                PROGRESS SIDEBAR: Vertical step navigation and progress tracking
+                MOBILE PROGRESS CARD: Only visible on mobile devices
                 ========================================================================
-                - Fixed width (320px) on desktop, full width on mobile
-                - flex-shrink-0: Prevents sidebar from shrinking when content is large
-                - Sticky positioning wrapper keeps sidebar visible during scrolling
-                - Glass card variant provides subtle background with blur effect
+                - Shows below main content on mobile
+                - Hidden on desktop where right sidebar is used instead
                 ======================================================================== */}
-            <div className="w-full lg:w-80 flex-shrink-0">
-              {/* 🔧 STICKY POSITIONING IMPLEMENTATION: This div makes the sidebar sticky! */}
-              {/* - lg:sticky: Enables sticky positioning only on large screens (≥1024px) */}
-              {/* - lg:top-8: Sets 2rem (32px) offset from viewport top when sticky */}
-              {/* - On mobile: Normal scroll behavior (no sticky) for better UX */}
-              {/* - This keeps the progress tracker visible while scrolling through content */}
-              <div className="lg:sticky lg:top-8">
-                {/* PROGRESS CARD: Glass-effect container for step navigation */}
-                <Card variant="glass">
-                  <CardContent className="p-4 sm:p-6">
-                    {/* Progress section header */}
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">Progress</h3>
-
-                    {/* ================================================================
-                      VERTICAL STEP NAVIGATION: Interactive progress indicator
-                      ================================================================
-                      - Displays all 5 steps with visual completion status
-                      - Allows navigation to completed/current steps only
-                      - Shows connecting lines between steps for visual flow
-                      ================================================================ */}
-                    <div className="space-y-4">
-                      {steps.map((step, index) => (
-                        <div key={step.id} className="flex items-start">
-                          {/* ========================================================
-                            STEP BUTTON: Clickable navigation to specific steps
-                            ========================================================
-                            - Disabled for future steps (step.id > currentStep)
-                            - Hover effects only for accessible steps
-                            - Full width button for better touch targets
-                            ======================================================== */}
-                          <button
-                            onClick={() => goToStep(step.id)}
-                            disabled={step.id > currentStep}
-                            className={`flex items-start w-full text-left transition-premium ${step.id <= currentStep ? "cursor-pointer" : "cursor-not-allowed"
-                              } ${step.id < currentStep ? "hover:scale-[1.02]" : ""}`}
-                          >
-                            {/* ====================================================
-                              STEP INDICATOR COLUMN: Number badge and connector
-                              ====================================================
-                              - Circular numbered badge with completion styling
-                              - Vertical connecting line to next step
-                              - Fixed width to maintain alignment
-                              ==================================================== */}
-                            <div className="flex flex-col items-center mr-3 flex-shrink-0">
-                              {/* Step number badge with completion state styling */}
+            <div className="lg:hidden mt-8">
+              <Card variant="glass">
+                <CardContent className="p-4">
+                  <h3 className="text-lg font-semibold mb-4 text-foreground">Progress</h3>
+                  <div className="space-y-4">
+                    {steps.map((step, index) => (
+                      <div key={step.id} className="flex items-start">
+                        <button
+                          onClick={() => goToStep(step.id)}
+                          disabled={step.id > currentStep}
+                          className={`flex items-start w-full text-left transition-premium ${step.id <= currentStep ? "cursor-pointer" : "cursor-not-allowed"
+                            } ${step.id < currentStep ? "hover:scale-[1.02]" : ""}`}
+                        >
+                          <div className="flex flex-col items-center mr-3 flex-shrink-0">
+                            <div
+                              className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground text-muted-foreground"
+                                } text-sm font-medium`}
+                            >
+                              {step.id}
+                            </div>
+                            {index < steps.length - 1 && (
                               <div
-                                className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                                  ? "bg-primary border-primary text-primary-foreground"  // Completed/current: filled with primary color
-                                  : "border-muted-foreground text-muted-foreground"      // Future: outlined with muted color
-                                  } text-sm font-medium`}
-                              >
-                                {step.id}
+                                className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                                  }`}
+                              />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 pt-1">
+                            <p className={`text-sm font-medium ${currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
+                              }`}>
+                              {step.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {step.description}
+                            </p>
+                            {currentStep === step.id && (
+                              <div className="flex items-center mt-2">
+                                <div className="w-2 h-2 bg-primary rounded-full mr-2"></div>
+                                <span className="text-xs text-primary font-medium">Current step</span>
                               </div>
-                              {/* Vertical connecting line between steps (except for last step) */}
-                              {index < steps.length - 1 && (
-                                <div
-                                  className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"  // Completed connections use primary color
-                                    }`}
-                                />
-                              )}
-                            </div>
-                            {/* ====================================================
-                              STEP DETAILS COLUMN: Name, description, and status
-                              ====================================================
-                              - Step name with completion-based text color
-                              - Description text for additional context
-                              - Current step indicator with dot and label
-                              ==================================================== */}
-                            <div className="flex-1 min-w-0 pt-1">
-                              {/* Step name with dynamic color based on completion status */}
-                              <p className={`text-sm font-medium ${currentStep >= step.id ? "text-foreground" : "text-muted-foreground"
-                                }`}>
-                                {step.name}
-                              </p>
-                              {/* Step description for additional context */}
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {step.description}
-                              </p>
-                              {/* Current step indicator - only shown for active step */}
-                              {currentStep === step.id && (
-                                <div className="flex items-center mt-2">
-                                  <div className="w-2 h-2 bg-primary rounded-full mr-2"></div>
-                                  <span className="text-xs text-primary font-medium">Current step</span>
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                            )}
+                          </div>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
