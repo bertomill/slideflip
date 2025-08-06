@@ -1,17 +1,21 @@
 "use client";
 
+// React hooks for state management and lifecycle
 import { useState, useEffect } from "react";
+// UI components for layout and interaction
 import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
-
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-import { createClient } from "@/lib/supabase/client";
-import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Users, BarChart3, Sun, Moon } from "lucide-react";
-import Link from "next/link";
 import { Input } from "@/components/ui/input";
+// Supabase client for authentication
+import { createClient } from "@/lib/supabase/client";
+// Lucide icons for UI elements
+import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Users, BarChart3, Sun, Moon } from "lucide-react";
+// Next.js Link component for navigation
+import Link from "next/link";
 
 // Mock data for presentation templates
 const presentationTemplates = [
@@ -75,34 +79,62 @@ const slideExamples = [
   { id: 12, title: "Case Study", color: "from-emerald-500 to-emerald-700" },
 ];
 
+/**
+ * Home Page Component - Main landing page and authenticated dashboard
+ * 
+ * This component serves dual purposes:
+ * 1. Landing page for unauthenticated users with marketing content and sign-up flow
+ * 2. Dashboard for authenticated users with presentation gallery and creation tools
+ * 
+ * Features:
+ * - Authentication state management with Supabase
+ * - Responsive sidebar navigation for authenticated users
+ * - Sample slide gallery showcasing different presentation styles
+ * - Theme switching between light and dark modes
+ * - Mobile-responsive design with collapsible navigation
+ */
 export default function Home() {
+  // Authentication state - stores current user information from Supabase
   const [user, setUser] = useState<{ id: string; email?: string; user_metadata?: { full_name?: string } } | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [promptText, setPromptText] = useState("");
+
+  // UI state management for responsive navigation
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop sidebar collapse state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);     // Mobile menu visibility state
+
+  // Landing page interactive elements
+  const [promptText, setPromptText] = useState(""); // User input for demo prompt functionality
+
+  // Theme management hook from next-themes
   const { setTheme, theme } = useTheme();
 
+  // Authentication lifecycle management
+  // Sets up Supabase auth listener and loads initial user state
   useEffect(() => {
     const supabase = createClient();
-    
+
+    // Load initial user session on component mount
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
     });
 
+    // Listen for authentication state changes (login/logout/session refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
       }
     );
 
+    // Cleanup subscription on component unmount
     return () => subscription.unsubscribe();
   }, []);
 
   // If user is authenticated, show dashboard
+  // AUTHENTICATED USER DASHBOARD: Show full dashboard interface for logged-in users
   if (user) {
-      return (
-    <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
-        {/* Fixed theme toggle in top right corner */}
+    return (
+      <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
+        {/* THEME TOGGLE: Fixed position theme switcher in top-right corner */}
+        {/* Positioned above all other content with high z-index for easy access */}
         <div className="fixed top-4 right-4 z-50">
           <Button 
             variant="ghost" 
@@ -110,28 +142,37 @@ export default function Home() {
             className="h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg hover:bg-background/90"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
+            {/* ICON ANIMATION: Sun and moon icons with smooth transitions between light/dark modes */}
+            {/* Sun icon: visible in light mode, hidden in dark mode with rotation animation */}
             <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            {/* Moon icon: hidden in light mode, visible in dark mode with rotation animation */}
             <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            {/* ACCESSIBILITY: Screen reader text for theme toggle functionality */}
             <span className="sr-only">Toggle theme</span>
           </Button>
         </div>
         
-        <Sidebar 
-          user={user} 
+        {/* Collapsible sidebar with user profile and navigation */}
+        <Sidebar
+          user={user}
           collapsed={sidebarCollapsed}
           onCollapsedChange={setSidebarCollapsed}
           isOpen={mobileMenuOpen}
           onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
-        
+
+        {/* Main content area that adjusts based on sidebar state */}
         <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+          {/* Top navigation bar with branding */}
           <Navigation variant="premium">
             <NavigationBrand>
-              <MobileMenuButton 
-                isOpen={mobileMenuOpen} 
+              {/* Mobile menu toggle button - only visible on small screens */}
+              <MobileMenuButton
+                isOpen={mobileMenuOpen}
                 onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="mr-2"
               />
+              {/* App logo and brand name */}
               <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                 <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
                   <div className="h-3 w-3 bg-background rounded-sm"></div>
@@ -146,9 +187,10 @@ export default function Home() {
             </div>
           </Navigation>
 
+          {/* Main dashboard content with responsive padding */}
           <div className="py-4 px-2 sm:py-8 sm:px-8 overflow-x-hidden">
             <div>
-              {/* Welcome Header */}
+              {/* Welcome Header - personalized greeting for authenticated users */}
               <div className="mb-8">
                 <h1 className="text-3xl font-bold text-foreground mb-2">
                   Welcome! 👋
@@ -158,7 +200,7 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Presentations Section */}
+              {/* Presentations Section - horizontal scrollable gallery of templates and user presentations */}
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
@@ -230,9 +272,9 @@ export default function Home() {
                     {/* Uber Slide - First Card */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full relative">
-                        <img 
-                          src="/samples/slides/uber_slide_1.png" 
-                          alt="Uber Problem Slide" 
+                        <img
+                          src="/samples/slides/uber_slide_1.png"
+                          alt="Uber Problem Slide"
                           className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
                         />
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
@@ -252,9 +294,9 @@ export default function Home() {
                     {/* DoorDash Slide - Second Card */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full relative">
-                        <img 
-                          src="/samples/slides/doordash_slide_1.png" 
-                          alt="DoorDash Delivery Time Slide" 
+                        <img
+                          src="/samples/slides/doordash_slide_1.png"
+                          alt="DoorDash Delivery Time Slide"
                           className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
                         />
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
@@ -274,9 +316,9 @@ export default function Home() {
                     {/* Facebook Slide - Third Card */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full relative">
-                        <img 
-                          src="/samples/slides/facebook_slide_1.png" 
-                          alt="Facebook Platform Introduction Slide" 
+                        <img
+                          src="/samples/slides/facebook_slide_1.png"
+                          alt="Facebook Platform Introduction Slide"
                           className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
                         />
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
@@ -296,9 +338,9 @@ export default function Home() {
                     {/* YouTube Slide - Fourth Card */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full relative">
-                        <img 
-                          src="/samples/slides/youtube_side_1.png" 
-                          alt="YouTube Company Purpose Slide" 
+                        <img
+                          src="/samples/slides/youtube_side_1.png"
+                          alt="YouTube Company Purpose Slide"
                           className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
                         />
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
@@ -326,9 +368,9 @@ export default function Home() {
                     {/* JPMorgan Chase Financial Highlights */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img 
-                          src="/samples/slides/jpm_slide_1.png" 
-                          alt="JPMorgan Chase Financial Highlights" 
+                        <img
+                          src="/samples/slides/jpm_slide_1.png"
+                          alt="JPMorgan Chase Financial Highlights"
                           className="w-full h-full object-contain"
                         />
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -338,13 +380,13 @@ export default function Home() {
                         </div>
                       </div>
                     </Card>
-                    
+
                     {/* RBC Client Assets and Activity */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img 
-                          src="/samples/slides/rbc_slide_1.png" 
-                          alt="RBC Client Assets and Activity" 
+                        <img
+                          src="/samples/slides/rbc_slide_1.png"
+                          alt="RBC Client Assets and Activity"
                           className="w-full h-full object-contain"
                         />
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -354,13 +396,13 @@ export default function Home() {
                         </div>
                       </div>
                     </Card>
-                    
+
                     {/* BMO Performance Metrics */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img 
-                          src="/samples/slides/bmo_slide_1.png" 
-                          alt="BMO Performance Metrics" 
+                        <img
+                          src="/samples/slides/bmo_slide_1.png"
+                          alt="BMO Performance Metrics"
                           className="w-full h-full object-contain"
                         />
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -370,13 +412,13 @@ export default function Home() {
                         </div>
                       </div>
                     </Card>
-                    
+
                     {/* P&G FY 2025 Results */}
                     <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                       <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img 
-                          src="/samples/slides/pg_slide_1.png" 
-                          alt="P&G FY 2025 Results" 
+                        <img
+                          src="/samples/slides/pg_slide_1.png"
+                          alt="P&G FY 2025 Results"
                           className="w-full h-full object-contain"
                         />
                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -399,8 +441,23 @@ export default function Home() {
   // Landing page for unauthenticated users
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Navigation */}
+      {/* Fixed theme toggle in top right corner */}
+      <div className="fixed top-4 right-4 z-50">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg hover:bg-background/90"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
+          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </div>
+      
+      {/* Navigation bar with logo and authentication buttons */}
       <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto">
+        {/* Logo and brand name */}
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
             <div className="h-4 w-4 bg-white rounded-sm"></div>
@@ -409,7 +466,8 @@ export default function Home() {
             SlideFlip
           </span>
         </div>
-        
+
+        {/* Authentication buttons */}
         <div className="flex items-center gap-4">
           <Link href="/auth/login">
             <Button variant="ghost" className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100">
@@ -435,7 +493,7 @@ export default function Home() {
                 The AI presentation maker for the workplace
               </span>
             </div>
-            
+
             <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight">
               It&apos;s{" "}
               <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
@@ -446,7 +504,7 @@ export default function Home() {
                 AI.
               </span>
             </h1>
-            
+
             <p className="text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-2xl mx-auto lg:mx-0">
               Create professional presentations in minutes, not hours. Let AI transform your ideas into stunning slides that captivate your audience.
             </p>
@@ -472,8 +530,8 @@ export default function Home() {
                   style={{ fontStyle: promptText ? 'normal' : 'italic' }}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg px-4"
                     onClick={() => window.location.href = '/auth/sign-up'}
                   >
@@ -482,7 +540,7 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-4 mt-4 text-sm text-slate-500 dark:text-slate-400">
                 <button className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                   <Zap className="h-4 w-4" />
@@ -498,17 +556,16 @@ export default function Home() {
           <div className="flex-1 max-w-2xl">
             <div className="grid grid-cols-3 gap-3 transform rotate-3 hover:rotate-0 transition-transform duration-700">
               {slideExamples.map((slide, index) => (
-                <Card 
-                  key={slide.id} 
-                  className={`aspect-[4/3] overflow-hidden hover:scale-105 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl ${
-                    index % 4 === 0 ? 'transform -rotate-2' : 
-                    index % 4 === 1 ? 'transform rotate-1' : 
-                    index % 4 === 2 ? 'transform -rotate-1' : 'transform rotate-2'
-                  }`}
-                  style={{ 
-                    animationDelay: `${index * 100}ms`,
-                    animation: 'fadeInUp 0.6s ease-out forwards'
+                <Card
+                  key={slide.id}
+                  className={`aspect-[4/3] overflow-hidden hover:scale-105 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl ${index % 4 === 0 ? 'transform -rotate-2' :
+                      index % 4 === 1 ? 'transform rotate-1' :
+                        index % 4 === 2 ? 'transform -rotate-1' : 'transform rotate-2'
+                    }`}
+                  style={{
+                    animationDelay: `${index * 50}ms`
                   }}
+                  className="animate-in fade-in slide-in-from-bottom-4 duration-500"
                 >
                   <div className={`h-full bg-gradient-to-br ${slide.color} relative group`}>
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -626,18 +683,7 @@ export default function Home() {
         </div>
       </footer>
 
-      <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+
     </div>
   );
 }

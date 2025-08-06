@@ -1,0 +1,332 @@
+{
+  "template": {
+    "name": "Modern Clean",
+    "id": "modern-clean-ppt",
+    "description": "A minimalist PowerPoint template with clean typography and professional layout",
+    "aspectRatio": "16:9",
+    "dimensions": {
+      "width": 720,
+      "height": 405,
+      "units": "points"
+    }
+  },
+  "background": {
+    "type": "solid",
+    "color": "#ffffff"
+  },
+  "elements": [
+    {
+      "type": "shape",
+      "id": "accent-bar",
+      "shape": "rectangle",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "width": 8,
+        "height": 405
+      },
+      "styling": {
+        "fill": {
+          "type": "gradient",
+          "colors": [
+            {"color": "#3b82f6", "position": 0},
+            {"color": "#1d4ed8", "position": 100}
+          ],
+          "direction": 90
+        }
+      }
+    },
+    {
+      "type": "textbox",
+      "id": "title",
+      "position": {
+        "x": 50,
+        "y": 50,
+        "width": 620,
+        "height": 80
+      },
+      "content": {
+        "text": "Clean & Modern Design",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Inter",
+          "size": 45,
+          "weight": "800",
+          "color": "#1f2937"
+        },
+        "alignment": "left",
+        "letterSpacing": -0.02
+      }
+    },
+    {
+      "type": "textbox",
+      "id": "subtitle",
+      "position": {
+        "x": 50,
+        "y": 140,
+        "width": 620,
+        "height": 40
+      },
+      "content": {
+        "text": "Professional presentation template with minimal aesthetics",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Inter",
+          "size": 20,
+          "weight": "normal",
+          "color": "#6b7280"
+        },
+        "alignment": "left"
+      }
+    },
+    {
+      "type": "group",
+      "id": "stats-row",
+      "position": {
+        "x": 50,
+        "y": 200,
+        "width": 620,
+        "height": 80
+      },
+      "elements": [
+        {
+          "type": "shape",
+          "id": "stat-1",
+          "shape": "roundedRectangle",
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 180,
+            "height": 80
+          },
+          "styling": {
+            "fill": {
+              "color": "#f8fafc"
+            },
+            "border": {
+              "color": "#e2e8f0",
+              "width": 1
+            },
+            "borderRadius": 16
+          },
+          "content": {
+            "text": "92%\nSUCCESS RATE",
+            "placeholder": true
+          },
+          "formatting": {
+            "alignment": "center",
+            "paragraphs": [
+              {
+                "index": 0,
+                "font": {
+                  "family": "Inter",
+                  "size": 35,
+                  "weight": "700",
+                  "color": "#3b82f6"
+                }
+              },
+              {
+                "index": 1,
+                "font": {
+                  "family": "Inter",
+                  "size": 11,
+                  "weight": "500",
+                  "color": "#64748b"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "shape",
+          "id": "stat-2",
+          "shape": "roundedRectangle",
+          "position": {
+            "x": 220,
+            "y": 0,
+            "width": 180,
+            "height": 80
+          },
+          "styling": {
+            "fill": {
+              "color": "#f8fafc"
+            },
+            "border": {
+              "color": "#e2e8f0",
+              "width": 1
+            },
+            "borderRadius": 16
+          },
+          "content": {
+            "text": "15K\nUSERS",
+            "placeholder": true
+          },
+          "formatting": {
+            "alignment": "center",
+            "paragraphs": [
+              {
+                "index": 0,
+                "font": {
+                  "family": "Inter",
+                  "size": 35,
+                  "weight": "700",
+                  "color": "#3b82f6"
+                }
+              },
+              {
+                "index": 1,
+                "font": {
+                  "family": "Inter",
+                  "size": 11,
+                  "weight": "500",
+                  "color": "#64748b"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "shape",
+          "id": "stat-3",
+          "shape": "roundedRectangle",
+          "position": {
+            "x": 440,
+            "y": 0,
+            "width": 180,
+            "height": 80
+          },
+          "styling": {
+            "fill": {
+              "color": "#f8fafc"
+            },
+            "border": {
+              "color": "#e2e8f0",
+              "width": 1
+            },
+            "borderRadius": 16
+          },
+          "content": {
+            "text": "4.8\nRATING",
+            "placeholder": true
+          },
+          "formatting": {
+            "alignment": "center",
+            "paragraphs": [
+              {
+                "index": 0,
+                "font": {
+                  "family": "Inter",
+                  "size": 35,
+                  "weight": "700",
+                  "color": "#3b82f6"
+                }
+              },
+              {
+                "index": 1,
+                "font": {
+                  "family": "Inter",
+                  "size": 11,
+                  "weight": "500",
+                  "color": "#64748b"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "textbox",
+      "id": "key-points",
+      "position": {
+        "x": 50,
+        "y": 300,
+        "width": 300,
+        "height": 100
+      },
+      "content": {
+        "text": "✓ Clean typography with excellent readability\n✓ Minimal design that focuses on content\n✓ Professional color scheme and spacing\n✓ Responsive layout that scales beautifully",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Inter",
+          "size": 14,
+          "weight": "normal",
+          "color": "#374151"
+        },
+        "alignment": "left",
+        "lineSpacing": 1.6
+      }
+    },
+    {
+      "type": "shape",
+      "id": "highlight-box",
+      "shape": "roundedRectangle",
+      "position": {
+        "x": 370,
+        "y": 300,
+        "width": 300,
+        "height": 100
+      },
+      "styling": {
+        "fill": {
+          "type": "gradient",
+          "colors": [
+            {"color": "#3b82f6", "position": 0},
+            {"color": "#1d4ed8", "position": 100}
+          ],
+          "direction": 135
+        },
+        "borderRadius": 20
+      },
+      "content": {
+        "text": "Key Insight\nSimple designs often communicate more effectively than complex ones, allowing your message to shine through clearly.",
+        "placeholder": true
+      },
+      "formatting": {
+        "alignment": "center",
+        "paragraphs": [
+          {
+            "index": 0,
+            "font": {
+              "family": "Inter",
+              "size": 20,
+              "weight": "600",
+              "color": "#ffffff"
+            }
+          },
+          {
+            "index": 1,
+            "font": {
+              "family": "Inter",
+              "size": 12,
+              "weight": "normal",
+              "color": "#e0e7ff"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "instructions": {
+    "setup": [
+      "Create new PowerPoint presentation with 16:9 aspect ratio",
+      "Set slide background to white (#ffffff)",
+      "Add blue accent bar on the left edge",
+      "Position all elements according to specifications",
+      "Apply Inter font family (fallback to system fonts if unavailable)"
+    ],
+    "customization": [
+      "Replace placeholder text with actual content",
+      "Adjust statistics to reflect real data",
+      "Modify key points to match presentation topic",
+      "Update highlight box with relevant insight",
+      "Maintain consistent spacing and alignment"
+    ]
+  }
+}

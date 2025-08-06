@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Clean Slide</title>
+    <style>
+        .slide-container {
+            width: 1920px;
+            height: 1080px;
+            background: #ffffff;
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 100px;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .slide-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 100%;
+            background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+        
+        .slide-content {
+            width: 100%;
+            max-width: 1400px;
+            text-align: left;
+        }
+        
+        .slide-container h1 {
+            color: #1f2937;
+            font-size: 4.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+        }
+        
+        .slide-container h2 {
+            color: #6b7280;
+            font-size: 2rem;
+            font-weight: 400;
+            margin-bottom: 4rem;
+            line-height: 1.3;
+        }
+        
+        .slide-container .stats-row {
+            display: flex;
+            gap: 4rem;
+            margin-bottom: 4rem;
+        }
+        
+        .slide-container .stat-item {
+            flex: 1;
+            text-align: center;
+            padding: 2rem;
+            background: #f8fafc;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .slide-container .stat-number {
+            color: #3b82f6;
+            font-size: 3.5rem;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        
+        .slide-container .stat-label {
+            color: #64748b;
+            font-size: 1.1rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .slide-container .content-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5rem;
+            align-items: start;
+        }
+        
+        .slide-container .key-points {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .slide-container .key-points li {
+            color: #374151;
+            font-size: 1.4rem;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            padding-left: 2.5rem;
+            position: relative;
+        }
+        
+        .slide-container .key-points li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        
+        .slide-container .highlight-box {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 3rem;
+            border-radius: 20px;
+            text-align: center;
+        }
+        
+        .slide-container .highlight-box h3 {
+            color: white;
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .slide-container .highlight-box p {
+            color: #e0e7ff;
+            font-size: 1.2rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="slide-content">
+            <h1>Clean & Modern Design</h1>
+            <h2>Professional presentation template with minimal aesthetics</h2>
+            
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-number">92%</span>
+                    <span class="stat-label">Success Rate</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">15K</span>
+                    <span class="stat-label">Users</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">4.8</span>
+                    <span class="stat-label">Rating</span>
+                </div>
+            </div>
+            
+            <div class="content-section">
+                <ul class="key-points">
+                    <li>Clean typography with excellent readability</li>
+                    <li>Minimal design that focuses on content</li>
+                    <li>Professional color scheme and spacing</li>
+                    <li>Responsive layout that scales beautifully</li>
+                </ul>
+                
+                <div class="highlight-box">
+                    <h3>Key Insight</h3>
+                    <p>Simple designs often communicate more effectively than complex ones, allowing your message to shine through clearly.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -9,31 +9,82 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowLeft, ArrowRight, RefreshCw, MessageSquare, Sparkles } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 
+// ============================================================================
+// PREVIEW STEP COMPONENT
+// ============================================================================
+// Fourth step in the slide builder workflow where users can:
+// - View their AI-generated slide preview
+// - Provide feedback for improvements
+// - Regenerate slides with modifications
+// - Navigate to the final download step
+//
+// KEY RECENT CHANGE: Now prioritizes parsed document content over raw files
+// when sending data to the AI slide generation API for better content quality
+// ============================================================================
+
+/**
+ * Props interface for the PreviewStep component
+ * Handles the fourth step in the slide builder workflow where users review and refine their generated slide
+ */
 interface PreviewStepProps {
-  slideData: SlideData;
-  updateSlideData: (updates: Partial<SlideData>) => void;
-  onNext: () => void;
-  onPrev: () => void;
+  slideData: SlideData;                                    // Current slide data containing all user inputs and generated content
+  updateSlideData: (updates: Partial<SlideData>) => void; // Callback to update slide data with user feedback
+  onNext: () => void;                                      // Navigate to download step
+  onPrev: () => void;                                      // Navigate back to content planning step
 }
 
+/**
+ * PreviewStep Component - Fourth step in the slide builder workflow
+ * 
+ * MAIN FUNCTIONALITY:
+ * - Auto-generates AI slide from user data when component mounts
+ * - Displays generated slide preview with fallback handling
+ * - Allows users to provide feedback for slide improvements
+ * - Regenerates slides based on user feedback
+ * - Provides navigation to download step
+ * 
+ * KEY FEATURES:
+ * - Prioritizes parsed document content over raw files for AI processing
+ * - Graceful error handling with placeholder slide fallback
+ * - Real-time feedback integration for iterative improvements
+ * - Debug tools for development and troubleshooting
+ */
 export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: PreviewStepProps) {
+  // ============================================================================
+  // COMPONENT STATE: Loading states and user input management
+  // ============================================================================
+  
+  // Loading state for initial slide generation when component first loads
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Loading state for slide regeneration when user provides feedback
   const [isRegenerating, setIsRegenerating] = useState(false);
+  
+  // User's feedback text input for slide improvements and refinements
   const [feedback, setFeedback] = useState("");
 
+  // LIFECYCLE: Auto-generate slide when component mounts if no slide exists yet
+  // This ensures users see their slide immediately upon reaching the preview step
   useEffect(() => {
     if (!slideData.slideHtml) {
       generateSlide();
     }
   }, [slideData.slideHtml]);
 
+  /**
+   * SLIDE GENERATION: Generate initial slide from user data
+   * Makes API call to generate-slide endpoint with user's description, theme, research, and documents
+   * Includes 5-second delay for better UX and fallback handling for errors
+   */
   const generateSlide = async () => {
     setIsGenerating(true);
-    
-    // Simulate 5-second loading time
+
+    // UX ENHANCEMENT: Simulate 5-second loading time for better perceived performance
+    // This gives users confidence that complex AI processing is happening
     await new Promise(resolve => setTimeout(resolve, 5000));
-    
+
     try {
+      // API CALL: Send all user data to OpenAI-powered slide generation endpoint
       const response = await fetch('/api/generate-slide', {
         method: 'POST',
         headers: {
@@ -43,7 +94,9 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           description: slideData.description,
           theme: slideData.selectedTheme,
           researchData: slideData.researchData,
-          documents: slideData.documents
+          contentPlan: slideData.contentPlan,
+          userFeedback: slideData.userFeedback,
+          documents: slideData.parsedDocuments || slideData.documents
         }),
       });
 
@@ -52,23 +105,31 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       }
 
       const result = await response.json();
+      // SUCCESS: Update parent component with generated HTML slide content
       updateSlideData({ slideHtml: result.slideHtml });
     } catch (error) {
       console.error('Error generating slide:', error);
-      // For now, we'll just show the cat slide instead of the fallback
+      // FALLBACK: Use placeholder cat slide image if AI generation fails
+      // This ensures users always see something rather than a broken state
       updateSlideData({ slideHtml: 'cat-slide-placeholder' });
     } finally {
       setIsGenerating(false);
     }
   };
 
+  /**
+   * SLIDE REGENERATION: Regenerate slide with user feedback incorporated
+   * Makes API call with original description plus user feedback for improvements
+   * Includes fallback handling for errors to ensure graceful degradation
+   */
   const regenerateWithFeedback = async () => {
     if (!feedback.trim()) return;
-    
+
     setIsRegenerating(true);
     updateSlideData({ userFeedback: feedback });
-    
+
     try {
+      // API CALL: Send enhanced prompt with user feedback to improve the slide
       const response = await fetch('/api/generate-slide', {
         method: 'POST',
         headers: {
@@ -78,7 +139,13 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           description: `${slideData.description}\n\nUser feedback: ${feedback}`,
           theme: slideData.selectedTheme,
           researchData: slideData.researchData,
-          documents: slideData.documents
+          contentPlan: slideData.contentPlan,
+          userFeedback: feedback,
+          // DOCUMENT PRIORITIZATION: Use parsed text content when available, fallback to raw files
+          // - parsedDocuments: Contains extracted text content that AI can actually process
+          // - documents: Raw File objects used as fallback when text extraction fails
+          // This ensures AI gets the best possible content for slide generation
+          documents: slideData.parsedDocuments || slideData.documents
         }),
       });
 
@@ -87,10 +154,11 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       }
 
       const result = await response.json();
+      // SUCCESS: Update slide with improved version based on feedback
       updateSlideData({ slideHtml: result.slideHtml });
     } catch (error) {
       console.error('Error regenerating slide:', error);
-      // Fallback to basic update on error
+      // FALLBACK: Apply basic text update if API fails to ensure user sees some change
       const updatedHtml = slideData.slideHtml?.replace(
         'Generated Content',
         `Updated with feedback: "${feedback.slice(0, 50)}..."`
@@ -102,10 +170,13 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     }
   };
 
+  // VALIDATION: Check if user can proceed to next step
+  // Requires slide to be generated and no active processing
   const canProceed = (slideData.slideHtml || slideData.slideHtml === 'cat-slide-placeholder') && !isGenerating && !isRegenerating;
 
   return (
     <div className="space-y-6">
+      {/* HEADER SECTION: Step introduction and instructions */}
       <Card variant="elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -118,7 +189,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
         </CardHeader>
       </Card>
 
-      {/* Slide Preview */}
+      {/* MAIN SLIDE PREVIEW: Display generated slide with loading states */}
       <Card variant="glass">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -128,6 +199,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 Based on your documents, theme, and {slideData.wantsResearch ? 'research' : 'content'}
               </CardDescription>
             </div>
+            {/* Badge indicating AI generation */}
             <Badge variant="secondary">
               <Sparkles className="h-3 w-3 mr-1" />
               AI Generated
@@ -135,6 +207,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           </div>
         </CardHeader>
         <CardContent>
+          {/* LOADING STATE: Show spinner while generating slide */}
           {isGenerating ? (
             <div className="flex items-center justify-center h-96 bg-muted/30 rounded-lg">
               <div className="text-center space-y-4">
@@ -146,39 +219,56 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
               </div>
             </div>
           ) : slideData.slideHtml === 'cat-slide-placeholder' ? (
+            // FALLBACK STATE: Show placeholder cat slide image when AI generation fails
             <div className="border rounded-lg overflow-hidden shadow-lg">
-              <img 
-                src="/samples/slides/cat_slide_1.png" 
-                alt="Generated Slide Preview" 
+              <img
+                src="/samples/slides/cat_slide_1.png"
+                alt="Generated Slide Preview"
                 className="w-full h-auto object-contain"
               />
             </div>
           ) : slideData.slideHtml ? (
+            // SUCCESS STATE: Render actual generated HTML slide with complete style isolation
             <div className="border rounded-lg overflow-hidden shadow-lg">
-              <div 
-                dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
-                className="transform scale-75 origin-top-left"
-                style={{ width: '133.33%', height: '133.33%' }}
-              />
+              <div className="bg-white relative">
+                {/* Debug info */}
+                <div className="p-2 bg-gray-100 text-xs text-gray-600 border-b">
+                  Debug: HTML length: {slideData.slideHtml.length} chars | Type: {typeof slideData.slideHtml}
+                </div>
+                {/* 
+                  SLIDE RENDERING: Display AI-generated HTML content with simplified rendering
+                  - dangerouslySetInnerHTML: Renders HTML from OpenAI API response
+                  - Simplified styling to avoid rendering conflicts
+                */}
+                <div
+                  dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
+                  style={{ 
+                    minHeight: '400px',
+                    maxHeight: '600px',
+                    overflow: 'auto'
+                  }}
+                />
+              </div>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
-      {/* Feedback Section */}
+      {/* FEEDBACK SECTION: User input for slide improvements - only shown after slide is generated */}
       {slideData.slideHtml && (
-        <Card variant="premium">
+        <Card variant="glass">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />
               Provide Feedback
             </CardTitle>
             <CardDescription>
-              Tell us what you&apos;d like to change or improve about the slide
+              Tell us what you'd like to change or improve about the slide
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              {/* Input field for user feedback */}
               <Label htmlFor="feedback">Your feedback</Label>
               <Input
                 id="feedback"
@@ -187,8 +277,9 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 onChange={(e) => setFeedback(e.target.value)}
               />
             </div>
-            <Button 
-              variant="outline" 
+            {/* Button to regenerate slide with feedback */}
+            <Button
+              variant="outline"
               onClick={regenerateWithFeedback}
               disabled={!feedback.trim() || isRegenerating}
               className="w-full"
@@ -209,20 +300,52 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
         </Card>
       )}
 
+      {/* NAVIGATION: Step navigation buttons */}
       <div className="flex justify-between">
+        {/* Back button to previous step */}
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Research
+          Back to Content Planning
         </Button>
-        <Button 
-          variant="engineering" 
-          size="lg" 
-          onClick={onNext}
-          disabled={!canProceed}
-        >
-          Continue to Download
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+        
+        <div className="flex gap-2">
+          {/* DEBUG BUTTON: Developer tool to inspect generated HTML code */}
+          {/* Opens generated HTML in new window and logs details to console */}
+          {slideData.slideHtml && slideData.slideHtml !== 'cat-slide-placeholder' && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                // Log HTML details to browser console for debugging
+                console.log('Generated HTML:', slideData.slideHtml);
+                console.log('HTML type:', typeof slideData.slideHtml);
+                console.log('HTML length:', slideData.slideHtml?.length);
+                
+                // Open HTML in new browser window for visual inspection
+                if (slideData.slideHtml) {
+                  const newWindow = window.open('', '_blank');
+                  if (newWindow) {
+                    newWindow.document.write(slideData.slideHtml);
+                    newWindow.document.close();
+                  }
+                }
+              }}
+            >
+              Debug: View HTML
+            </Button>
+          )}
+          
+          {/* Next button to download step - disabled until slide is ready */}
+          <Button
+            variant="engineering"
+            size="lg"
+            onClick={onNext}
+            disabled={!canProceed}
+          >
+            Continue to Download
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
   );

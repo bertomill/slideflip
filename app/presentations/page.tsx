@@ -27,7 +27,7 @@ export default function PresentationsPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    
+
     supabase.auth.getUser().then(({ data: { user }, error }) => {
       if (error || !user) {
         window.location.href = "/auth/login";
@@ -81,9 +81,9 @@ export default function PresentationsPage() {
     <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
       {/* Fixed theme toggle in top right corner */}
       <div className="fixed top-4 right-4 z-50">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 shadow-lg hover:bg-background/90"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
@@ -92,48 +92,38 @@ export default function PresentationsPage() {
           <span className="sr-only">Toggle theme</span>
         </Button>
       </div>
-      
+
       {/* Sidebar with user profile */}
-      <Sidebar 
-        user={user} 
+      <Sidebar
+        user={user}
         collapsed={sidebarCollapsed}
         onCollapsedChange={setSidebarCollapsed}
         isOpen={mobileMenuOpen}
         onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
-      
+
       {/* Main content area */}
       <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
         {/* Top navigation bar with branding and theme toggle */}
         <Navigation variant="premium">
-                      <NavigationBrand>
-              <MobileMenuButton 
-                isOpen={mobileMenuOpen} 
-                onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="mr-2"
-              />
-              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-                  <div className="h-3 w-3 bg-background rounded-sm"></div>
-                </div>
-                <span className="font-semibold text-foreground">
-                  SlideFlip
-                </span>
-              </Link>
-            </NavigationBrand>
-                      <div className="flex items-center gap-4">
-              <ThemeToggle />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
-            </div>
+          <NavigationBrand>
+            <MobileMenuButton
+              isOpen={mobileMenuOpen}
+              onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="mr-2"
+            />
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
+                <div className="h-3 w-3 bg-background rounded-sm"></div>
+              </div>
+              <span className="font-semibold text-foreground">
+                SlideFlip
+              </span>
+            </Link>
+          </NavigationBrand>
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Theme toggle removed - using fixed one in top right corner */}
+          </div>
         </Navigation>
 
         <div className="px-4 py-8">
@@ -183,7 +173,7 @@ export default function PresentationsPage() {
                           <span>{new Date(project.createdAt).toLocaleDateString()}</span>
                         </div>
                       </div>
-                      <Badge 
+                      <Badge
                         variant={project.status === 'completed' ? 'default' : 'secondary'}
                         className="capitalize"
                       >

@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "name": "Add Code Comments",
-  "description": "Automatically adds descriptive comments to code sections when files are modified to improve readability and make it easier to interpret when scrolling through code",
+  "description": "Automatically adds descriptive comments to code sections when files are modified to help the user understand the code and make it easier to interpret when scrolling through code",
   "version": "1",
   "when": {
     "type": "fileEdited",

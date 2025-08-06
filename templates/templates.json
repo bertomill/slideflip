@@ -1,0 +1,37 @@
+{
+  "templates": [
+    {
+      "id": "professional-gradient",
+      "name": "Professional Gradient",
+      "description": "A modern professional slide template with gradient background, glass morphism effects, and clean typography. Perfect for business presentations and data visualization.",
+      "theme": "Professional",
+      "filename": "professional-gradient.html",
+      "aspect_ratio": "16:9",
+      "tags": ["professional", "gradient", "modern", "business", "glass-morphism"],
+      "primary_colors": ["#667eea", "#764ba2", "#ffffff"],
+      "use_cases": ["business presentations", "quarterly reports", "executive summaries", "data visualization"]
+    },
+    {
+      "id": "modern-clean",
+      "name": "Modern Clean",
+      "description": "A minimalist design with clean typography and subtle accents. Ideal for corporate presentations and professional communications.",
+      "theme": "Modern",
+      "filename": "modern-clean.html",
+      "aspect_ratio": "16:9",
+      "tags": ["modern", "clean", "minimal", "corporate", "professional"],
+      "primary_colors": ["#ffffff", "#3b82f6", "#1f2937"],
+      "use_cases": ["corporate presentations", "product launches", "team updates", "client meetings"]
+    },
+    {
+      "id": "dark-tech",
+      "name": "Dark Tech",
+      "description": "A dark-themed template with tech aesthetics, perfect for developer presentations, technical demos, and startup pitches.",
+      "theme": "Tech",
+      "filename": "dark-tech.html",
+      "aspect_ratio": "16:9",
+      "tags": ["dark", "tech", "developer", "startup", "modern"],
+      "primary_colors": ["#0f172a", "#78dbff", "#10b981"],
+      "use_cases": ["developer presentations", "technical demos", "startup pitches", "product roadmaps"]
+    }
+  ]
+}

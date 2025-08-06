@@ -497,7 +497,7 @@ Your slide will be created using the uploaded documents and description provided
           onClick={onNext}
           disabled={!canProceed || isResearching}
         >
-          Continue to Preview
+          Continue to Content Planning
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>
