@@ -24,18 +24,39 @@ import PptxGenJS from 'pptxgenjs';
  * @returns Binary PPTX file as downloadable attachment or error response
  */
 export async function POST(request: NextRequest) {
+  // ============================================================================
+  // VARIABLE DECLARATION: Pre-declare variables for error handler access
+  // ============================================================================
+  // These variables are declared outside the try block so they can be accessed
+  // in the catch block for detailed error reporting and debugging purposes
+  let slideHtml: string | undefined;    // AI-generated HTML slide content
+  let description: string | undefined;  // User's slide description text
+  let theme: string | undefined;        // Selected visual theme identifier
+  
   try {
-    // REQUEST PARSING: Extract all slide generation parameters from request body
+    // ============================================================================
+    // REQUEST PARSING: Extract slide generation parameters from request body
+    // ============================================================================
+    // Parse the incoming JSON request to extract all slide generation parameters
     // These parameters come from the slide builder workflow and contain all user inputs
-    const {
-      slideHtml,      // Generated HTML content from OpenAI (optional)
-      description,    // User's original slide description (fallback for title)
+    const requestData = await request.json();
+    
+    // DESTRUCTURING ASSIGNMENT: Extract core parameters with proper scoping
+    // Uses destructuring to assign values to the pre-declared variables
+    // This pattern ensures variables are accessible in both try and catch blocks
+    ({
+      slideHtml,      // Generated HTML content from OpenAI (optional - may be undefined)
+      description,    // User's original slide description (fallback for title generation)
       theme,          // Visual theme selection (Professional, Modern, Tech, etc.)
-      researchData,   // Research insights from Tavily API (optional)
-      userFeedback,   // User's refinement feedback (stored as slide notes)
-      title,          // Explicit slide title (takes priority over description)
-      subtitle        // Optional subtitle for the slide
-    } = await request.json();
+      researchData: requestData.researchData,   // Research insights from Tavily API (optional)
+      userFeedback: requestData.userFeedback,   // User's refinement feedback (stored as slide notes)
+      title: requestData.title,          // Explicit slide title (takes priority over description)
+      subtitle: requestData.subtitle     // Optional subtitle for the slide
+    } = requestData);
+    
+    // PARAMETER EXTRACTION: Extract remaining parameters for local use
+    // Creates local constants for parameters that don't need error handler access
+    const { researchData, userFeedback, title, subtitle } = requestData;
 
     // INPUT VALIDATION: Ensure we have enough content to create a meaningful slide
     // Either an explicit title or a description is required for slide generation
@@ -67,16 +88,29 @@ export async function POST(request: NextRequest) {
 
     // BACKGROUND STYLING: Apply theme-appropriate background (gradient or solid color)
     // Gradient backgrounds create visual depth, solid backgrounds provide clean minimalism
+    // --------------------------------------------------------------------------
+    // BACKGROUND STYLING: Convert theme background definition into pptxgenjs
+    // compatible format.  Note that pptxgenjs expects raw 6-character hex values
+    // ("FF0000") without the leading hash and a two-colour gradient needs
+    // `color1` and `color2` keys instead of a `colors` array.
+    // --------------------------------------------------------------------------
     if (themeConfig.background.type === 'gradient') {
+      const [color1 = 'FFFFFF', color2 = 'FFFFFF'] = themeConfig.background.colors;
+
       slide.background = {
         fill: {
           type: 'gradient',
-          colors: themeConfig.background.colors,
-          angle: themeConfig.background.angle || 45
+          color1: color1.replace('#', ''),
+          color2: color2.replace('#', ''),
+          rotation: themeConfig.background.angle || 45
         }
       };
     } else {
-      slide.background = { fill: themeConfig.background.color };
+      slide.background = {
+        fill: {
+          color: (themeConfig.background.color || 'FFFFFF').replace('#', '')
+        }
+      };
     }
 
     // CONTENT EXTRACTION: Parse HTML slide content or create from structured data
@@ -128,18 +162,21 @@ export async function POST(request: NextRequest) {
     // 4. Statistics visualization at the bottom
     // Each section uses theme-appropriate styling for visual consistency
 
+    // ============================================================================
     // TITLE SECTION: Main slide heading with prominent styling
+    // ============================================================================
     // Creates the primary title that captures audience attention immediately
     // Uses large font size and center alignment for maximum visual impact
+    // All positioning values are in inches for PowerPoint compatibility
     const titleOptions: any = {
       x: 1,          // Horizontal position: 1 inch from left edge (standard margin)
       y: 0.5,        // Vertical position: 0.5 inches from top (header area)
       w: 8,          // Width: 8 inches (spans most of slide width for centering)
       h: 1.5,        // Height: 1.5 inches (adequate space for large text)
       fontSize: 44,  // Font size: 44pt (large enough for presentation visibility)
-      fontFace: themeConfig.fonts.title.family,  // Theme-specific font family
-      color: themeConfig.fonts.title.color,      // Theme-specific text color
-      bold: true,    // Bold weight for emphasis and hierarchy
+      fontFace: themeConfig.fonts.title.family,  // Theme-specific font family (e.g., Segoe UI, Inter)
+      color: String(themeConfig.fonts.title.color || 'FFFFFF').startsWith('#') ? String(themeConfig.fonts.title.color) : `#${String(themeConfig.fonts.title.color || 'FFFFFF')}`,
+      bold: true,    // Bold weight for emphasis and visual hierarchy
       align: 'center' // Center alignment for professional appearance
     };
 
@@ -163,7 +200,7 @@ export async function POST(request: NextRequest) {
         h: 0.8,        // Smaller height than title
         fontSize: 24,  // Smaller font size to create hierarchy
         fontFace: themeConfig.fonts.subtitle.family,
-        color: themeConfig.fonts.subtitle.color,
+        color: String(themeConfig.fonts.subtitle.color || 'F0F0F0').startsWith('#') ? String(themeConfig.fonts.subtitle.color) : `#${String(themeConfig.fonts.subtitle.color || 'F0F0F0')}`,
         align: 'center'
       });
     }
@@ -187,7 +224,7 @@ export async function POST(request: NextRequest) {
           h: 2.5,        // Sufficient height for multiple bullet points
           fontSize: 16,  // Readable body text size
           fontFace: themeConfig.fonts.body.family,
-          color: themeConfig.fonts.body.color,
+          color: String(themeConfig.fonts.body.color || 'F0F0F0').startsWith('#') ? String(themeConfig.fonts.body.color) : `#${String(themeConfig.fonts.body.color || 'F0F0F0')}`,
           lineSpacing: 24 // Generous line spacing for readability
         });
       }
@@ -210,11 +247,11 @@ export async function POST(request: NextRequest) {
           w: 2,          // 2 inches wide - compact but readable
           h: 1.2,        // 1.2 inches tall - enough for number and label
           fill: {
-            color: themeConfig.colors.accent,
+            color: String(themeConfig.colors.accent || 'FFFFFF').startsWith('#') ? String(themeConfig.colors.accent) : `#${String(themeConfig.colors.accent || 'FFFFFF')}`,
             transparency: 20  // 20% transparency for subtle background
           },
           line: {
-            color: themeConfig.colors.accent,
+            color: String(themeConfig.colors.accent || 'FFFFFF').startsWith('#') ? String(themeConfig.colors.accent) : `#${String(themeConfig.colors.accent || 'FFFFFF')}`,
             width: 1,
             transparency: 30  // Slightly more transparent border
           }
@@ -223,8 +260,8 @@ export async function POST(request: NextRequest) {
         // STATISTIC TEXT: Add the actual number and label inside the container
         // Uses multi-part text with different formatting for number vs label
         slide.addText([
-          { text: stat.value, options: { fontSize: 28, bold: true, color: themeConfig.fonts.stat.color } },
-          { text: '\n' + stat.label, options: { fontSize: 12, color: themeConfig.fonts.statLabel.color } }
+          { text: stat.value, options: { fontSize: 28, bold: true, color: String(themeConfig.fonts.stat.color || 'FFFFFF').startsWith('#') ? String(themeConfig.fonts.stat.color) : `#${String(themeConfig.fonts.stat.color || 'FFFFFF')}` } },
+          { text: '\n' + stat.label, options: { fontSize: 12, color: String(themeConfig.fonts.statLabel.color || 'F0F0F0').startsWith('#') ? String(themeConfig.fonts.statLabel.color) : `#${String(themeConfig.fonts.statLabel.color || 'F0F0F0')}` } }
         ], {
           x: xPos,       // Same position as container
           y: 4.5,        // Same position as container
@@ -317,7 +354,7 @@ function getThemeConfig(theme?: string) {
         accent: 'FFFFFF' // White accent color for boxes and highlights
       },
       effects: {
-        textShadow: { type: 'outer', blur: 3, offset: 2, angle: 45, color: '000000', opacity: 0.3 }
+        textShadow: { type: 'outer', blur: 3, offset: 2, angle: 45, color: '#000000', opacity: 0.3 }
       }
     },
     // MODERN THEME: Clean minimalist design with white background and blue accents
@@ -358,7 +395,7 @@ function getThemeConfig(theme?: string) {
         accent: '78DBFF' // Cyan accent color for tech/futuristic feel
       },
       effects: {
-        textShadow: { type: 'outer', blur: 8, offset: 0, angle: 0, color: '78DBFF', opacity: 0.5 }
+        textShadow: { type: 'outer', blur: 8, offset: 0, angle: 0, color: '#78DBFF', opacity: 0.5 }
       }
     }
   };
