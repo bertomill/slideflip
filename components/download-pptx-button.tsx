@@ -27,7 +27,7 @@ export function DownloadPptxButton({
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Handle PPTX download
+   * Handle PPTX download with enhanced error handling and user feedback
    * Makes API call to generate PowerPoint file and triggers browser download
    */
   const handleDownload = async () => {
@@ -35,49 +35,87 @@ export function DownloadPptxButton({
       setIsGenerating(true);
       setError(null);
 
-      // Prepare slide data for PPTX generation
+      // Validate slide data before sending
+      if (!slideData.slideHtml && !slideData.description) {
+        throw new Error('No slide content available to download');
+      }
+
+      // Prepare comprehensive slide data for PPTX generation
       const pptxData = {
         slideHtml: slideData.slideHtml,
         description: slideData.description,
-        theme: slideData.selectedTheme,
+        theme: slideData.selectedTheme || 'Professional',
         researchData: slideData.researchData,
         userFeedback: slideData.userFeedback,
         title: extractTitleFromDescription(slideData.description),
-        subtitle: slideData.wantsResearch ? 'Research-Enhanced Presentation' : 'AI Generated Slide'
+        subtitle: slideData.wantsResearch ? 'Research-Enhanced Presentation' : 'AI Generated Slide',
+        // Additional metadata for better PowerPoint generation
+        contentPlan: slideData.contentPlan,
+        documents: slideData.parsedDocuments?.length || 0
       };
 
-      // Make API call to generate PPTX
+      // Make API call to generate PPTX with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch('/api/generate-pptx', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(pptxData),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate PowerPoint file');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+
+      // Verify response is actually a PPTX file
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
+        console.warn('Unexpected content type:', contentType);
       }
 
       // Get the PPTX file as a blob
       const blob = await response.blob();
       
+      // Verify blob size
+      if (blob.size === 0) {
+        throw new Error('Generated PowerPoint file is empty');
+      }
+
       // Create download link and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `slide-${generateFileName()}.pptx`;
+      link.style.display = 'none';
+      
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      // Cleanup with delay to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
 
     } catch (error) {
       console.error('Error downloading PPTX:', error);
-      setError(error instanceof Error ? error.message : 'Failed to download PowerPoint file');
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          setError('Download timed out. Please try again.');
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError('Failed to download PowerPoint file. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
