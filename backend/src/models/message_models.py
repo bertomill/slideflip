@@ -38,10 +38,20 @@ class SlideDescriptionMessage(BaseModel):
     description: str = Field(..., description="User's description of the slide")
     client_id: Optional[str] = Field(None, description="Client identifier")
 
+class ThemeMessage(BaseModel):
+    """Model for theme selection messages"""
+    theme_id: str = Field(..., description="Selected theme ID")
+    theme_name: str = Field(..., description="Theme name")
+    theme_description: str = Field(..., description="Theme description")
+    color_palette: List[str] = Field(..., description="Theme color palette")
+    preview_text: str = Field(..., description="Theme preview text")
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
 class SlideGenerationMessage(BaseModel):
     """Model for slide generation requests"""
     description: str = Field(..., description="User's description of the slide")
     theme: Optional[str] = Field("default", description="Selected theme")
+    theme_details: Optional[Dict[str, Any]] = Field(None, description="Detailed theme information")
     wants_research: Optional[bool] = Field(False, description="Whether to include research")
     client_id: Optional[str] = Field(None, description="Client identifier")
 

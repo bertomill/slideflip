@@ -26,7 +26,8 @@ from src.models.message_models import (
     FileUploadMessage, 
     SlideDescriptionMessage,
     SlideGenerationMessage,
-    ProcessingStatus
+    ProcessingStatus,
+    ThemeMessage
 )
 from src.services.file_service import FileService
 from src.services.slide_service import SlideService
@@ -137,40 +138,35 @@ async def debug_connections():
 
 @app.get("/debug/client-folders")
 async def debug_client_folders():
-    """Debug endpoint to show client folders and their contents"""
-    client_folders = file_service.list_client_folders()
-    folder_details = {}
-    
-    for client_id in client_folders:
-        folder_path = file_service.get_client_folder_path(client_id)
-        folder_size = file_service.get_client_folder_size(client_id)
-        files = await file_service.get_client_files(client_id)
+    """Debug endpoint to list client folders and their contents"""
+    try:
+        client_folders = file_service.list_client_folders()
+        folder_details = []
         
-        # List all files in the folder (including generated PPT and HTML files)
-        all_files = []
-        if folder_path.exists():
-            for file_path in folder_path.rglob('*'):
-                if file_path.is_file():
-                    all_files.append({
-                        "name": file_path.name,
-                        "path": str(file_path),
-                        "size": file_path.stat().st_size,
-                        "type": "generated" if file_path.suffix in ['.pptx', '.html'] else "uploaded"
-                    })
+        for client_id in client_folders:
+            folder_path = file_service.get_client_folder_path(client_id)
+            folder_size = file_service.get_client_folder_size(client_id)
+            files = await file_service.get_client_files(client_id)
+            
+            # Get content statistics
+            content_stats = await slide_service.get_client_content_stats(client_id)
+            
+            folder_details.append({
+                "client_id": client_id,
+                "folder_path": str(folder_path),
+                "folder_size": folder_size,
+                "file_count": len(files),
+                "files": [f.model_dump() for f in files],
+                "content_stats": content_stats
+            })
         
-        folder_details[client_id] = {
-            "folder_path": str(folder_path),
-            "folder_size": folder_size,
-            "file_count": len(files),
-            "uploaded_files": [{"filename": f.filename, "file_path": f.file_path, "file_size": f.file_size} for f in files],
-            "all_files": all_files
+        return {
+            "total_clients": len(client_folders),
+            "client_folders": folder_details
         }
-    
-    return {
-        "client_folders": client_folders,
-        "folder_details": folder_details,
-        "storage_stats": file_service.get_storage_stats()
-    }
+    except Exception as e:
+        logger.error(f"Error in debug_client_folders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/download/{file_path:path}")
 async def download_file(file_path: str):
@@ -354,12 +350,12 @@ async def handle_client_message(websocket: WebSocket, client_id: str, message: C
         elif message.type == "slide_description":
             logger.info(f"Received slide description from client {client_id}")
             await handle_slide_description(websocket, client_id, message.data)
-        elif message.type == "generate_slide":
-            logger.info(f"Received slide generation request from client {client_id}")
+        elif message.type == "theme_selection":
+            logger.info(f"Received theme selection from client {client_id}")
+            await handle_theme_selection(websocket, client_id, message.data)
+        elif message.type in ["generate_slide", "process_slide"]:
+            logger.info(f"Received slide generation/processing request from client {client_id}")
             await handle_generate_slide(websocket, client_id, message.data)
-        elif message.type == "process_slide":
-            logger.info(f"Received slide processing request from client {client_id}")
-            await handle_process_slide(websocket, client_id, message.data)
         elif message.type == "ping":
             # Respond to ping with pong
             pong_message = ServerMessage(type="pong", data={})
@@ -416,15 +412,35 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
             client_id
         )
         
+        # Extract content (text and images) for HTML files
+        content_info = None
+        if file_data.filename.lower().endswith(('.html', '.htm')):
+            content_info = await file_service.extract_content_from_file(str(file_path))
+        
+        # Store extracted content in slide service
+        if client_id:
+            await slide_service.store_file_content(client_id, str(file_path), file_data.filename)
+        
+        # Prepare success data
+        success_data = {
+            "filename": file_data.filename,
+            "file_path": str(file_path),
+            "file_size": len(file_data.content),
+            "file_type": file_data.file_type
+        }
+        
+        # Add content information if available
+        if content_info:
+            success_data["content_info"] = {
+                "text_length": len(content_info.get('text', '')) if content_info.get('text') else 0,
+                "images_count": len(content_info.get('images', [])),
+                "images": content_info.get('images', [])
+            }
+        
         # Send success message
         success_message = ServerMessage(
             type="file_upload_success",
-            data={
-                "filename": file_data.filename,
-                "file_path": str(file_path),
-                "file_size": len(file_data.content),
-                "file_type": file_data.file_type
-            }
+            data=success_data
         )
         await asyncio.wait_for(
             websocket.send_text(success_message.model_dump_json()),
@@ -497,9 +513,61 @@ async def handle_slide_description(websocket: WebSocket, client_id: str, data: d
             logger.error(f"Error sending slide description error: {send_error}")
             raise
 
+async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dict):
+    """Handle theme selection from client"""
+    try:
+        # Send acknowledgment
+        ack_message = ServerMessage(
+            type="theme_selection_ack",
+            data={"status": "received", "message": "Theme selection received"}
+        )
+        await asyncio.wait_for(
+            websocket.send_text(ack_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        # Process the theme selection
+        theme_data = ThemeMessage(**data)
+        
+        # Store the theme information
+        await slide_service.store_theme_selection(client_id, theme_data)
+        
+        # Send success message
+        success_message = ServerMessage(
+            type="theme_selection_success",
+            data={
+                "theme_id": theme_data.theme_id,
+                "theme_name": theme_data.theme_name,
+                "color_palette": theme_data.color_palette
+            }
+        )
+        await asyncio.wait_for(
+            websocket.send_text(success_message.model_dump_json()),
+            timeout=10.0
+        )
+        
+        logger.info(f"Theme selection stored for client {client_id}: {theme_data.theme_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling theme selection: {e}")
+        try:
+            error_message = ServerMessage(
+                type="theme_selection_error",
+                data={"error": "Failed to process theme selection", "details": str(e)}
+            )
+            await asyncio.wait_for(
+                websocket.send_text(error_message.model_dump_json()),
+                timeout=10.0
+            )
+        except Exception as send_error:
+            logger.error(f"Error sending theme selection error: {send_error}")
+            raise
+
 async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict):
     """Handle slide generation request from client"""
     try:
+        logger.info(f"Received slide generation request for client {client_id} with data: {data}")
+        
         # Send processing started message
         processing_message = ServerMessage(
             type="slide_generation_started",
@@ -512,9 +580,7 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             websocket.send_text(processing_message.model_dump_json()),
             timeout=10.0
         )
-        
-        # Parse the generation request
-        generation_data = SlideGenerationMessage(**data)
+        logger.info(f"Sent slide_generation_started message to client {client_id}")
         
         # Get stored files for this client
         files = await file_service.get_client_files(client_id)
@@ -532,46 +598,138 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             )
             return
         
+        # Determine if this is a parameterized request or basic request
+        has_parameters = 'theme' in data or 'wants_research' in data
+        logger.info(f"Request type: {'parameterized' if has_parameters else 'basic'}")
+        
+        if has_parameters:
+            # Parameterized request - use SlideGenerationMessage
+            try:
+                generation_data = SlideGenerationMessage(**data)
+                description = generation_data.description
+                theme = generation_data.theme
+                wants_research = generation_data.wants_research
+                logger.info(f"Using parameterized request - description: {description[:50]}..., theme: {theme}, research: {wants_research}")
+            except Exception as e:
+                logger.error(f"Error parsing generation data: {e}")
+                error_message = ServerMessage(
+                    type="slide_generation_error",
+                    data={"error": "Invalid generation parameters", "details": str(e)}
+                )
+                await asyncio.wait_for(
+                    websocket.send_text(error_message.model_dump_json()),
+                    timeout=10.0
+                )
+                return
+        else:
+            # Basic request - get description from stored data
+            description = await slide_service.get_slide_description(client_id)
+            theme = "default"
+            wants_research = False
+            logger.info(f"Using basic request - description: {description[:50] if description else 'None'}...")
+            
+            if not description:
+                error_message = ServerMessage(
+                    type="slide_generation_error",
+                    data={"error": "No slide description found. Please provide a description first."}
+                )
+                await asyncio.wait_for(
+                    websocket.send_text(error_message.model_dump_json()),
+                    timeout=10.0
+                )
+                return
+        
         # Update processing status
         processing_message = ServerMessage(
             type="slide_generation_status",
             data={
                 "status": ProcessingStatus.ANALYZING,
-                "message": "Analyzing uploaded files and generating slide content..."
+                "message": "Analyzing uploaded files and generating slide content...",
+                "progress": 0
             }
         )
         await asyncio.wait_for(
             websocket.send_text(processing_message.model_dump_json()),
             timeout=10.0
         )
+        logger.info(f"Sent initial status update to client {client_id}")
         
-        # Generate the slide with the provided parameters
+        # Create status callback function
+        async def send_status_update(message: str, progress: int):
+            try:
+                logger.info(f"Sending status update to client {client_id}: {message} (progress: {progress}%)")
+                status_message = ServerMessage(
+                    type="slide_generation_status",
+                    data={
+                        "status": ProcessingStatus.PROCESSING,
+                        "message": message,
+                        "progress": progress
+                    }
+                )
+                await asyncio.wait_for(
+                    websocket.send_text(status_message.model_dump_json()),
+                    timeout=10.0
+                )
+            except Exception as e:
+                logger.error(f"Error sending status update: {e}")
+        
+        # Generate the slide with the provided parameters and status callback
+        logger.info(f"Starting slide generation for client {client_id}")
         slide_result = await slide_service.generate_slide_with_params(
             files, 
-            generation_data.description,
-            generation_data.theme,
-            generation_data.wants_research,
-            client_id
+            description,
+            theme,
+            wants_research,
+            client_id,
+            status_callback=send_status_update
         )
         
         # Send completion message with the generated slide HTML and PPT file path
+        slide_html = slide_result.get("slide_html", "")
+        
+        # Validate HTML content size before sending
+        if len(slide_html) > 50000:  # 50KB limit
+            logger.warning(f"HTML content too large ({len(slide_html)} chars), truncating")
+            slide_html = slide_html[:50000]
+        
+        # Log message size for debugging
+        message_data = {
+            "status": ProcessingStatus.COMPLETED,
+            "slide_html": slide_html,
+            "ppt_file_path": slide_result.get("ppt_file_path", ""),
+            "processing_time": slide_result.get("processing_time", 0),
+            "theme": theme,
+            "wants_research": wants_research,
+            "message": "Slide generation completed successfully"
+        }
+        
         completion_message = ServerMessage(
             type="slide_generation_complete",
-            data={
-                "status": ProcessingStatus.COMPLETED,
-                "slide_html": slide_result.get("slide_html", ""),
-                "ppt_file_path": slide_result.get("ppt_file_path", ""),
-                "slide_data": slide_result.get("slide_data", {}),
-                "processing_time": slide_result.get("processing_time", 0),
-                "message": "Slide generation completed successfully"
-            }
+            data=message_data
         )
+        
+        # Log the message size
+        message_json = completion_message.model_dump_json()
+        logger.info(f"Sending completion message, size: {len(message_json)} bytes")
+        
+        # Check if message is too large for WebSocket
+        if len(message_json) > 65536:  # 64KB limit
+            logger.warning(f"Message too large ({len(message_json)} bytes), implementing chunking")
+            # For now, truncate the HTML content
+            message_data["slide_html"] = message_data["slide_html"][:30000]  # Limit to 30KB
+            completion_message = ServerMessage(
+                type="slide_generation_complete",
+                data=message_data
+            )
+            message_json = completion_message.model_dump_json()
+            logger.info(f"Truncated message size: {len(message_json)} bytes")
+        
         await asyncio.wait_for(
-            websocket.send_text(completion_message.model_dump_json()),
+            websocket.send_text(message_json),
             timeout=10.0
         )
         
-        logger.info(f"Slide generation completed for client {client_id}")
+        logger.info(f"Slide generation completed for client {client_id} with theme: {theme}, research: {wants_research}")
         
     except Exception as e:
         logger.error(f"Error generating slide: {e}")
@@ -586,84 +744,6 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             )
         except Exception as send_error:
             logger.error(f"Error sending slide generation error: {send_error}")
-            raise
-
-async def handle_process_slide(websocket: WebSocket, client_id: str, data: dict):
-    """Handle slide processing request"""
-    try:
-        # Send processing started message
-        processing_message = ServerMessage(
-            type="processing_status",
-            data={
-                "status": ProcessingStatus.STARTED,
-                "message": "Starting slide generation process..."
-            }
-        )
-        await asyncio.wait_for(
-            websocket.send_text(processing_message.model_dump_json()),
-            timeout=10.0
-        )
-        
-        # Get stored data for this client
-        files = await file_service.get_client_files(client_id)
-        description = await slide_service.get_slide_description(client_id)
-        
-        if not files or not description:
-            error_message = ServerMessage(
-                type="processing_error",
-                data={"error": "Missing files or description for processing"}
-            )
-            await asyncio.wait_for(
-                websocket.send_text(error_message.model_dump_json()),
-                timeout=10.0
-            )
-            return
-        
-        # Update processing status
-        processing_message = ServerMessage(
-            type="processing_status",
-            data={
-                "status": ProcessingStatus.ANALYZING,
-                "message": "Analyzing uploaded files..."
-            }
-        )
-        await asyncio.wait_for(
-            websocket.send_text(processing_message.model_dump_json()),
-            timeout=10.0
-        )
-        
-        # Process the slide
-        slide_result = await slide_service.generate_slide(files, description)
-        
-        # Send completion message
-        completion_message = ServerMessage(
-            type="processing_complete",
-            data={
-                "status": ProcessingStatus.COMPLETED,
-                "slide_data": slide_result,
-                "message": "Slide generation completed successfully"
-            }
-        )
-        await asyncio.wait_for(
-            websocket.send_text(completion_message.model_dump_json()),
-            timeout=10.0
-        )
-        
-        logger.info(f"Slide processing completed for client {client_id}")
-        
-    except Exception as e:
-        logger.error(f"Error processing slide: {e}")
-        try:
-            error_message = ServerMessage(
-                type="processing_error",
-                data={"error": "Failed to process slide", "details": str(e)}
-            )
-            await asyncio.wait_for(
-                websocket.send_text(error_message.model_dump_json()),
-                timeout=10.0
-            )
-        except Exception as send_error:
-            logger.error(f"Error sending processing error: {send_error}")
             raise
 
 if __name__ == "__main__":

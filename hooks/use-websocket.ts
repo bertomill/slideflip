@@ -132,6 +132,10 @@ export function useWebSocket({
     return websocketService.sendGenerateSlide(description, theme, wantsResearch);
   }, []);
 
+  const sendThemeSelection = useCallback((themeData: any) => {
+    return websocketService.sendThemeSelection(themeData);
+  }, []);
+
   const sendProcessSlide = useCallback((options?: any) => {
     return websocketService.sendProcessSlide(options);
   }, []);
@@ -150,6 +154,7 @@ export function useWebSocket({
     sendFileUpload,
     sendSlideDescription,
     sendGenerateSlide,
+    sendThemeSelection,
     sendProcessSlide,
     ping
   };

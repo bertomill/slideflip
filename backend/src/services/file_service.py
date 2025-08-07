@@ -13,6 +13,22 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import mimetypes
 
+# Add BeautifulSoup for HTML parsing
+try:
+    from bs4 import BeautifulSoup
+    BEAUTIFULSOUP_AVAILABLE = True
+except ImportError:
+    BEAUTIFULSOUP_AVAILABLE = False
+    logging.warning("BeautifulSoup not available. HTML parsing will be limited.")
+
+# Add aiohttp for URL fetching
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
+    logging.warning("aiohttp not available. URL fetching will not be supported.")
+
 from src.core.config import Settings
 from src.models.message_models import FileInfo
 
@@ -171,6 +187,8 @@ class FileService:
                 return file_content.decode('utf-8', errors='ignore')
             elif file_extension == '.md':
                 return file_content.decode('utf-8', errors='ignore')
+            elif file_extension == '.html' or file_extension == '.htm':
+                return await self._extract_text_from_html(file_content)
             elif file_extension == '.pdf':
                 # For PDF files, we would need a PDF library
                 # For now, return a placeholder
@@ -185,6 +203,226 @@ class FileService:
                 
         except Exception as e:
             logger.error(f"Error extracting text from {file_path}: {e}")
+            return None
+    
+    async def extract_content_from_file(self, file_path: str) -> Optional[Dict]:
+        """Extract both text and image content from various file types"""
+        try:
+            file_content = await self.get_file_content(file_path)
+            if not file_content:
+                return None
+            
+            path = Path(file_path)
+            file_extension = path.suffix.lower()
+            
+            result = {
+                'text': None,
+                'images': [],
+                'file_path': str(file_path),
+                'file_name': path.name
+            }
+            
+            if file_extension == '.txt':
+                result['text'] = file_content.decode('utf-8', errors='ignore')
+            elif file_extension == '.md':
+                result['text'] = file_content.decode('utf-8', errors='ignore')
+            elif file_extension == '.html' or file_extension == '.htm':
+                result['text'] = await self._extract_text_from_html(file_content)
+                result['images'] = await self._extract_images_from_html(file_content)
+            elif file_extension == '.pdf':
+                # For PDF files, we would need a PDF library
+                result['text'] = f"[PDF Content from {path.name}]"
+            elif file_extension == '.docx':
+                # For DOCX files, we would need a DOCX library
+                result['text'] = f"[DOCX Content from {path.name}]"
+            else:
+                # Try to decode as text
+                result['text'] = file_content.decode('utf-8', errors='ignore')
+            
+            return result
+                
+        except Exception as e:
+            logger.error(f"Error extracting content from {file_path}: {e}")
+            return None
+    
+    async def _extract_text_from_html(self, html_content: bytes) -> str:
+        """Extract text content from HTML using BeautifulSoup"""
+        try:
+            if not BEAUTIFULSOUP_AVAILABLE:
+                # Fallback: try to decode as text and return raw content
+                return html_content.decode('utf-8', errors='ignore')
+            
+            # Decode HTML content
+            html_text = html_content.decode('utf-8', errors='ignore')
+            
+            # Parse HTML with BeautifulSoup
+            soup = BeautifulSoup(html_text, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+            
+            # Get text content
+            text = soup.get_text()
+            
+            # Clean up whitespace
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = ' '.join(chunk for chunk in chunks if chunk)
+            
+            # If no meaningful text found, return a fallback
+            if not text.strip():
+                # Try to get title
+                title = soup.find('title')
+                if title:
+                    text = f"HTML Document: {title.get_text()}"
+                else:
+                    text = "HTML Document (no text content found)"
+            
+            return text
+            
+        except Exception as e:
+            logger.error(f"Error parsing HTML content: {e}")
+            # Fallback: return raw decoded content
+            return html_content.decode('utf-8', errors='ignore')
+    
+    async def _extract_images_from_html(self, html_content: bytes, base_url: str = None) -> List[Dict]:
+        """Extract image information from HTML content"""
+        try:
+            if not BEAUTIFULSOUP_AVAILABLE:
+                logger.warning("BeautifulSoup not available for image extraction")
+                return []
+            
+            # Decode HTML content
+            html_text = html_content.decode('utf-8', errors='ignore')
+            
+            # Parse HTML with BeautifulSoup
+            soup = BeautifulSoup(html_text, 'html.parser')
+            
+            images = []
+            
+            # Find all img tags
+            for img in soup.find_all('img'):
+                image_info = {
+                    'src': img.get('src', ''),
+                    'alt': img.get('alt', ''),
+                    'title': img.get('title', ''),
+                    'width': img.get('width', ''),
+                    'height': img.get('height', ''),
+                    'class': img.get('class', []),
+                    'id': img.get('id', '')
+                }
+                
+                # Resolve relative URLs if base_url is provided
+                if base_url and image_info['src']:
+                    if not image_info['src'].startswith(('http://', 'https://', 'data:')):
+                        from urllib.parse import urljoin
+                        image_info['src'] = urljoin(base_url, image_info['src'])
+                
+                # Only add if we have a valid src
+                if image_info['src']:
+                    images.append(image_info)
+            
+            # Also look for background images in CSS
+            for element in soup.find_all(style=True):
+                style_content = element.get_text()
+                # Simple regex to find background-image URLs
+                import re
+                bg_images = re.findall(r'background-image:\s*url\(["\']?([^"\')\s]+)["\']?\)', style_content)
+                for bg_src in bg_images:
+                    if bg_src and not bg_src.startswith('data:'):
+                        image_info = {
+                            'src': bg_src,
+                            'alt': 'Background image',
+                            'title': 'Background image from CSS',
+                            'width': '',
+                            'height': '',
+                            'class': [],
+                            'id': '',
+                            'type': 'background'
+                        }
+                        
+                        # Resolve relative URLs if base_url is provided
+                        if base_url:
+                            if not image_info['src'].startswith(('http://', 'https://')):
+                                from urllib.parse import urljoin
+                                image_info['src'] = urljoin(base_url, image_info['src'])
+                        
+                        images.append(image_info)
+            
+            logger.info(f"Extracted {len(images)} images from HTML")
+            return images
+            
+        except Exception as e:
+            logger.error(f"Error extracting images from HTML: {e}")
+            return []
+    
+    async def download_image(self, image_url: str, save_path: Path = None) -> Optional[Path]:
+        """Download an image from URL"""
+        try:
+            if not AIOHTTP_AVAILABLE:
+                logger.error("aiohttp not available for image downloading")
+                return None
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url, timeout=30) as response:
+                    if response.status == 200:
+                        image_content = await response.read()
+                        
+                        # Generate filename if not provided
+                        if not save_path:
+                            filename = image_url.split('/')[-1]
+                            if '?' in filename:
+                                filename = filename.split('?')[0]
+                            if not filename or '.' not in filename:
+                                filename = f"image_{hash(image_url) % 10000}.jpg"
+                            
+                            save_path = Path(self.settings.TEMP_DIR) / filename
+                        
+                        # Save image
+                        async with aiofiles.open(save_path, 'wb') as f:
+                            await f.write(image_content)
+                        
+                        logger.info(f"Downloaded image: {save_path}")
+                        return save_path
+                    else:
+                        logger.error(f"Failed to download image {image_url}: HTTP {response.status}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"Error downloading image {image_url}: {e}")
+            return None
+    
+    async def fetch_and_parse_html_from_url(self, url: str) -> Optional[Dict]:
+        """Fetch HTML content from a URL and extract text and images"""
+        try:
+            if not AIOHTTP_AVAILABLE:
+                logger.error("aiohttp not available for URL fetching")
+                return None
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=30) as response:
+                    if response.status == 200:
+                        html_content = await response.read()
+                        
+                        # Extract text
+                        text_content = await self._extract_text_from_html(html_content)
+                        
+                        # Extract images
+                        images = await self._extract_images_from_html(html_content, url)
+                        
+                        return {
+                            'text': text_content,
+                            'images': images,
+                            'url': url,
+                            'content_length': len(html_content)
+                        }
+                    else:
+                        logger.error(f"Failed to fetch URL {url}: HTTP {response.status}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"Error fetching HTML from URL {url}: {e}")
             return None
     
     async def get_file_info(self, file_path: str) -> Optional[Dict]:

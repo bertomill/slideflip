@@ -25,7 +25,9 @@ class Settings(BaseSettings):
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
         "text/markdown",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "text/html",
+        "application/xhtml+xml"
     ]
     
     # WebSocket settings
@@ -45,6 +47,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    # OpenAI settings
+    OPENAI_API_KEY: Optional[str] = None
+    
     class Config:
-        env_file = ".env"
+        env_file = ".env.local"
+        env_file_encoding = "utf-8"
         case_sensitive = True 

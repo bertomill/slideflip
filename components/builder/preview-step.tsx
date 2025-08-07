@@ -21,6 +21,38 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev, sendGe
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
 
+  // Debug logging to see current state
+  console.log('PreviewStep - Current state:', {
+    isGenerating: slideData.isGenerating,
+    generationStatus: slideData.generationStatus,
+    generationProgress: slideData.generationProgress,
+    hasHtml: !!slideData.slideHtml,
+    htmlLength: slideData.slideHtml?.length || 0,
+    timestamp: new Date().toISOString()
+  });
+
+  // Ensure generating state is set if we have a description but no HTML yet
+  useEffect(() => {
+    if (slideData.description && !slideData.slideHtml && !slideData.isGenerating && !slideData.generationError) {
+      console.log('Setting generating state to true - slide should be generating');
+      updateSlideData({ 
+        isGenerating: true, 
+        generationStatus: "Starting slide generation...",
+        generationProgress: 0
+      });
+    }
+  }, [slideData.description, slideData.slideHtml, slideData.isGenerating, slideData.generationError, updateSlideData]);
+
+  // Log when the component re-renders due to state changes
+  useEffect(() => {
+    console.log('PreviewStep re-rendered with new state:', {
+      isGenerating: slideData.isGenerating,
+      generationStatus: slideData.generationStatus,
+      generationProgress: slideData.generationProgress,
+      timestamp: new Date().toISOString()
+    });
+  }, [slideData.isGenerating, slideData.generationStatus, slideData.generationProgress]);
+
   // Remove automatic slide generation - will be triggered manually by user action
 
   // Watch for slide HTML updates to know when regeneration is complete
@@ -158,20 +190,85 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev, sendGe
           </div>
         </CardHeader>
         <CardContent>
+          {/* Remove debug info section */}
+          
           {slideData.isGenerating ? (
             <div className="flex items-center justify-center h-96 bg-muted/30 rounded-lg">
-              <div className="text-center space-y-4">
-                <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-                <div>
-                  <p className="font-medium">Generating your slide...</p>
-                  {slideData.generationStatus && (
-                    <p className="text-sm text-muted-foreground">{slideData.generationStatus}</p>
-                  )}
-                  <p className="text-sm text-muted-foreground">This may take a few moments</p>
+              <div className="text-center space-y-6 w-full max-w-md">
+                <div className="space-y-4">
+                  <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+                  <div>
+                    <p className="font-medium text-lg">Generating your slide...</p>
+                    {slideData.generationStatus && (
+                      <p className="text-sm text-muted-foreground mt-2">{slideData.generationStatus}</p>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${slideData.generationProgress || 0}%` }}
+                  />
+                </div>
+                
+                {/* Progress Steps */}
+                <div className="space-y-2 text-xs">
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 5 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 5 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Starting process</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 15 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 15 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Processing files</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 40 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 40 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Combining content</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 50 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 50 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Generating layout</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 60 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 60 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Creating content</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 75 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 75 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Building presentation</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 85 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 85 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Generating preview</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(slideData.generationProgress || 0) >= 95 ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`w-2 h-2 rounded-full ${(slideData.generationProgress || 0) >= 95 ? 'bg-primary' : 'bg-muted'}`} />
+                    <span>Finalizing</span>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-muted-foreground">This may take a few moments</p>
               </div>
             </div>
-          ) : !slideData.slideHtml ? (
+          ) : slideData.slideHtml ? (
+            <div className="flex justify-center">
+              <div className="border rounded-lg overflow-hidden shadow-lg bg-white max-w-4xl w-full">
+                <iframe
+                  srcDoc={slideData.slideHtml}
+                  className="w-full border-0"
+                  style={{ 
+                    height: '600px',
+                    minHeight: '400px',
+                    maxHeight: '800px'
+                  }}
+                  sandbox="allow-same-origin"
+                  title="Slide Preview"
+                />
+              </div>
+            </div>
+          ) : (
             <div className="flex items-center justify-center h-96 bg-muted/30 rounded-lg">
               <div className="text-center space-y-4">
                 <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
@@ -181,15 +278,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev, sendGe
                 </div>
               </div>
             </div>
-          ) : slideData.slideHtml ? (
-            <div className="border rounded-lg overflow-hidden shadow-lg">
-              <div 
-                dangerouslySetInnerHTML={{ __html: slideData.slideHtml }}
-                className="transform scale-75 origin-top-left"
-                style={{ width: '133.33%', height: '133.33%' }}
-              />
-            </div>
-          ) : null}
+          )}
         </CardContent>
       </Card>
 

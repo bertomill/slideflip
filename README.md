@@ -1,105 +1,304 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# SlideFlip
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+A modern, AI-powered presentation generator that transforms documents into professional slides with real-time collaboration features.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+## 🚀 Overview
 
-## Features
+SlideFlip is a full-stack application that combines the power of AI with modern web technologies to create stunning presentations. Users can upload documents (PDF, DOCX, TXT, MD), and the system will automatically generate professional slides with customizable themes and layouts.
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Middleware
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## ✨ Features
 
-## Demo
+### Core Features
+- **AI-Powered Slide Generation**: Transform documents into professional presentations
+- **Real-time Collaboration**: WebSocket-based live editing and chat
+- **Multi-format Support**: Upload PDF, DOCX, TXT, and Markdown files
+- **Theme Customization**: Professional themes with color scheme options
+- **Export Options**: Download presentations in multiple formats
+- **Responsive Design**: Works seamlessly across all devices
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+### Technical Features
+- **Modern Frontend**: Next.js 14 with TypeScript and Tailwind CSS
+- **Real-time Backend**: Python FastAPI with WebSocket support
+- **Authentication**: Supabase-powered user management
+- **File Processing**: Advanced document parsing and content extraction
+- **AI Integration**: LLM-powered content analysis and slide generation
 
-## Deploy to Vercel
+## 🏗️ Architecture
 
-Vercel deployment will guide you through creating a Supabase account and project.
+```
+slideflip/
+├── app/                    # Next.js frontend application
+├── backend/               # Python FastAPI backend
+├── components/            # React components
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility libraries
+├── services/             # API services
+└── types/                # TypeScript type definitions
+```
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+## 🛠️ Tech Stack
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+### Frontend
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Authentication**: Supabase Auth
+- **Real-time**: WebSocket connections
+- **Deployment**: Vercel
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+### Backend
+- **Framework**: FastAPI (Python)
+- **WebSocket**: WebSocket support for real-time communication
+- **File Processing**: Multiple format support (PDF, DOCX, TXT, MD)
+- **AI Integration**: LLM-powered content analysis
+- **Database**: File-based storage with structured data
+- **Deployment**: Docker-ready
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+## 🚀 Quick Start
 
-## Clone and run locally
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Supabase account
+- Git
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd slideflip
+```
 
-2. Create a Next.js app using the Supabase Starter template npx command
+### 2. Frontend Setup
+```bash
+# Install dependencies
+npm install
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your Supabase credentials
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+# Start development server
+npm run dev
+```
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+### 3. Backend Setup
+```bash
+cd backend
 
-3. Use `cd` to change into the app's directory
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-   ```bash
-   cd with-supabase-app
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-4. Rename `.env.example` to `.env.local` and update the following:
+# Start backend server
+python main.py
+```
 
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=[INSERT SUPABASE PROJECT API ANON KEY]
-   ```
+### 4. Access the Application
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/docs
 
-   Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+## 📖 Documentation
 
-5. You can now run the Next.js local development server:
+### Frontend Documentation
+- [Frontend README](./FRONTEND_README.md) - Complete frontend guide
+- [Component Architecture](./FRONTEND_README.md#component-architecture)
+- [Authentication Setup](./FRONTEND_README.md#authentication)
+- [Real-time Features](./FRONTEND_README.md#real-time-features)
 
-   ```bash
-   npm run dev
-   ```
+### Backend Documentation
+- [Backend README](./backend/README.md) - Complete backend guide
+- [API Documentation](./backend/README.md#api-endpoints)
+- [WebSocket Communication](./backend/README.md#websocket-communication)
+- [File Processing](./backend/README.md#file-processing)
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+### Additional Documentation
+- [Frontend Integration](./backend/docs/FRONTEND_INTEGRATION.md)
+- [LLM Integration](./backend/docs/LLM_INTEGRATION_README.md)
+- [Content Storage](./backend/docs/CONTENT_STORAGE_README.md)
+- [Slide Generation](./backend/docs/SLIDE_GENERATION_README.md)
+- [HTML Features](./backend/docs/HTML_FEATURES_README.md)
+- [Implementation Summary](./backend/docs/IMPLEMENTATION_SUMMARY.md)
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+## 🔧 Configuration
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+### Environment Variables
 
-## Feedback and issues
+#### Frontend (.env.local)
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+```
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+#### Backend (.env)
+```env
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
+SECRET_KEY=your_secret_key
+UPLOAD_DIR=./uploads
+MAX_FILE_SIZE=52428800
+```
 
-## More Supabase examples
+## 🧪 Testing
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+### Frontend Tests
+```bash
+npm run test
+npm run test:integration
+npm run test:e2e
+```
+
+### Backend Tests
+```bash
+cd backend
+python -m pytest tests/
+```
+
+## 🚀 Deployment
+
+### Frontend (Vercel)
+1. Connect your GitHub repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### Backend (Docker)
+```dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+## 🔄 Development Workflow
+
+### Adding New Features
+
+1. **Frontend Changes**:
+   - Create feature branch
+   - Add components in `components/`
+   - Update types in `types/`
+   - Test with `npm run test`
+
+2. **Backend Changes**:
+   - Add API endpoints in `main.py`
+   - Create services in `src/services/`
+   - Add models in `src/models/`
+   - Test with pytest
+
+3. **Integration**:
+   - Update WebSocket messages
+   - Test real-time features
+   - Verify API communication
+
+### Code Style
+- **Frontend**: ESLint + Prettier
+- **Backend**: Black + isort
+- **TypeScript**: Strict mode enabled
+- **Python**: Type hints required
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+- Follow the existing code style
+- Add tests for new features
+- Update documentation
+- Ensure all tests pass
+- Test both frontend and backend integration
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Frontend Issues
+- **Authentication Problems**: Check Supabase configuration
+- **WebSocket Issues**: Verify backend is running
+- **Build Errors**: Clear node_modules and reinstall
+
+#### Backend Issues
+- **Import Errors**: Check Python environment
+- **File Upload Issues**: Verify upload directory permissions
+- **WebSocket Connection**: Check firewall settings
+
+#### Integration Issues
+- **CORS Errors**: Verify backend CORS configuration
+- **WebSocket Connection**: Check WebSocket URL
+- **API Communication**: Verify environment variables
+
+## 📊 Performance
+
+### Frontend Optimization
+- Code splitting and lazy loading
+- Image optimization with Next.js
+- Bundle analysis and optimization
+- Caching strategies
+
+### Backend Optimization
+- Async file processing
+- Connection pooling
+- Memory-efficient file handling
+- Configurable concurrent processing
+
+## 🔒 Security
+
+### Frontend Security
+- Supabase authentication
+- Environment variable protection
+- Input validation
+- XSS prevention
+
+### Backend Security
+- File type validation
+- File size limits
+- Filename sanitization
+- Error message sanitization
+
+## 📈 Monitoring
+
+### Frontend Monitoring
+- Vercel Analytics
+- Error tracking
+- Performance monitoring
+- User analytics
+
+### Backend Monitoring
+- Health check endpoints
+- Connection statistics
+- Processing metrics
+- Error logging
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [Next.js](https://nextjs.org/) for the amazing React framework
+- [Supabase](https://supabase.com/) for authentication and real-time features
+- [Tailwind CSS](https://tailwindcss.com/) for utility-first styling
+- [shadcn/ui](https://ui.shadcn.com/) for beautiful components
+- [FastAPI](https://fastapi.tiangolo.com/) for the high-performance Python API
+
+## 📞 Support
+
+- **Documentation**: Check the README files in each directory
+- **Issues**: Create an issue on GitHub
+- **Discussions**: Use GitHub Discussions for questions
+- **Email**: Contact the development team
+
+---
+
+**Made with ❤️ by the SlideFlip Team**

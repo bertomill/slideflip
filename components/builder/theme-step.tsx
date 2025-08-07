@@ -12,6 +12,7 @@ interface ThemeStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void;
   onNext: () => void;
   onPrev: () => void;
+  sendThemeSelection?: (themeData: any) => boolean;
 }
 
 const themes = [
@@ -49,11 +50,37 @@ const themes = [
   }
 ];
 
-export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeStepProps) {
+export function ThemeStep({ slideData, updateSlideData, onNext, onPrev, sendThemeSelection }: ThemeStepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const selectTheme = async (themeId: string) => {
     setIsGenerating(true);
+    
+    // Find the selected theme data
+    const selectedTheme = themes.find(theme => theme.id === themeId);
+    
+    if (selectedTheme && sendThemeSelection) {
+      try {
+        // Send theme data to backend
+        const themeData = {
+          theme_id: selectedTheme.id,
+          theme_name: selectedTheme.name,
+          theme_description: selectedTheme.description,
+          color_palette: selectedTheme.colors,
+          preview_text: selectedTheme.preview
+        };
+        
+        const success = sendThemeSelection(themeData);
+        if (success) {
+          console.log('Theme selection sent to backend');
+        } else {
+          console.error('Failed to send theme selection to backend');
+        }
+      } catch (error) {
+        console.error('Error sending theme selection:', error);
+      }
+    }
+    
     updateSlideData({ selectedTheme: themeId });
     
     // Simulate AI theme generation
@@ -171,15 +198,31 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Upload
         </Button>
-        <Button 
-          variant="engineering" 
-          size="lg" 
-          onClick={onNext}
-          disabled={!canProceed}
-        >
-          Continue to Research
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+        
+        {/* Show progress when generating slide */}
+        {slideData.isGenerating ? (
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              {slideData.generationStatus || "Generating slide..."}
+            </div>
+            <div className="w-32 bg-muted rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${slideData.generationProgress || 0}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <Button 
+            variant="engineering" 
+            size="lg" 
+            onClick={onNext}
+            disabled={!canProceed}
+          >
+            Continue to Research
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        )}
       </div>
     </div>
   );
