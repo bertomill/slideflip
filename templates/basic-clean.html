@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basic Clean Template</title>
+  <style>
+    /* Scope all styles under .slide-main to avoid leaking */
+    .slide-main {
+      width: 1280px;           /* 16:9 reference size for screenshots */
+      height: 720px;           /* 16:9 */
+      background: #FFFFFF;     /* Solid white background */
+      padding: 0;              /* full-bleed header bar */
+      box-sizing: border-box;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      position: relative;      /* enable absolute child positioning */
+      color: #1a1a1a;
+      overflow: hidden;
+    }
+    .header-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 0.55in;
+      background: #3B82F6;     /* accent color */
+      opacity: 0.9;
+    }
+    .logo {
+      position: absolute;
+      top: 0.22in;
+      left: 0.5in;
+      width: 2.5in;
+      height: 0.4in;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 14pt;
+      display: flex;
+      align-items: center;
+    }
+    .title {
+      position: absolute;
+      left: 1in;               /* aligned to schema inches */
+      top: 0.9in;
+      width: 8in;
+      height: 1.2in;
+      font-size: 44pt;
+      font-weight: 700;
+      color: #1A1A1A;
+      text-align: center;
+      line-height: 1.2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .subtitle {
+      position: absolute;
+      left: 1in;
+      top: 2.3in;
+      width: 8in;
+      height: 0.8in;
+      font-size: 24pt;
+      color: #333333;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bullets {
+      position: absolute;
+      left: 1.2in;
+      top: 3.4in;
+      width: 7.6in;
+      height: 2.8in;
+      font-size: 16pt;
+      color: #333333;
+      line-height: 1.5;
+    }
+    .bullets ul {
+      margin: 0;
+      padding-left: 1rem;
+    }
+    .stats {
+      position: absolute;
+      left: 2in;              /* first box anchor, other boxes spaced via gap */
+      top: 6.2in;
+      display: grid;
+      grid-template-columns: 2in 2.5in 2.5in; /* three boxes with spacing */
+      column-gap: 0.5in;
+      align-items: center;
+    }
+    .stat-box {
+      width: 2in;
+      height: 1.1in;
+      background: #F3F4F6;
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #111827;
+    }
+    .stat-number {
+      display: block;
+      font-size: 28pt;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-label {
+      display: block;
+      margin-top: 6px;
+      font-size: 12pt;
+      color: #6B7280;
+    }
+  </style>
+  <!-- For local preview tooling like Live Server, body is enough -->
+</head>
+<body>
+  <div class="slide-main">
+    <div class="header-bar"></div>
+    <div class="logo">SLIDEFLIP</div>
+    <div class="title">Sample Title</div>
+    <div class="subtitle">Optional subtitle</div>
+    <div class="bullets">
+      <ul>
+        <li>Bullet one</li>
+        <li>Bullet two</li>
+      </ul>
+    </div>
+    <div class="stats">
+      <div class="stat-box">
+        <div>
+          <span class="stat-number">42%</span>
+          <span class="stat-label">Growth</span>
+        </div>
+      </div>
+      <div class="stat-box">
+        <div>
+          <span class="stat-number">18k</span>
+          <span class="stat-label">Users</span>
+        </div>
+      </div>
+      <div class="stat-box">
+        <div>
+          <span class="stat-number">95</span>
+          <span class="stat-label">NPS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

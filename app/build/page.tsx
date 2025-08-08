@@ -63,6 +63,7 @@ export type SlideData = {
   sessionId?: string;       // Session ID for tracking document uploads
   description: string;      // User's description of what the slide should contain
   selectedTheme: string;    // Visual theme choice for the presentation
+  selectedPalette?: string[]; // Hex colors chosen/generated for this slide
   wantsResearch: boolean;   // Whether user wants additional research performed
   researchOptions?: ResearchOptions; // Customizable research parameters
   researchData?: string;    // Optional research results from external sources

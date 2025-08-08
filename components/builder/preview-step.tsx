@@ -123,6 +123,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
         body: JSON.stringify({
           description: slideData.description,
           theme: slideData.selectedTheme,
+          palette: slideData.selectedPalette,
           researchData: slideData.researchData,
           contentPlan: slideData.contentPlan,
           userFeedback: slideData.userFeedback,
@@ -168,6 +169,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
         body: JSON.stringify({
           description: `${slideData.description}\n\nUser feedback: ${feedback}`,
           theme: slideData.selectedTheme,
+          palette: slideData.selectedPalette,
           researchData: slideData.researchData,
           contentPlan: slideData.contentPlan,
           userFeedback: feedback,
@@ -348,7 +350,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
               Provide Feedback
             </CardTitle>
             <CardDescription>
-              Tell us what you'd like to change or improve about the slide
+              Tell us what you’d like to change or improve about the slide
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

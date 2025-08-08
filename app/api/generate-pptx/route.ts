@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PptxGenJS from 'pptxgenjs';
+import { loadSchemaById, renderPptxFromSchema } from '@/lib/pptx-templates/schema';
 
 // ============================================================================
 // POWERPOINT GENERATION API ENDPOINT
@@ -86,6 +87,13 @@ export async function POST(request: NextRequest) {
     // This ensures the PowerPoint matches the visual style of the HTML preview
     const themeConfig = getThemeConfig(theme);
 
+    // Helper to normalize hex color strings for pptxgenjs (expects 'RRGGBB' without '#')
+    const normalizeHex = (input?: unknown): string => {
+      if (typeof input !== 'string' || input.length === 0) return 'FFFFFF';
+      const trimmed = input.trim();
+      return trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+    };
+
     // BACKGROUND STYLING: Apply theme-appropriate background (gradient or solid color)
     // Gradient backgrounds create visual depth, solid backgrounds provide clean minimalism
     // --------------------------------------------------------------------------
@@ -94,23 +102,27 @@ export async function POST(request: NextRequest) {
     // ("FF0000") without the leading hash and a two-colour gradient needs
     // `color1` and `color2` keys instead of a `colors` array.
     // --------------------------------------------------------------------------
-    if (themeConfig.background.type === 'gradient') {
-      const [color1 = 'FFFFFF', color2 = 'FFFFFF'] = themeConfig.background.colors;
-
-      slide.background = {
-        fill: {
-          type: 'gradient',
-          color1: color1.replace('#', ''),
-          color2: color2.replace('#', ''),
-          rotation: themeConfig.background.angle || 45
-        }
-      };
-    } else {
-      slide.background = {
-        fill: {
-          color: (themeConfig.background.color || 'FFFFFF').replace('#', '')
-        }
-      };
+    const bg = themeConfig.background as
+      | { type: 'gradient'; colors: string[]; angle?: number }
+      | { type: 'solid'; color: string };
+    // Set simple solid background for maximum compatibility
+    const bgColor = bg.type === 'gradient' ? bg.colors[0] : (bg as { type: 'solid'; color: string }).color;
+    slide.background = { color: normalizeHex(bgColor || 'FFFFFF') } as { color: string };
+    // If gradient requested, draw a full-slide rectangle with gradient fill as the bottom-most layer
+    if (bg.type === 'gradient') {
+      try {
+        const [c1 = 'FFFFFF', c2 = 'FFFFFF'] = bg.colors || [];
+        slide.addShape(pptx.ShapeType.rect, {
+          x: 0,
+          y: 0,
+          w: '100%',
+          h: '100%',
+          fill: { type: 'gradient', color1: normalizeHex(c1), color2: normalizeHex(c2), rotation: (bg as { type: 'gradient'; colors: string[]; angle?: number }).angle ?? 45 },
+          line: { type: 'none' }
+        } as Record<string, unknown>);
+      } catch {
+        console.error('Failed adding gradient background rectangle');
+      }
     }
 
     // CONTENT EXTRACTION: Parse HTML slide content or create from structured data
@@ -122,6 +134,30 @@ export async function POST(request: NextRequest) {
       bulletPoints: [],
       statistics: []
     };
+
+    // If a schema-based template exists for the provided theme/id, render via schema for full fidelity
+    const schema = theme ? loadSchemaById(theme) : null;
+    if (schema) {
+      try {
+        renderPptxFromSchema(pptx, schema, {
+          title: slideContent.title,
+          subtitle: slideContent.subtitle,
+          bulletPoints: slideContent.bulletPoints,
+          statistics: slideContent.statistics,
+        });
+
+        const pptxBuffer = await pptx.write({ outputType: 'nodebuffer' });
+        return new NextResponse(pptxBuffer as unknown as BodyInit, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'Content-Disposition': `attachment; filename="slide-${Date.now()}.pptx"`
+          }
+        });
+      } catch (e) {
+        console.error('Schema-based PPTX render failed, falling back to generic layout.', e);
+      }
+    }
 
     // ============================================================================
     // CONTENT ENHANCEMENT: Improve slide content quality and PowerPoint compatibility
@@ -168,14 +204,14 @@ export async function POST(request: NextRequest) {
     // Creates the primary title that captures audience attention immediately
     // Uses large font size and center alignment for maximum visual impact
     // All positioning values are in inches for PowerPoint compatibility
-    const titleOptions: any = {
+    const titleOptions: Record<string, unknown> = {
       x: 1,          // Horizontal position: 1 inch from left edge (standard margin)
       y: 0.5,        // Vertical position: 0.5 inches from top (header area)
       w: 8,          // Width: 8 inches (spans most of slide width for centering)
       h: 1.5,        // Height: 1.5 inches (adequate space for large text)
       fontSize: 44,  // Font size: 44pt (large enough for presentation visibility)
       fontFace: themeConfig.fonts.title.family,  // Theme-specific font family (e.g., Segoe UI, Inter)
-      color: String(themeConfig.fonts.title.color || 'FFFFFF').startsWith('#') ? String(themeConfig.fonts.title.color) : `#${String(themeConfig.fonts.title.color || 'FFFFFF')}`,
+      color: normalizeHex(themeConfig.fonts.title.color || 'FFFFFF'),
       bold: true,    // Bold weight for emphasis and visual hierarchy
       align: 'center' // Center alignment for professional appearance
     };
@@ -183,26 +219,42 @@ export async function POST(request: NextRequest) {
     // CONDITIONAL EFFECTS: Add text shadow only if theme supports it
     // Prevents errors when themes don't define shadow effects (like Modern theme)
     // Text shadows enhance readability on gradient backgrounds
-    if (themeConfig.effects.textShadow) {
-      titleOptions.shadow = themeConfig.effects.textShadow;
+    const effects = themeConfig.effects as { textShadow?: { color?: string } } | undefined;
+    if (effects?.textShadow) {
+      const shadow = { ...effects.textShadow } as Record<string, unknown>;
+      if (typeof shadow.color === 'string') shadow.color = normalizeHex(shadow.color);
+      titleOptions.shadow = shadow;
     }
 
     // Apply the title text with all formatting options to the slide
-    slide.addText(slideContent.title, titleOptions);
+    try {
+      console.log('PPTX title options:', titleOptions);
+      slide.addText(slideContent.title, titleOptions);
+    } catch (e) {
+      console.error('Failed adding title text. Options:', titleOptions);
+      throw e;
+    }
 
     // SUBTITLE PLACEMENT: Add supporting subtitle text below main title (if available)
     // Provides additional context or key message in smaller, complementary styling
     if (slideContent.subtitle) {
-      slide.addText(slideContent.subtitle, {
+      const subtitleOptions: Record<string, unknown> = {
         x: 1,          // Aligned with title
         y: 2.2,        // Positioned below title with appropriate spacing
         w: 8,          // Same width as title for visual consistency
         h: 0.8,        // Smaller height than title
         fontSize: 24,  // Smaller font size to create hierarchy
         fontFace: themeConfig.fonts.subtitle.family,
-        color: String(themeConfig.fonts.subtitle.color || 'F0F0F0').startsWith('#') ? String(themeConfig.fonts.subtitle.color) : `#${String(themeConfig.fonts.subtitle.color || 'F0F0F0')}`,
+        color: normalizeHex(themeConfig.fonts.subtitle.color || 'F0F0F0'),
         align: 'center'
-      });
+      };
+      try {
+        console.log('PPTX subtitle options:', subtitleOptions);
+        slide.addText(slideContent.subtitle, subtitleOptions);
+      } catch (e) {
+        console.error('Failed adding subtitle text. Options:', subtitleOptions);
+        throw e;
+      }
     }
 
     // CONTENT POINTS: Add bullet points from HTML content or research data
@@ -217,16 +269,23 @@ export async function POST(request: NextRequest) {
         // Convert string array to properly formatted text for pptxgenjs
         const bulletText = points.map(point => `• ${point}`).join('\n');
 
-        slide.addText(bulletText, {
+        const bulletsOptions: Record<string, unknown> = {
           x: 1.5,        // Slightly indented from slide edges
           y: 3.5,        // Positioned in middle section of slide
           w: 7,          // Narrower than title to allow for bullet indentation
           h: 2.5,        // Sufficient height for multiple bullet points
           fontSize: 16,  // Readable body text size
           fontFace: themeConfig.fonts.body.family,
-          color: String(themeConfig.fonts.body.color || 'F0F0F0').startsWith('#') ? String(themeConfig.fonts.body.color) : `#${String(themeConfig.fonts.body.color || 'F0F0F0')}`,
+          color: normalizeHex(themeConfig.fonts.body.color || 'F0F0F0'),
           lineSpacing: 24 // Generous line spacing for readability
-        });
+        };
+        try {
+          console.log('PPTX bullets options:', bulletsOptions);
+          slide.addText(bulletText, bulletsOptions);
+        } catch (e) {
+          console.error('Failed adding bullets. Options:', bulletsOptions);
+          throw e;
+        }
       }
     }
 
@@ -241,35 +300,50 @@ export async function POST(request: NextRequest) {
 
         // STATISTIC CONTAINER: Create rounded rectangle background for each metric
         // Uses theme accent color with transparency for subtle visual emphasis
-        slide.addShape('roundRect', {
+        const shapeOptions: Record<string, unknown> = {
           x: xPos,       // Calculated horizontal position
           y: 4.5,        // Fixed vertical position in lower section
           w: 2,          // 2 inches wide - compact but readable
           h: 1.2,        // 1.2 inches tall - enough for number and label
           fill: {
-            color: String(themeConfig.colors.accent || 'FFFFFF').startsWith('#') ? String(themeConfig.colors.accent) : `#${String(themeConfig.colors.accent || 'FFFFFF')}`,
+            color: normalizeHex(themeConfig.colors.accent || 'FFFFFF'),
             transparency: 20  // 20% transparency for subtle background
           },
           line: {
-            color: String(themeConfig.colors.accent || 'FFFFFF').startsWith('#') ? String(themeConfig.colors.accent) : `#${String(themeConfig.colors.accent || 'FFFFFF')}`,
+            color: normalizeHex(themeConfig.colors.accent || 'FFFFFF'),
             width: 1,
             transparency: 30  // Slightly more transparent border
           }
-        });
+        };
+        try {
+          console.log('PPTX shape options:', shapeOptions);
+          slide.addShape(pptx.ShapeType.roundRect, shapeOptions);
+        } catch (e) {
+          console.error('Failed adding shape at index', index, 'Options:', shapeOptions);
+          throw e;
+        }
 
         // STATISTIC TEXT: Add the actual number and label inside the container
         // Uses multi-part text with different formatting for number vs label
-        slide.addText([
-          { text: stat.value, options: { fontSize: 28, bold: true, color: String(themeConfig.fonts.stat.color || 'FFFFFF').startsWith('#') ? String(themeConfig.fonts.stat.color) : `#${String(themeConfig.fonts.stat.color || 'FFFFFF')}` } },
-          { text: '\n' + stat.label, options: { fontSize: 12, color: String(themeConfig.fonts.statLabel.color || 'F0F0F0').startsWith('#') ? String(themeConfig.fonts.statLabel.color) : `#${String(themeConfig.fonts.statLabel.color || 'F0F0F0')}` } }
-        ], {
+        const statsText: Array<{ text: string; options: Record<string, unknown> }> = [
+          { text: stat.value, options: { fontSize: 28, bold: true, color: normalizeHex(themeConfig.fonts.stat.color || 'FFFFFF') } },
+          { text: '\n' + stat.label, options: { fontSize: 12, color: normalizeHex(themeConfig.fonts.statLabel.color || 'F0F0F0') } }
+        ];
+        const statsOptions: Record<string, unknown> = {
           x: xPos,       // Same position as container
           y: 4.5,        // Same position as container
           w: 2,          // Same width as container
           h: 1.2,        // Same height as container
           align: 'center',
           valign: 'middle' // Center text vertically within container
-        });
+        };
+        try {
+          console.log('PPTX stats text options:', statsOptions, 'text:', statsText);
+          slide.addText(statsText, statsOptions);
+        } catch (e) {
+          console.error('Failed adding stats text at index', index, 'Options:', statsOptions, 'text:', statsText);
+          throw e;
+        }
       });
     }
 
@@ -282,17 +356,16 @@ export async function POST(request: NextRequest) {
 
     // PPTX GENERATION: Convert the slide definition into binary PowerPoint format
     // Uses 'nodebuffer' format for direct HTTP response without file system writes
-    const pptxBuffer = await pptx.write('nodebuffer');
+    const pptxBuffer = await pptx.write({ outputType: 'nodebuffer' });
 
     // FILE DOWNLOAD RESPONSE: Return the PPTX file as an immediate download
     // Sets appropriate headers for browser to recognize and download the file
     // Filename includes timestamp to prevent conflicts with multiple downloads
-    return new NextResponse(pptxBuffer, {
+    return new NextResponse(pptxBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'Content-Disposition': `attachment; filename="slide-${Date.now()}.pptx"`,
-        'Content-Length': pptxBuffer.length.toString()
+        'Content-Disposition': `attachment; filename="slide-${Date.now()}.pptx"`
       }
     });
 
@@ -477,7 +550,7 @@ function extractContentFromHtml(html?: string) {
     }
 
     // STATISTICS EXTRACTION: Find numeric statistics with labels
-    let statistics: Array<{ value: string, label: string }> = [];
+    const statistics: Array<{ value: string, label: string }> = [];
     if (statMatches) {
       statMatches.forEach((match, index) => {
         const value = cleanHtmlText(match);

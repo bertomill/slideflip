@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Imported Quarterly Reports (HTML Preview)</title>
+  <style>
+    /* Canvas is 10in × 5.625in (960×540 @ 96dpi). Using inches for exact 1:1 layout. */
+    .slide { position: relative; width: 10in; height: 5.625in; background: #ffffff; font-family: Roboto, Arial, sans-serif; }
+    .box { position: absolute; }
+    .title { left: 0.063in; top: 0.060in; width: 9.318in; height: 0.627in; color: #980000; font-weight: 700; font-size: 20pt; line-height: 1.2; display: flex; align-items: center; }
+    .summary { left: 0.162in; top: 0.468in; width: 9.683in; height: 0.505in; color: #111111; font-size: 9pt; line-height: 1.3; display: flex; align-items: center; }
+
+    .col { background: #ffffff; border: 0.01in solid #b3b3b3; padding: 0.12in; }
+    .col1 { left: 0.162in; top: 0.972in; width: 3.100in; height: 4.000in; }
+    .col2 { left: 3.451in; top: 0.972in; width: 3.100in; height: 4.000in; }
+    .col3 { left: 6.744in; top: 0.972in; width: 3.100in; height: 4.000in; }
+    .col h3 { margin: 0 0 0.08in 0; font-size: 10pt; line-height: 1.2; font-weight: 700; color: #111111; }
+    .col ul { margin: 0; padding-left: 0.35in; list-style: disc; list-style-position: outside; }
+    .col li { font-size: 10pt; line-height: 1.35; color: #111111; margin-bottom: 0.06in; }
+    .col li::marker { font-size: 12pt; color: #111111; }
+
+    .divider { position: absolute; left: 0.064in; right: 0.064in; top: 5.340in; height: 0; border-top: 0.01in solid #b3b3b3; }
+    .footer-left { left: 0.064in; top: 5.340in; width: 1.868in; height: 0.339in; font-size: 10pt; color: #333333; display: flex; align-items: center; }
+    .footer-right { left: 8.967in; top: 5.340in; width: 0.877in; height: 0.339in; font-size: 10pt; color: #333333; display: flex; align-items: center; justify-content: flex-end; text-align: right; }
+  </style>
+  <!--
+    Explanation (non-technical):
+    - Everything is measured in inches so the preview lines up perfectly with PowerPoint which uses a fixed page size.
+    - Each element (title, columns, footer) is absolutely positioned using x/y/width/height taken from your PPTX XML.
+    - Font sizes follow the XML (e.g., sz=2000 ≈ 20pt). Colors use hex codes.
+    - The three highlight boxes are simple containers with a light background and a thin border.
+  -->
+  </head>
+<body>
+  <div class="slide">
+    <div class="box title">Tech Quarterly Earnings Reports</div>
+    <div class="box summary">Meta, Google, and Amazon all posted strong Q2 2025 earnings, driven by AI and ad growth, with Meta and Amazon showing double-digit revenue gains and Google leading in ad and cloud expansion.</div>
+
+    <div class="box col col1">
+      <h3>Meta Q2 2025 Highlights</h3>
+      <ul>
+        <li>Revenue up 22% to $47.5B; net income up 36% to $18.3B—both above expectations.</li>
+        <li>Daily active users rose 6% to 3.48B.</li>
+        <li>Ads drove 21% revenue growth, boosted by new AI tools used by 2M+ advertisers.</li>
+        <li>Big focus on AI: new Superintelligence Lab, heavy investment in tech and talent.</li>
+        <li>Reality Labs (smart glasses, VR) up 5%, but still not profitable.</li>
+        <li>Capex raised to fund AI and data center growth.</li>
+        <li>Returned $11B to shareholders.</li>
+        <li>Q3 outlook remains strong with ad and AI growth continuing.</li>
+      </ul>
+    </div>
+
+    <div class="box col col2">
+      <h3>Google (Alphabet) Q2 2025 Highlights</h3>
+      <ul>
+        <li>Revenue up 14% to $96.4B; net income up 19% to $28.2B; EPS rose 22% to $2.31, all ahead of expectations.</li>
+        <li>Strong growth across core businesses: Search, YouTube, subscriptions, and Cloud.</li>
+        <li>Google Cloud revenue surged 32% to $13.6B; profitability more than doubled.</li>
+        <li>AI at the center: new AI-powered search features, YouTube Shorts growth, launch of “Google AI Ultra” subscription.</li>
+        <li>Capital expenditures soared 70% to $22.5B, guidance for 2025 CapEx raised to $85B, focused on AI and cloud infrastructure.</li>
+        <li>Outlook positive, with growing demand for AI and cloud services.</li>
+      </ul>
+    </div>
+
+    <div class="box col col3">
+      <h3>Amazon Q2 2025 Highlights</h3>
+      <ul>
+        <li>Revenue up 13% to $167.7B; net income up 35% to $18.2B; EPS $1.68, all beating forecasts.</li>
+        <li>North America sales rose 11%; International up 16%; AWS (cloud) grew 18% to $30.9B.</li>
+        <li>Operating income jumped to $19.2B.</li>
+        <li>AI was a major focus, with new features in Alexa, shopping, and logistics.</li>
+        <li>Held biggest Prime Day ever; expanded fast delivery to more cities.</li>
+        <li>Launched tools for AI-powered shopping and increased robotics automation.</li>
+        <li>Guidance cautious but demand and innovation remain strong.</li>
+      </ul>
+    </div>
+
+    <div class="divider"></div>
+    <div class="box footer-left">Tech Earnings Analysis</div>
+    <div class="box footer-right">Robert Mill</div>
+  </div>
+</body>
+</html>
+

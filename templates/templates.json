@@ -1,6 +1,28 @@
 {
   "templates": [
     {
+      "id": "basic-01",
+      "name": "Basic Clean",
+      "description": "A minimal slide with title, optional subtitle, bullets, and optional stats row.",
+      "theme": "Professional",
+      "filename": "basic-clean.html",
+      "aspect_ratio": "16:9",
+      "tags": ["basic", "clean", "professional"],
+      "primary_colors": ["#ffffff", "#1a1a1a", "#333333"],
+      "use_cases": ["quick slides", "status updates", "dashboards"]
+    },
+    {
+      "id": "imported-02",
+      "name": "Quarterly Reports (Imported)",
+      "description": "Three-column highlights with title, summary, divider, and footer labels. 1:1 from PPTX.",
+      "theme": "Imported",
+      "filename": "imported-02.html",
+      "aspect_ratio": "16:9",
+      "tags": ["imported", "earnings", "three-column"],
+      "primary_colors": ["#ffffff", "#980000", "#333333"],
+      "use_cases": ["earnings", "reports", "comparisons"]
+    },
+    {
       "id": "professional-gradient",
       "name": "Professional Gradient",
       "description": "A modern professional slide template with gradient background, glass morphism effects, and clean typography. Perfect for business presentations and data visualization.",

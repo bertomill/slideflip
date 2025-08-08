@@ -102,7 +102,8 @@ ${researchData}
       // If we have parsed document content, include the actual text
       if (Array.isArray(documents) && documents[0] && typeof documents[0] === 'object' && 'content' in documents[0]) {
         // documents contains parsed content
-        documents.forEach((doc: any, index: number) => {
+        type ParsedDoc = { filename: string; success?: boolean; content?: string };
+        (documents as ParsedDoc[]).forEach((doc, index: number) => {
           if (doc.success && doc.content) {
             prompt += `Document ${index + 1} (${doc.filename}):\n${doc.content}\n\n`;
           } else {
