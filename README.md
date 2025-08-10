@@ -258,6 +258,9 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Recent Updates
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
+
+### Assets
+- `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).
 - Landing page CTAs updated: all "Get Started" buttons now navigate to `'/auth/login'` so users are prompted to sign in before creating content.
 - Landing page bottom CTA alignment: "View Examples" button height now matches "Start Free Trial" for a uniform appearance.
  - Added a new route `'/waitlist'` accessible from the sidebar as "Waitlist QR Code". Users can scan a QR or submit an email to join the waitlist. Emails are stored in Supabase table `waitlist_emails` (see migration `004_create_waitlist_emails.sql`).
