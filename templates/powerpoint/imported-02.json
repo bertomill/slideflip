@@ -1,0 +1,103 @@
+{
+  "id": "imported-02",
+  "name": "Quarterly Reports (Imported)",
+  "description": "Three-column highlights with title, summary, divider, and footer labels. Converted from slide1.xml.",
+  "category": "Imported",
+  "background": { "type": "solid", "color": "FFFFFF" },
+  "titleBox": {
+    "x": 0.063,
+    "y": 0.060,
+    "w": 9.318,
+    "h": 0.627,
+    "style": { "fontFace": "Roboto", "fontSize": 20, "color": "980000", "bold": true, "align": "left" }
+  },
+  "subtitleBox": {
+    "x": 0.162,
+    "y": 0.468,
+    "w": 9.683,
+    "h": 0.505,
+    "style": { "fontFace": "Roboto", "fontSize": 9, "color": "111111", "align": "left" }
+  },
+  "columns": [
+    {
+      "x": 0.162,
+      "y": 0.972,
+      "w": 3.100,
+      "h": 4.000,
+      "header": "Meta Q2 2025 Highlights",
+      "bullets": [
+        "Revenue up 22% to $47.5B; net income up 36% to $18.3B—both above expectations.",
+        "Daily active users rose 6% to 3.48B.",
+        "Ads drove 21% revenue growth, boosted by new AI tools used by 2M+ advertisers.",
+        "Big focus on AI: new Superintelligence Lab, heavy investment in tech and talent.",
+        "Reality Labs (smart glasses, VR) up 5%, but still not profitable.",
+        "Capex raised to fund AI and data center growth.",
+        "Returned $11B to shareholders.",
+        "Q3 outlook remains strong with ad and AI growth continuing."
+      ],
+      "style": {
+        "headerStyle": { "fontFace": "Roboto", "fontSize": 10, "bold": true, "color": "111111", "align": "left" },
+        "bulletStyle": { "fontFace": "Roboto", "fontSize": 10, "color": "111111" }
+      },
+      "boxStyle": { "fillColor": "F5F7FA", "lineColor": "333333" }
+    },
+    {
+      "x": 3.451,
+      "y": 0.972,
+      "w": 3.100,
+      "h": 4.000,
+      "header": "Google (Alphabet) Q2 2025 Highlights",
+      "bullets": [
+        "Revenue up 14% to $96.4B; net income up 19% to $28.2B; EPS rose 22% to $2.31, all ahead of expectations.",
+        "Strong growth across core businesses: Search, YouTube, subscriptions, and Cloud.",
+        "Google Cloud revenue surged 32% to $13.6B; profitability more than doubled.",
+        "AI at the center: new AI-powered search features, YouTube Shorts growth, launch of “Google AI Ultra” subscription.",
+        "Capital expenditures soared 70% to $22.5B, guidance for 2025 CapEx raised to $85B, focused on AI and cloud infrastructure.",
+        "Outlook positive, with growing demand for AI and cloud services."
+      ],
+      "style": {
+        "headerStyle": { "fontFace": "Roboto", "fontSize": 10, "bold": true, "color": "111111", "align": "left" },
+        "bulletStyle": { "fontFace": "Roboto", "fontSize": 10, "color": "111111" }
+      },
+      "boxStyle": { "fillColor": "F5F7FA", "lineColor": "333333" }
+    },
+    {
+      "x": 6.744,
+      "y": 0.972,
+      "w": 3.100,
+      "h": 4.000,
+      "header": "Amazon Q2 2025 Highlights",
+      "bullets": [
+        "Revenue up 13% to $167.7B; net income up 35% to $18.2B; EPS $1.68, all beating forecasts.",
+        "North America sales rose 11%; International up 16%; AWS (cloud) grew 18% to $30.9B.",
+        "Operating income jumped to $19.2B.",
+        "AI was a major focus, with new features in Alexa, shopping, and logistics.",
+        "Held biggest Prime Day ever; expanded fast delivery to more cities.",
+        "Launched tools for AI-powered shopping and increased robotics automation.",
+        "Guidance cautious but demand and innovation remain strong."
+      ],
+      "style": {
+        "headerStyle": { "fontFace": "Roboto", "fontSize": 10, "bold": true, "color": "111111", "align": "left" },
+        "bulletStyle": { "fontFace": "Roboto", "fontSize": 10, "color": "111111" }
+      },
+      "boxStyle": { "fillColor": "F5F7FA", "lineColor": "333333" }
+    }
+  ],
+  "dividerLineY": 5.340,
+  "footerLeft": {
+    "x": 0.064,
+    "y": 5.340,
+    "w": 1.868,
+    "h": 0.339,
+    "text": "Tech Earnings Analysis",
+    "style": { "fontFace": "Roboto", "fontSize": 10, "color": "333333", "align": "left" }
+  },
+  "footerRight": {
+    "x": 8.967,
+    "y": 5.340,
+    "w": 0.877,
+    "h": 0.339,
+    "text": "Robert Mill",
+    "style": { "fontFace": "Roboto", "fontSize": 10, "color": "333333", "align": "left" }
+  }
+}

@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent horizontal scrolling globally */
+html, body {
+  overflow-x: hidden;
+}
+
 @layer base {
   :root {
     /* Engineering-focused Light Theme - Practicality & Simplicity */
@@ -36,32 +41,32 @@
   }
   
   .dark {
-    /* Engineering-focused Dark Theme - Precision & Craftsmanship */
-    --background: 0 0% 4%;
+    /* Dark Blue Theme - Inspired by Login Screen */
+    --background: 215 28% 8%;
     --foreground: 0 0% 96%;
-    --card: 0 0% 4%;
+    --card: 215 30% 10%;
     --card-foreground: 0 0% 96%;
-    --popover: 0 0% 4%;
+    --popover: 215 30% 10%;
     --popover-foreground: 0 0% 96%;
     --primary: 0 0% 96%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 0 0% 8%;
+    --primary-foreground: 215 28% 8%;
+    --secondary: 215 25% 15%;
     --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 8%;
+    --muted: 215 25% 15%;
     --muted-foreground: 0 0% 60%;
-    --accent: 0 0% 8%;
+    --accent: 215 25% 15%;
     --accent-foreground: 0 0% 96%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 96%;
-    --border: 0 0% 8%;
-    --input: 0 0% 8%;
+    --border: 215 20% 20%;
+    --input: 215 25% 15%;
     --ring: 0 0% 96%;
     --radius: 0.375rem;
     
-    /* Engineering-inspired dark accent colors */
+    /* Dark blue inspired accent colors */
     --engineering-primary: 0 0% 96%;
     --engineering-secondary: 0 0% 60%;
-    --engineering-accent: 200 6% 90%;
+    --engineering-accent: 215 25% 85%;
     --engineering-success: 142 71% 45%;
     --engineering-warning: 38 92% 50%;
     --engineering-error: 0 72% 51%;
@@ -145,5 +150,22 @@
      Ideal for hero sections, cards, and premium UI components */
   .gradient-premium {
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.5));
+  }
+  
+  /* Theme-responsive gradient - Adapts to light/dark mode
+     Creates appropriate atmosphere for both light and dark themes
+     Perfect for main app backgrounds and dashboard sections */
+  .gradient-dark-blue {
+    background: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--muted) / 0.3), hsl(var(--card)));
+  }
+  
+  /* Legacy dark blue gradient - For specific dark-only use cases */
+  .gradient-dark-blue-legacy {
+    background: linear-gradient(to bottom right, rgb(15 23 42), rgb(17 24 39), rgb(0 0 0));
+  }
+  
+  /* Subtle dark blue gradient for cards and components */
+  .gradient-dark-blue-subtle {
+    background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
   }
 }

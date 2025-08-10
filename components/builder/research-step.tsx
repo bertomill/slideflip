@@ -527,7 +527,22 @@ Your slide will be created using the uploaded documents and description provided
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
+<<<<<<< HEAD
           Back to Theme
+=======
+          Back to Themes
+        </Button>
+        {/* Forward Navigation: Proceed to preview step */}
+        {/* Disabled during active research or if user hasn't made research choice */}
+        <Button 
+          variant="engineering" 
+          size="lg" 
+          onClick={onNext}
+          disabled={!canProceed || isResearching}
+        >
+          Continue to Content Planning
+          <ArrowRight className="h-4 w-4 ml-2" />
+>>>>>>> origin/main
         </Button>
         
         {/* Show progress when generating slide */}

@@ -1,0 +1,19 @@
+{
+  "id": "basic-01",
+  "name": "Basic Clean",
+  "description": "A minimal slide with title, optional subtitle, bullets, and optional stats row.",
+  "category": "Professional",
+  "background": { "type": "solid", "color": "FFFFFF" },
+  "accentColor": "3B82F6",
+  "headerBar": { "height": 0.55, "color": "3B82F6", "transparency": 10 },
+  "logoBox": { "x": 0.5, "y": 0.22, "w": 2.5, "h": 0.4, "style": { "fontFace": "Segoe UI", "fontSize": 14, "color": "FFFFFF", "bold": true, "align": "left" }, "text": "SLIDEFLIP" },
+  "titleBox": { "x": 1, "y": 0.7, "w": 8, "h": 1.2, "style": { "fontFace": "Segoe UI", "fontSize": 44, "color": "1A1A1A", "bold": true, "align": "center" } },
+  "subtitleBox": { "x": 1, "y": 2.1, "w": 8, "h": 0.8, "style": { "fontFace": "Segoe UI", "fontSize": 24, "color": "333333", "align": "center" } },
+  "bulletsBox": { "x": 1.2, "y": 3.2, "w": 7.6, "h": 2.8, "style": { "fontFace": "Segoe UI", "fontSize": 16, "color": "333333", "lineSpacing": 24 } },
+  "statBoxes": [
+    { "x": 2, "y": 6.2, "w": 2, "h": 1.1, "fillColor": "F3F4F6", "lineColor": "E5E7EB", "numberStyle": { "fontSize": 28, "color": "111827" }, "labelStyle": { "fontSize": 12, "color": "6B7280" } },
+    { "x": 4.5, "y": 6.2, "w": 2, "h": 1.1, "fillColor": "F3F4F6", "lineColor": "E5E7EB", "numberStyle": { "fontSize": 28, "color": "111827" }, "labelStyle": { "fontSize": 12, "color": "6B7280" } },
+    { "x": 7, "y": 6.2, "w": 2, "h": 1.1, "fillColor": "F3F4F6", "lineColor": "E5E7EB", "numberStyle": { "fontSize": 28, "color": "111827" }, "labelStyle": { "fontSize": 12, "color": "6B7280" } }
+  ]
+}
+
