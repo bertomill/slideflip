@@ -11,12 +11,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-import Image from "next/image";
+// import Image from "next/image"; // Removed: we now only show the dynamic QR
 
 export default function WaitlistPage() {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ email?: string; user_metadata?: { avatar_url?: string; full_name?: string }; } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -45,8 +45,8 @@ export default function WaitlistPage() {
       if (error) throw error;
       toast.success("You're on the list! We'll be in touch soon.");
       setEmail("");
-    } catch (err: any) {
-      const message = err?.message || "Could not join the waitlist";
+    } catch (err: unknown) {
+      const message = typeof err === 'object' && err && 'message' in err ? (err as { message?: string }).message || "Could not join the waitlist" : "Could not join the waitlist";
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -58,7 +58,7 @@ export default function WaitlistPage() {
       <Toaster richColors position="top-center" />
       {/* Mobile header */}
       <div className="md:hidden sticky top-0 z-40 w-full bg-background/80 backdrop-blur border-b border-border flex items-center justify-between px-4 py-3">
-        <MobileMenuButton isOpen={mobileMenuOpen} onClick={() => setMobileMenuOpen((o) => !o)} />
+        <MobileMenuButton isOpen={mobileMenuOpen} onToggle={() => setMobileMenuOpen((o) => !o)} />
         <div className="font-semibold">Waitlist</div>
         <div className="w-8" />
       </div>
@@ -89,27 +89,13 @@ export default function WaitlistPage() {
           <div className="grid md:grid-cols-2 gap-6">
             <Card variant="glass">
               <CardContent className="p-6">
-                <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-background p-4 rounded-lg border border-border">
-                      {waitlistUrl && (
-                        <QRCode value={waitlistUrl} size={180} fgColor="currentColor" />
-                      )}
-                    </div>
-                    <span className="text-xs text-muted-foreground">Dynamic QR (links to this page)</span>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-background p-6 rounded-xl border border-border shadow-inner">
+                    {waitlistUrl && (
+                      <QRCode value={waitlistUrl} size={320} fgColor="currentColor" />
+                    )}
                   </div>
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-background p-2 rounded-lg border border-border">
-                      <Image
-                        src="/slideo-waitlist.png"
-                        alt="Slideo waitlist QR"
-                        width={184}
-                        height={184}
-                        className="rounded"
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">Static QR image</span>
-                  </div>
+                  <span className="text-xs text-muted-foreground">Scan to join the waitlist</span>
                 </div>
               </CardContent>
             </Card>
@@ -131,7 +117,7 @@ export default function WaitlistPage() {
                   <Button type="submit" disabled={isSubmitting || !email} className="w-full">
                     {isSubmitting ? "Joining..." : "Join Waitlist"}
                   </Button>
-                  <Button
+                   <Button
                     type="button"
                     variant="secondary"
                     className="w-full"
