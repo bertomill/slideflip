@@ -261,6 +261,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Landing page CTAs updated: all "Get Started" buttons now navigate to `'/auth/login'` so users are prompted to sign in before creating content.
 - Landing page bottom CTA alignment: "View Examples" button height now matches "Start Free Trial" for a uniform appearance.
  - Added a new route `'/waitlist'` accessible from the sidebar as "Waitlist QR Code". Users can scan a QR or submit an email to join the waitlist. Emails are stored in Supabase table `waitlist_emails` (see migration `004_create_waitlist_emails.sql`).
+ - The waitlist page shows both a dynamic QR that points to the current `/waitlist` URL and a static QR image at `public/slideo-waitlist.png` if you want to reuse a branded code offline.
 
 ### Waitlist feature setup
 

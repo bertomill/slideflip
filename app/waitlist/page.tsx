@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
+import Image from "next/image";
 
 export default function WaitlistPage() {
   const [email, setEmail] = useState("");
@@ -87,11 +88,28 @@ export default function WaitlistPage() {
 
           <div className="grid md:grid-cols-2 gap-6">
             <Card variant="glass">
-              <CardContent className="p-6 flex items-center justify-center">
-                <div className="bg-background p-4 rounded-lg border border-border">
-                  {waitlistUrl && (
-                    <QRCode value={waitlistUrl} size={180} fgColor="currentColor" />
-                  )}
+              <CardContent className="p-6">
+                <div className="grid grid-cols-2 gap-4 items-center justify-items-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="bg-background p-4 rounded-lg border border-border">
+                      {waitlistUrl && (
+                        <QRCode value={waitlistUrl} size={180} fgColor="currentColor" />
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">Dynamic QR (links to this page)</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="bg-background p-2 rounded-lg border border-border">
+                      <Image
+                        src="/slideo-waitlist.png"
+                        alt="Slideo waitlist QR"
+                        width={184}
+                        height={184}
+                        className="rounded"
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Static QR image</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
