@@ -626,33 +626,36 @@ export default function Home() {
           <div className="relative max-w-5xl mx-auto mt-8">
             <div className="relative h-[420px]">
               {/* back-left */}
-              <div className="absolute -left-10 top-10 w-[46%] h-[320px] rounded-2xl bg-gradient-to-br from-[hsl(var(--charade))] to-[hsl(var(--baltic-sea))] shadow-2xl border border-border/40 rotate-[-4deg] opacity-90 overflow-hidden">
-                <div className="p-6">
-                  <div className="text-sm text-muted-foreground mb-2">Creation</div>
-                  <div className="text-xl font-semibold mb-2">AI-Powered Creation</div>
-                  <p className="text-sm text-muted-foreground">Transform ideas into slides instantly with contextual layouts.</p>
+              <div className="absolute -left-10 top-10 w-[46%] h-[320px] rounded-2xl bg-gradient-to-br from-[hsl(var(--charade))] to-[hsl(var(--baltic-sea))] shadow-2xl border border-border/40 rotate-[-4deg] opacity-95 overflow-hidden backdrop-blur-sm">
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="relative p-6">
+                  <div className="text-sm text-foreground/70 mb-2">Creation</div>
+                  <div className="text-xl font-semibold mb-2 text-foreground">AI-Powered Creation</div>
+                  <p className="text-sm text-foreground/80">Transform ideas into slides instantly with contextual layouts.</p>
                 </div>
                 <div className="absolute bottom-0 right-0 w-40 h-40 rounded-tl-3xl"
                      style={{ background: "linear-gradient(135deg, hsl(var(--old-lavender-light)), transparent)" }}></div>
               </div>
 
               {/* front-center */}
-              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[56%] h-[360px] rounded-2xl bg-gradient-to-br from-[hsl(var(--plantation))] to-[hsl(var(--charade))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-border/50 rotate-[1deg] overflow-hidden">
-                <div className="p-6">
-                  <div className="text-sm text-muted-foreground mb-2">Enterprise</div>
-                  <div className="text-xl font-semibold mb-2">Enterprise Ready</div>
-                  <p className="text-sm text-muted-foreground">SSO, RBAC, and audit logs tailored for teams.</p>
+              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[56%] h-[360px] rounded-2xl bg-gradient-to-br from-[hsl(var(--plantation))] to-[hsl(var(--charade))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-border/50 rotate-[1deg] overflow-hidden backdrop-blur-sm">
+                <div className="absolute inset-0 bg-black/25" />
+                <div className="relative p-6">
+                  <div className="text-sm text-foreground/70 mb-2">Enterprise</div>
+                  <div className="text-xl font-semibold mb-2 text-foreground">Enterprise Ready</div>
+                  <p className="text-sm text-foreground/80">SSO, RBAC, and audit logs tailored for teams.</p>
                 </div>
                 <div className="absolute -bottom-10 -left-10 w-56 h-56 rounded-full blur-2xl"
                      style={{ background: "radial-gradient(closest-side, hsl(var(--old-lavender-light)), transparent)" }} />
               </div>
 
               {/* back-right */}
-              <div className="absolute -right-10 top-16 w-[46%] h-[320px] rounded-2xl bg-gradient-to-br from-[hsl(var(--pale-sky))] to-[hsl(var(--manatee))] shadow-2xl border border-border/40 rotate-[5deg] opacity-95 overflow-hidden">
-                <div className="p-6">
-                  <div className="text-sm text-muted-foreground mb-2">Insights</div>
-                  <div className="text-xl font-semibold mb-2">Smart Analytics</div>
-                  <p className="text-sm text-muted-foreground">Engagement metrics and exportable reports built-in.</p>
+              <div className="absolute -right-10 top-16 w-[46%] h-[320px] rounded-2xl bg-gradient-to-br from-[hsl(var(--pale-sky))] to-[hsl(var(--manatee))] shadow-2xl border border-border/40 rotate-[5deg] opacity-95 overflow-hidden backdrop-blur-sm">
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="relative p-6">
+                  <div className="text-sm text-foreground/70 mb-2">Insights</div>
+                  <div className="text-xl font-semibold mb-2 text-foreground">Smart Analytics</div>
+                  <p className="text-sm text-foreground/80">Engagement metrics and exportable reports built-in.</p>
                 </div>
                 <div className="absolute top-0 right-0 w-40 h-40 rounded-bl-3xl"
                      style={{ background: "linear-gradient(135deg, hsl(var(--manatee)), transparent)" }}></div>
@@ -674,14 +677,14 @@ export default function Home() {
               <Link href="/auth/sign-up">
                 <Button
                   size="lg"
-                  className="shadow-xl text-lg px-8 py-6 rounded-full text-white transition-all duration-300 hover:shadow-2xl hover:scale-105 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 border-0 font-medium"
+                  className="shadow-xl text-lg px-8 py-6 rounded-full text-white transition-all duration-300 hover:shadow-2xl hover:scale-105 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 font-medium"
                 >
                   <Star className="h-5 w-5 mr-2" />
                   Start Free Trial
                 </Button>
               </Link>
               <Link href="/auth/login">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-4 rounded-xl border-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-4 rounded-full border-2 hover:bg-slate-50 dark:hover:bg-slate-800">
                   <FileText className="h-5 w-5 mr-2" />
                   View Examples
                 </Button>

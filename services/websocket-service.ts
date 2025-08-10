@@ -58,7 +58,8 @@ class WebSocketService {
       this.isConnecting = true;
       this.connectionStatus = 'connecting';
 
-      const wsUrl = `ws://localhost:8000/ws/${clientId}`;
+      const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://localhost:8000';
+      const wsUrl = `${backendWsUrl}/ws/${clientId}`;
       
       try {
         const ws = new WebSocket(wsUrl);

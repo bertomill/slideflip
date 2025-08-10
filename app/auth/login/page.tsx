@@ -4,23 +4,23 @@ export default function Page() {
   return (
     <div className="flex min-h-screen w-full">
       {/* Left side - Sign in form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 md:p-10 bg-gradient-to-br from-zinc-50 via-zinc-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-900/80 dark:to-zinc-900/60">
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 md:p-10 bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted))]/30 to-[hsl(var(--card))]">
         <div className="w-full max-w-sm">
           <LoginForm />
         </div>
       </div>
       
       {/* Right side - Creative design assets */}
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black relative overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-[hsl(var(--charade))] via-[hsl(var(--woodsmoke))] to-black relative overflow-hidden">
         {/* Design assets overlay */}
         <div className="absolute inset-0 opacity-20">
           {/* Magazine covers and design elements */}
-          <div className="absolute top-10 left-10 w-32 h-40 bg-white rounded-lg shadow-lg transform rotate-6"></div>
-          <div className="absolute top-20 right-20 w-28 h-36 bg-gradient-to-br from-purple-400 to-pink-400 rounded-lg shadow-lg transform -rotate-3"></div>
-          <div className="absolute top-40 left-20 w-24 h-32 bg-gradient-to-br from-green-400 to-blue-400 rounded-lg shadow-lg transform rotate-12"></div>
-          <div className="absolute top-60 right-10 w-36 h-44 bg-gradient-to-br from-orange-400 to-red-400 rounded-lg shadow-lg transform -rotate-6"></div>
-          <div className="absolute bottom-20 left-10 w-30 h-38 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-lg shadow-lg transform rotate-3"></div>
-          <div className="absolute bottom-40 right-20 w-26 h-34 bg-gradient-to-br from-teal-400 to-green-400 rounded-lg shadow-lg transform -rotate-12"></div>
+          <div className="absolute top-10 left-10 w-32 h-40 rounded-lg shadow-lg transform rotate-6 bg-gradient-to-br from-[hsl(var(--manatee))] to-[hsl(var(--pale-sky))]"></div>
+          <div className="absolute top-20 right-20 w-28 h-36 rounded-lg shadow-lg transform -rotate-3 bg-gradient-to-br from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))]"></div>
+          <div className="absolute top-40 left-20 w-24 h-32 rounded-lg shadow-lg transform rotate-12 bg-gradient-to-br from-[hsl(var(--plantation))] to-[hsl(var(--charade))]"></div>
+          <div className="absolute top-60 right-10 w-36 h-44 rounded-lg shadow-lg transform -rotate-6 bg-gradient-to-br from-[hsl(var(--pale-sky))] to-[hsl(var(--manatee))]"></div>
+          <div className="absolute bottom-20 left-10 w-30 h-38 rounded-lg shadow-lg transform rotate-3 bg-gradient-to-br from-[hsl(var(--charade))] to-[hsl(var(--baltic-sea))]"></div>
+          <div className="absolute bottom-40 right-20 w-26 h-34 rounded-lg shadow-lg transform -rotate-12 bg-gradient-to-br from-[hsl(var(--manatee))] to-[hsl(var(--pale-sky))]"></div>
           
           {/* Presentation slides */}
           <div className="absolute top-32 left-40 w-40 h-24 bg-white rounded-lg shadow-lg transform rotate-2">
