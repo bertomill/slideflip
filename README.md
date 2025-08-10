@@ -159,6 +159,15 @@ LDAP_GROUP_SEARCH_FILTER=(member={userDn})
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
+### Fallback slide generation
+
+If AI generation is unavailable (for example, `OPENAI_API_KEY` is missing or rate-limited), the Preview step will automatically load a local fallback slide so you can proceed through the flow:
+
+- Fallback endpoint: `GET /api/fallback-slide` reads `templates/imported-02.html` and returns it as `slideHtml`.
+- If both AI and the fallback fail, the UI shows a placeholder image (`cat-slide-placeholder`).
+
+You can replace the fallback HTML by editing `templates/imported-02.html`.
+
 ### Google OAuth + Supabase
 
 This project uses Supabase Auth with Google as an OAuth provider. Configure it once for production and local development.
