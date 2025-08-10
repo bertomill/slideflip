@@ -76,40 +76,40 @@ export default function WaitlistPage() {
       <main
         className={`transition-all duration-300 ${
           sidebarCollapsed ? "md:ml-16" : "md:ml-64"
-        } px-6 py-10`}
+        } px-8 py-12`}
       >
-        <div className="max-w-3xl mx-auto space-y-8">
+        <div className="max-w-5xl mx-auto space-y-10">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Join the Waitlist</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-4xl md:text-5xl font-bold">Join the Waitlist</h1>
+            <p className="text-lg text-muted-foreground">
               Scan the QR code or enter your email below to get early access updates.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-8">
             <Card variant="glass">
-              <CardContent className="p-6">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="bg-background p-4 rounded-xl border border-border shadow-inner">
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="bg-background p-6 rounded-xl border border-border shadow-inner">
                     <Image
                       src="/slideo-waitlist.png"
                       alt="Slideo waitlist QR"
-                      width={360}
-                      height={360}
+                      width={420}
+                      height={420}
                       className="rounded"
                       priority
                     />
                   </div>
-                  <span className="text-xs text-muted-foreground">Scan to join the waitlist</span>
+                  <span className="text-sm md:text-base text-muted-foreground">Scan to join the waitlist</span>
                 </div>
               </CardContent>
             </Card>
 
             <Card variant="glass">
-              <CardContent className="p-6">
-                <form onSubmit={handleSubmit} className="space-y-4">
+              <CardContent className="p-8">
+                <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-base">Email</Label>
                     <Input
                       id="email"
                       type="email"
@@ -117,15 +117,17 @@ export default function WaitlistPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      className="h-12 text-base"
                     />
                   </div>
-                  <Button type="submit" disabled={isSubmitting || !email} className="w-full">
+                  <Button type="submit" size="lg" disabled={isSubmitting || !email} className="w-full text-base">
                     {isSubmitting ? "Joining..." : "Join Waitlist"}
                   </Button>
                    <Button
                     type="button"
                     variant="secondary"
-                    className="w-full"
+                     size="lg"
+                     className="w-full text-base"
                     onClick={() => {
                       if (!waitlistUrl) return;
                       navigator.clipboard.writeText(waitlistUrl);
