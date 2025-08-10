@@ -6,14 +6,16 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
+import { SlideoLogo } from "@/components/slideo-logo";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { Input } from "@/components/ui/input";
 // Supabase client for authentication
 import { createClient } from "@/lib/supabase/client";
 // Lucide icons for UI elements
-import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Users, BarChart3, Sun, Moon } from "lucide-react";
+import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Sun, Moon } from "lucide-react";
 // Next.js Link component for navigation
 import Link from "next/link";
 
@@ -63,20 +65,34 @@ const presentationTemplates = [
   }
 ];
 
-// Mock slide examples for the grid
+// Demo slides pulled from public/samples/slides
 const slideExamples = [
-  { id: 1, title: "Corporate Pitch", color: "from-blue-500 to-blue-700" },
-  { id: 2, title: "Product Launch", color: "from-purple-500 to-purple-700" },
-  { id: 3, title: "Quarterly Review", color: "from-green-500 to-green-700" },
-  { id: 4, title: "Market Analysis", color: "from-orange-500 to-orange-700" },
-  { id: 5, title: "Team Presentation", color: "from-pink-500 to-pink-700" },
-  { id: 6, title: "Sales Report", color: "from-teal-500 to-teal-700" },
-  { id: 7, title: "Strategy Plan", color: "from-red-500 to-red-700" },
-  { id: 8, title: "Project Update", color: "from-indigo-500 to-indigo-700" },
-  { id: 9, title: "Brand Guide", color: "from-yellow-500 to-yellow-700" },
-  { id: 10, title: "Investor Deck", color: "from-cyan-500 to-cyan-700" },
-  { id: 11, title: "Training Material", color: "from-violet-500 to-violet-700" },
-  { id: 12, title: "Case Study", color: "from-emerald-500 to-emerald-700" },
+  { id: 1, title: "Uber Problem", image: "/samples/slides/uber_slide_1.png" },
+  { id: 2, title: "DoorDash Performance", image: "/samples/slides/doordash_slide_1.png" },
+  { id: 3, title: "Facebook Platform", image: "/samples/slides/facebook_slide_1.png" },
+  { id: 4, title: "YouTube Purpose", image: "/samples/slides/youtube_side_1.png" },
+  { id: 5, title: "JPM Financial Highlights", image: "/samples/slides/jpm_slide_1.png" },
+  { id: 6, title: "RBC Client Assets", image: "/samples/slides/rbc_slide_1.png" },
+  { id: 7, title: "BMO Performance", image: "/samples/slides/bmo_slide_1.png" },
+  { id: 8, title: "P&G FY 2025", image: "/samples/slides/pg_slide_1.png" },
+  { id: 9, title: "Research Concrete", image: "/samples/slides/research-concrete.png" },
+  { id: 10, title: "Research Grey", image: "/samples/slides/research-grey.png" },
+  { id: 11, title: "Example Black", image: "/samples/slides/example-black.png" },
+  { id: 12, title: "Cat Slide", image: "/samples/slides/cat_slide_1.png" },
+];
+
+// Example prompts for quick-start
+const examplePrompts: string[] = [
+  "Executive summary for quarterly results with KPIs",
+  "Product launch overview with three key features and benefits",
+  "Market analysis: TAM/SAM/SOM with a simple chart",
+  "Team presentation: introduce 5 team members with roles",
+  "Sales report: pipeline by stage and next steps",
+  "Strategy plan: 3 objectives, 5 initiatives, 90‑day roadmap",
+  "Investor deck: problem, solution, traction, ask",
+  "Project update: timeline, risks, and blockers",
+  "Brand guide: typography, colors, and tone of voice",
+  "Case study: client challenge, solution, results"
 ];
 
 /**
@@ -174,11 +190,9 @@ export default function Home() {
               />
               {/* App logo and brand name */}
               <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-                  <div className="h-3 w-3 bg-background rounded-sm"></div>
-                </div>
+                <SlideoLogo className="h-6 w-6" />
                 <span className="font-semibold text-foreground text-sm sm:text-base">
-                  SlideFlipper
+                  Slideo
                 </span>
               </Link>
             </NavigationBrand>
@@ -195,8 +209,8 @@ export default function Home() {
                 <h1 className="text-3xl font-bold text-foreground mb-2">
                   Welcome! 👋
                 </h1>
-                <p className="text-muted-foreground">
-                  This is your SlideFlip dashboard. Explore tools to build your presentations & create stunning slides.
+                    <p className="text-muted-foreground">
+                      This is your Slideo dashboard. Explore tools to build your presentations & create stunning slides.
                 </p>
               </div>
 
@@ -440,7 +454,7 @@ export default function Home() {
 
   // Landing page for unauthenticated users
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+    <div className="min-h-screen gradient-dark-blue">
       {/* Fixed theme toggle in top right corner */}
       <div className="fixed top-4 right-4 z-50">
         <Button 
@@ -459,23 +473,21 @@ export default function Home() {
       <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto">
         {/* Logo and brand name */}
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-            <div className="h-4 w-4 bg-white rounded-sm"></div>
-          </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            SlideFlip
-          </span>
+          <SlideoLogo className="h-8 w-8" />
+          <span className="text-xl font-bold text-foreground">Slideo</span>
         </div>
 
         {/* Authentication buttons */}
         <div className="flex items-center gap-4">
           <Link href="/auth/login">
-            <Button variant="ghost" className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100">
+            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
               Sign In
             </Button>
           </Link>
-          <Link href="/auth/sign-up">
-            <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg">
+          <Link href="/">
+            <Button
+              className="text-white shadow-lg transition-colors rounded-full px-6 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))]"
+            >
               Get Started
             </Button>
           </Link>
@@ -488,21 +500,19 @@ export default function Home() {
           {/* Left Side - Content */}
           <div className="flex-1 text-center lg:text-left">
             <div className="mb-6">
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium mb-6">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-200 dark:bg-zinc-800/50 text-zinc-800 dark:text-zinc-200 text-sm font-medium mb-6">
                 <Sparkles className="h-4 w-4" />
                 The AI presentation maker for the workplace
               </span>
             </div>
 
-            <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight">
+            <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight animate-in fade-in slide-in-from-bottom-2 duration-700">
               It&apos;s{" "}
-              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-zinc-200 to-zinc-400 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">
                 stunning
               </span>{" "}
               what you can do with a little{" "}
-              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                AI.
-              </span>
+              <span className="bg-gradient-to-r from-zinc-200 to-zinc-400 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">AI.</span>
             </h1>
 
             <p className="text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-2xl mx-auto lg:mx-0">
@@ -511,8 +521,11 @@ export default function Home() {
 
             {/* CTA Section */}
             <div className="mb-8">
-              <Link href="/">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl text-lg px-8 py-4 rounded-xl">
+              <Link href="/build">
+                <Button
+                  size="lg"
+                  className="shadow-xl text-lg px-8 py-6 rounded-full text-white transition-all duration-300 hover:shadow-2xl hover:scale-105 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 font-medium"
+                >
                   <Sparkles className="h-5 w-5 mr-2" />
                   Start Creating Now
                 </Button>
@@ -526,13 +539,13 @@ export default function Home() {
                   placeholder="Try a prompt to create your own slide..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  className="pr-32 py-4 text-lg rounded-xl border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm"
+                  className="pr-32 py-4 text-lg rounded-xl border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
                   style={{ fontStyle: promptText ? 'normal' : 'italic' }}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
                   <Button
                     size="sm"
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg px-4"
+                    className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-lg px-4"
                     onClick={() => window.location.href = '/auth/sign-up'}
                   >
                     <ArrowRight className="h-4 w-4 mr-1" />
@@ -541,11 +554,24 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 mt-4 text-sm text-slate-500 dark:text-slate-400">
-                <button className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  <Zap className="h-4 w-4" />
-                  Try an example
-                </button>
+              <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-auto px-0 py-0 text-sm font-normal flex items-center gap-1 hover:text-foreground">
+                      <Zap className="h-4 w-4" />
+                      Try an example
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[340px]">
+                    {examplePrompts.map((p, i) => (
+                      <DropdownMenuItem key={i} className="whitespace-normal text-sm leading-snug"
+                        onClick={() => setPromptText(p)}
+                      >
+                        {p}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <span>•</span>
                 <span>A quote by Albert Einstein about the universe</span>
               </div>
@@ -558,30 +584,18 @@ export default function Home() {
               {slideExamples.map((slide, index) => (
                 <Card
                   key={slide.id}
-                  className={`aspect-[4/3] overflow-hidden hover:scale-105 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl ${index % 4 === 0 ? 'transform -rotate-2' :
-                      index % 4 === 1 ? 'transform rotate-1' :
-                        index % 4 === 2 ? 'transform -rotate-1' : 'transform rotate-2'
-                    }`}
-                  style={{
-                    animationDelay: `${index * 50}ms`
-                  }}
-                  className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+                  className={`aspect-[16/9] overflow-hidden hover:scale-105 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl ${index % 4 === 0 ? 'transform -rotate-2' :
+                    index % 4 === 1 ? 'transform rotate-1' :
+                      index % 4 === 2 ? 'transform -rotate-1' : 'transform rotate-2'
+                    } animate-in fade-in slide-in-from-bottom-4 duration-500`}
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className={`h-full bg-gradient-to-br ${slide.color} relative group`}>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-8 h-6 bg-white/20 rounded border border-white/30 flex items-center justify-center">
-                        <div className="text-xs text-white/80 font-medium">AI</div>
-                      </div>
-                    </div>
+                  <div className="h-full relative group bg-background/40 dark:bg-zinc-900/40">
+                    <img src={slide.image} alt={slide.title} className="w-full h-full object-contain" />
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="secondary" className="h-6 w-6 p-0 bg-white/90 hover:bg-white">
+                      <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
                         <Play className="h-3 w-3" />
                       </Button>
-                    </div>
-                    <div className="absolute bottom-2 left-2 right-2">
-                      <div className="text-xs text-white/90 font-medium truncate bg-black/20 rounded px-2 py-1">
-                        {slide.title}
-                      </div>
                     </div>
                   </div>
                 </Card>
@@ -590,50 +604,60 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Section */}
-        <div className="py-20">
+        {/* Features Section (stacked preview like Umbrel) */}
+        <div className="relative py-28">
+          {/* Ambient gradient background accents */}
+          <div
+            className="pointer-events-none absolute inset-0 -z-10"
+            style={{
+              background:
+                "radial-gradient(60% 40% at 15% 10%, hsl(var(--plantation)/0.25) 0%, transparent 60%), radial-gradient(50% 35% at 85% 20%, hsl(var(--old-lavender)/0.25) 0%, transparent 60%)",
+            }}
+          />
+
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Why choose{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                SlideFlip?
-              </span>
-            </h2>
-            <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4 text-foreground">Why choose Slideo?</h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               Powerful AI meets intuitive design to transform how you create presentations
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="p-8 text-center hover:shadow-lg transition-all duration-300 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-slate-200 dark:border-slate-700">
-              <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-white" />
+          {/* Stacked preview: three floating cards with parallax-like offsets */}
+          <div className="relative max-w-5xl mx-auto mt-8">
+            <div className="relative h-[420px]">
+              {/* back-left */}
+              <div className="absolute -left-10 top-10 w-[46%] h-[320px] rounded-2xl bg-gradient-to-br from-[hsl(var(--charade))] to-[hsl(var(--baltic-sea))] shadow-2xl border border-border/40 rotate-[-4deg] opacity-90 overflow-hidden">
+                <div className="p-6">
+                  <div className="text-sm text-muted-foreground mb-2">Creation</div>
+                  <div className="text-xl font-semibold mb-2">AI-Powered Creation</div>
+                  <p className="text-sm text-muted-foreground">Transform ideas into slides instantly with contextual layouts.</p>
+                </div>
+                <div className="absolute bottom-0 right-0 w-40 h-40 rounded-tl-3xl"
+                     style={{ background: "linear-gradient(135deg, hsl(var(--old-lavender-light)), transparent)" }}></div>
               </div>
-              <h3 className="text-xl font-bold mb-4">AI-Powered Creation</h3>
-              <p className="text-slate-600 dark:text-slate-300">
-                Transform your ideas into professional slides instantly with our advanced AI technology
-              </p>
-            </Card>
 
-            <Card className="p-8 text-center hover:shadow-lg transition-all duration-300 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-slate-200 dark:border-slate-700">
-              <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center">
-                <Users className="h-8 w-8 text-white" />
+              {/* front-center */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[56%] h-[360px] rounded-2xl bg-gradient-to-br from-[hsl(var(--plantation))] to-[hsl(var(--charade))] shadow-[0_20px_60px_rgba(0,0,0,0.45)] border border-border/50 rotate-[1deg] overflow-hidden">
+                <div className="p-6">
+                  <div className="text-sm text-muted-foreground mb-2">Enterprise</div>
+                  <div className="text-xl font-semibold mb-2">Enterprise Ready</div>
+                  <p className="text-sm text-muted-foreground">SSO, RBAC, and audit logs tailored for teams.</p>
+                </div>
+                <div className="absolute -bottom-10 -left-10 w-56 h-56 rounded-full blur-2xl"
+                     style={{ background: "radial-gradient(closest-side, hsl(var(--old-lavender-light)), transparent)" }} />
               </div>
-              <h3 className="text-xl font-bold mb-4">Enterprise Ready</h3>
-              <p className="text-slate-600 dark:text-slate-300">
-                LDAP integration, SSO support, and enterprise-grade security for your organization
-              </p>
-            </Card>
 
-            <Card className="p-8 text-center hover:shadow-lg transition-all duration-300 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-slate-200 dark:border-slate-700">
-              <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center">
-                <BarChart3 className="h-8 w-8 text-white" />
+              {/* back-right */}
+              <div className="absolute -right-10 top-16 w-[46%] h-[320px] rounded-2xl bg-gradient-to-br from-[hsl(var(--pale-sky))] to-[hsl(var(--manatee))] shadow-2xl border border-border/40 rotate-[5deg] opacity-95 overflow-hidden">
+                <div className="p-6">
+                  <div className="text-sm text-muted-foreground mb-2">Insights</div>
+                  <div className="text-xl font-semibold mb-2">Smart Analytics</div>
+                  <p className="text-sm text-muted-foreground">Engagement metrics and exportable reports built-in.</p>
+                </div>
+                <div className="absolute top-0 right-0 w-40 h-40 rounded-bl-3xl"
+                     style={{ background: "linear-gradient(135deg, hsl(var(--manatee)), transparent)" }}></div>
               </div>
-              <h3 className="text-xl font-bold mb-4">Smart Analytics</h3>
-              <p className="text-slate-600 dark:text-slate-300">
-                Track engagement, measure impact, and optimize your presentations with built-in analytics
-              </p>
-            </Card>
+            </div>
           </div>
         </div>
 
@@ -648,7 +672,10 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/sign-up">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl text-lg px-8 py-4 rounded-xl">
+                <Button
+                  size="lg"
+                  className="shadow-xl text-lg px-8 py-6 rounded-full text-white transition-all duration-300 hover:shadow-2xl hover:scale-105 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 border-0 font-medium"
+                >
                   <Star className="h-5 w-5 mr-2" />
                   Start Free Trial
                 </Button>
@@ -665,19 +692,15 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-700 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
+      <footer className="border-t border-border bg-white/30 dark:bg-zinc-900/30 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <div className="h-6 w-6 bg-gradient-to-br from-blue-600 to-indigo-600 rounded flex items-center justify-center">
-                <div className="h-3 w-3 bg-white rounded-sm"></div>
-              </div>
-              <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                SlideFlip
-              </span>
+              <SlideoLogo className="h-6 w-6" />
+              <span className="text-lg font-bold text-foreground">Slideo</span>
             </div>
             <div className="text-slate-500 dark:text-slate-400 text-sm">
-              © 2025 SlideFlip. All rights reserved.
+              © 2025 Slideo. All rights reserved.
             </div>
           </div>
         </div>

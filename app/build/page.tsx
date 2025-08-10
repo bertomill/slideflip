@@ -29,6 +29,9 @@ import { DownloadStep } from "@/components/builder/download-step";  // Step 6: F
 // Supabase client for user authentication and session management
 import { createClient } from "@/lib/supabase/client";
 
+// WebSocket hook for backend communication
+import { useWebSocket } from "@/hooks/use-websocket";
+
 // ============================================================================
 // TYPE DEFINITIONS: Data structures for the slide builder workflow
 // ============================================================================
@@ -132,6 +135,53 @@ export default function Build() {
   });
 
   // ============================================================================
+  // WEBSOCKET INTEGRATION: Real-time backend communication for slide generation
+  // ============================================================================
+  // Generate unique client ID for WebSocket connection
+  const [clientId] = useState(() => `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+
+  // Initialize WebSocket connection to FastAPI backend
+  const {
+    isConnected,
+    connectionStatus,
+    lastMessage,
+    sendFileUpload,
+    sendSlideDescription,
+    sendGenerateSlide,
+    sendThemeSelection,
+    sendProcessSlide,
+  } = useWebSocket({
+    clientId,
+    onMessage: (message) => {
+      console.log('Received message from backend:', message);
+      
+      // Handle different message types from backend
+      if (message.type === 'processing_complete') {
+        // Update slide HTML when generation is complete
+        if (message.data?.slide_data?.content) {
+          updateSlideData({ slideHtml: message.data.slide_data.content });
+        }
+      } else if (message.type === 'processing_status') {
+        // Log processing status updates
+        console.log('Processing status:', message.data.status, message.data.message);
+      } else if (message.type === 'file_upload_success') {
+        console.log('File uploaded successfully:', message.data.filename);
+      } else if (message.type === 'connection_established') {
+        console.log('Connected to SlideFlip Backend:', message.data.message);
+      }
+    },
+    onError: (error) => {
+      console.error('WebSocket error:', error);
+    },
+    onClose: () => {
+      console.log('Disconnected from backend');
+    },
+    onOpen: () => {
+      console.log('Connected to backend successfully');
+    }
+  });
+
+  // ============================================================================
   // AUTHENTICATION LIFECYCLE: Load and monitor user authentication state
   // ============================================================================
   // Sets up Supabase auth listener and loads initial user state on component mount
@@ -193,17 +243,65 @@ export default function Build() {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <UploadStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} />;
+        return (
+          <UploadStep 
+            slideData={slideData} 
+            updateSlideData={updateSlideData} 
+            onNext={nextStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendFileUpload={sendFileUpload}
+            sendSlideDescription={sendSlideDescription}
+            lastMessage={lastMessage}
+          />
+        );
       case 2:
-        return <ThemeStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return (
+          <ThemeStep 
+            slideData={slideData} 
+            updateSlideData={updateSlideData} 
+            onNext={nextStep} 
+            onPrev={prevStep}
+            sendThemeSelection={sendThemeSelection}
+          />
+        );
       case 3:
-        return <ResearchStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return (
+          <ResearchStep 
+            slideData={slideData} 
+            updateSlideData={updateSlideData} 
+            onNext={nextStep} 
+            onPrev={prevStep}
+            sendGenerateSlide={sendGenerateSlide}
+          />
+        );
       case 4:
-        return <ContentStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return (
+          <ContentStep 
+            slideData={slideData} 
+            updateSlideData={updateSlideData} 
+            onNext={nextStep} 
+            onPrev={prevStep} 
+          />
+        );
       case 5:
-        return <PreviewStep slideData={slideData} updateSlideData={updateSlideData} onNext={nextStep} onPrev={prevStep} />;
+        return (
+          <PreviewStep 
+            slideData={slideData} 
+            updateSlideData={updateSlideData} 
+            onNext={nextStep} 
+            onPrev={prevStep}
+            sendGenerateSlide={sendGenerateSlide}
+          />
+        );
       case 6:
-        return <DownloadStep slideData={slideData} onPrev={prevStep} onComplete={() => setCurrentStep(1)} />;
+        return (
+          <DownloadStep 
+            slideData={slideData} 
+            onPrev={prevStep} 
+            onComplete={() => setCurrentStep(1)} 
+          />
+        );
       default:
         return null;
     }

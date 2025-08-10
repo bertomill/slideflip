@@ -27,7 +27,7 @@ export class BackendService {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('Connected to SlideFlip Backend');
+        console.log('Connected to Slideo Backend');
         resolve();
       };
 
@@ -46,7 +46,7 @@ export class BackendService {
       };
 
       this.ws.onclose = (event) => {
-        console.log('Disconnected from SlideFlip Backend');
+        console.log('Disconnected from Slideo Backend');
         this.ws = null;
         this.connectionPromise = null;
       };

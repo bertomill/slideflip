@@ -92,7 +92,7 @@ class WebSocketService {
           }
           
           this.callbacks.onOpen?.();
-          console.log('Connected to SlideFlip Backend');
+          console.log('Connected to Slideo Backend');
           resolve(true);
         };
 
@@ -138,7 +138,7 @@ class WebSocketService {
           this.socket = null;
           this.isConnecting = false;
           this.connectionStatus = 'disconnected';
-          console.log('Disconnected from SlideFlip Backend', event.code, event.reason);
+          console.log('Disconnected from Slideo Backend', event.code, event.reason);
           this.callbacks.onClose?.();
 
           // Only attempt to reconnect if not manually closed and we've successfully connected before

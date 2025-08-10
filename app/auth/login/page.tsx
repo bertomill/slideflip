@@ -4,14 +4,14 @@ export default function Page() {
   return (
     <div className="flex min-h-screen w-full">
       {/* Left side - Sign in form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 md:p-10 bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200">
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 md:p-10 bg-gradient-to-br from-zinc-50 via-zinc-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-900/80 dark:to-zinc-900/60">
         <div className="w-full max-w-sm">
           <LoginForm />
         </div>
       </div>
       
       {/* Right side - Creative design assets */}
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 relative overflow-hidden">
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black relative overflow-hidden">
         {/* Design assets overlay */}
         <div className="absolute inset-0 opacity-20">
           {/* Magazine covers and design elements */}

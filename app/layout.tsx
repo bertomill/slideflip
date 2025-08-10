@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { WebSocketProvider } from "@/components/websocket-provider";
@@ -10,12 +10,12 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "SlideFlip - Create Stunning Presentations",
+  title: "Slideo - Create Stunning Presentations",
   description: "Build beautiful presentations with AI-powered slide creation and design tools",
   keywords: ["presentations", "slides", "AI", "design", "presentation builder", "slide creation"],
-  authors: [{ name: "SlideFlip Team" }],
-  creator: "SlideFlip",
-  publisher: "SlideFlip Tech, Inc.",
+  authors: [{ name: "Slideo Team" }],
+  creator: "Slideo",
+  publisher: "Slideo Tech, Inc.",
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
@@ -25,31 +25,33 @@ export const metadata: Metadata = {
     apple: '/icon.svg',
   },
   openGraph: {
-    title: "SlideFlip - Create Stunning Presentations",
+  title: "Slideo - Create Stunning Presentations",
     description: "Build beautiful presentations with AI-powered slide creation and design tools",
     type: "website",
     url: defaultUrl,
-    siteName: "SlideFlip",
+  siteName: "Slideo",
     images: [
       {
         url: "/opengraph-image.png",
         width: 1200,
         height: 630,
-        alt: "SlideFlip - AI-Powered Presentation Builder",
+  alt: "Slideo - AI-Powered Presentation Builder",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SlideFlip - Create Stunning Presentations",
+  title: "Slideo - Create Stunning Presentations",
     description: "Build beautiful presentations with AI-powered slide creation and design tools",
     images: ["/twitter-image.png"],
   },
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Display/sans family similar to modern editorial in the reference: Plus Jakarta Sans
+const displaySans = Plus_Jakarta_Sans({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -69,7 +71,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className={`${geistSans.className} antialiased`}>
+      <body className={`${displaySans.className} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
