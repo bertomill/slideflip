@@ -539,7 +539,7 @@ export default function Home() {
                   placeholder="Try a prompt to create your own slide..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  className="flex-1 py-4 text-lg rounded-xl border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
+                  className="flex-1 py-4 text-lg rounded-full border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
                   style={{ fontStyle: promptText ? 'normal' : 'italic' }}
                 />
                 <Button

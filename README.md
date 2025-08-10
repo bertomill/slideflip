@@ -75,7 +75,9 @@ npm install
 
 # Set up environment variables
 cp .env.example .env.local
-# Edit .env.local with your Supabase credentials
+# Also copy for the backend runtime
+cp .env.example backend/.env.local
+# Edit both files with your credentials and keys
 
 # Start development server
 npm run dev
@@ -127,21 +129,87 @@ python main.py
 
 ### Environment Variables
 
-#### Frontend (.env.local)
+All variables are demonstrated in `.env.example` at the repo root. Copy it to `.env.local` (root) for the frontend and to `backend/.env.local` for the Python backend.
+
+#### Root `.env.local` (Next.js / server routes)
 ```env
+# Supabase client (required)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Backend URLs used by the app (required for local dev)
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_BACKEND_WS_URL=ws://localhost:8000
+
+# AI keys
+OPENAI_API_KEY=your_openai_api_key            # required for AI features
+TAVILY_API_KEY=                                # optional, research API for /api/research
+
+# LDAP (optional; enable if using corporate directory)
+LDAP_URL=ldap://your-ldap-server:389
+LDAP_BASE_DN=dc=yourcompany,dc=com
+LDAP_BIND_DN=cn=admin,dc=yourcompany,dc=com
+LDAP_BIND_PASSWORD=your-admin-password
+LDAP_USER_SEARCH_BASE=ou=users,dc=yourcompany,dc=com
+LDAP_USER_SEARCH_FILTER=(uid={username})
+LDAP_GROUP_SEARCH_BASE=ou=groups,dc=yourcompany,dc=com
+LDAP_GROUP_SEARCH_FILTER=(member={userDn})
+
+# Node scripts (do not expose to browsers)
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-#### Backend (.env)
+### Google OAuth + Supabase
+
+This project uses Supabase Auth with Google as an OAuth provider. Configure it once for production and local development.
+
+1) Google Cloud Console → Credentials → Your Web OAuth client
+
+- Authorized redirect URIs (exactly one for Supabase):
+  - `https://wyelvtfmvjturmxhoqfd.supabase.co/auth/v1/callback`
+- Authorized JavaScript origins (where your app is served from):
+  - `http://localhost:3000` or `http://localhost:3001` (match your local port)
+  - Your production origin (for example `https://slideflip.vercel.app`)
+
+Why: Google redirects back to Supabase, not directly to your app. Supabase finishes the OAuth handshake and then redirects the browser to your app using the URL you pass as `redirectTo` in code.
+
+2) Supabase → Authentication → URL configuration
+
+- Site URL: your production site (e.g., `https://slideflip.vercel.app`). For local‑only testing, you can temporarily set this to `http://localhost:3001`.
+- Redirect URLs (allowlist): add the origins and callback routes you will use in development and production, for example:
+  - `http://localhost:3000`
+  - `http://localhost:3000/auth/callback`
+  - `http://localhost:3001`
+  - `http://localhost:3001/auth/callback`
+  - `https://slideflip.vercel.app`
+  - `https://slideflip.vercel.app/auth/callback`
+
+3) App behavior (already implemented)
+
+- The app initiates OAuth with `redirectTo: ${window.location.origin}/auth/callback`.
+- The route handler at `app/auth/callback/route.ts` exchanges the code for a session and then redirects to `/` (or the `next` param if present).
+
+Troubleshooting
+
+- If logging in on localhost sends you to production, your localhost URL is likely missing from Supabase “Redirect URLs,” so Supabase falls back to the Site URL.
+- After changing Google or Supabase settings, wait 1–2 minutes, sign out, and retry. Clearing cookies for localhost and your prod domain can also help.
+
+#### Backend `backend/.env.local` (FastAPI)
 ```env
+# Host/port and operational flags
 HOST=0.0.0.0
 PORT=8000
 DEBUG=True
+
+# Security
 SECRET_KEY=your_secret_key
-UPLOAD_DIR=./uploads
+
+# Storage and limits
+UPLOAD_DIR=uploads
 MAX_FILE_SIZE=52428800
+
+# AI key (backend will also read OPENAI_API_KEY if present here)
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## 🧪 Testing
