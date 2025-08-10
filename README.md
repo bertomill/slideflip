@@ -179,6 +179,9 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ## 🔄 Development Workflow
 
+### Recent Updates
+- Landing page CTAs updated: all "Get Started" buttons now navigate to `'/auth/login'` so users are prompted to sign in before creating content.
+
 ### Adding New Features
 
 1. **Frontend Changes**:

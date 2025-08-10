@@ -484,7 +484,7 @@ export default function Home() {
               Sign In
             </Button>
           </Link>
-          <Link href="/">
+          <Link href="/auth/login">
             <Button
               className="text-white shadow-lg transition-colors rounded-full px-6 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))]"
             >
@@ -521,7 +521,7 @@ export default function Home() {
 
             {/* CTA Section */}
             <div className="mb-8">
-              <Link href="/build">
+              <Link href="/auth/login">
                 <Button
                   size="lg"
                   className="shadow-xl text-lg px-8 py-6 rounded-full text-white transition-all duration-300 hover:shadow-2xl hover:scale-105 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 font-medium"

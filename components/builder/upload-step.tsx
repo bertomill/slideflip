@@ -1,11 +1,35 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, X, ArrowRight, Type, Sparkles } from "lucide-react";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles, Mic, Square } from "lucide-react";
 import { SlideData } from "@/app/build/page";
+
+// Minimal types to avoid 'any' while supporting browser SpeechRecognition
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: Array<{ 0: { transcript: string }; isFinal: boolean }>;
+};
+
+type MinimalSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => MinimalSpeechRecognition;
+
+type BackendMessage = {
+  type: string;
+  data: { filename?: string; error?: string };
+};
 
 // Interface defining props for the UploadStep component
 interface UploadStepProps {
@@ -17,7 +41,7 @@ interface UploadStepProps {
   connectionStatus?: string;
   sendFileUpload?: (file: File) => Promise<boolean>;
   sendSlideDescription?: (description: string) => boolean;
-  lastMessage?: any;
+  lastMessage?: BackendMessage;
 }
 
 export function UploadStep({ 
@@ -35,8 +59,18 @@ export function UploadStep({
   const [showTextInput, setShowTextInput] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [isParsing] = useState(false);
+  
+  // Voice input state
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const recognitionRef = useRef<MinimalSpeechRecognition | null>(null);
+  const descriptionRef = useRef<string>(slideData.description);
+
+  // Keep a ref of latest description so speech results append correctly
+  useEffect(() => {
+    descriptionRef.current = slideData.description;
+  }, [slideData.description]);
 
   // Handle backend messages
   useEffect(() => {
@@ -50,6 +84,75 @@ export function UploadStep({
       }
     }
   }, [lastMessage]);
+
+  // Detect SpeechRecognition support and initialize recognition instance
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const getSpeechCtor = (): SpeechRecognitionConstructor | undefined => {
+      const w = window as unknown as {
+        SpeechRecognition?: SpeechRecognitionConstructor;
+        webkitSpeechRecognition?: SpeechRecognitionConstructor;
+      };
+      return w.SpeechRecognition || w.webkitSpeechRecognition;
+    };
+    const SpeechRecognitionCtor = getSpeechCtor();
+    if (!SpeechRecognitionCtor) {
+      setIsSpeechSupported(false);
+      return;
+    }
+    setIsSpeechSupported(true);
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "en-US";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
+      let transcriptChunk = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        transcriptChunk += result[0].transcript;
+        if (result.isFinal) {
+          const combined = `${descriptionRef.current} ${transcriptChunk}`.trim();
+          updateSlideData({ description: combined });
+          transcriptChunk = "";
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      try { recognition.stop(); } catch {}
+      recognitionRef.current = null;
+    };
+  }, [updateSlideData]);
+
+  const startVoiceInput = () => {
+    if (!isSpeechSupported || isListening) return;
+    try {
+      recognitionRef.current?.start();
+      setIsListening(true);
+    } catch {
+      // no-op
+    }
+  };
+
+  const stopVoiceInput = () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // no-op
+    }
+    setIsListening(false);
+  };
 
   // Handle drag events for file upload area
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -325,34 +428,47 @@ export function UploadStep({
         </CardContent>
       </Card>
 
-      {/* Slide Description Section */}
+      {/* Slide Focus / Description Section */}
       <Card variant="glass">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="text-lg sm:text-xl font-semibold tracking-tight">
-            Describe Your Slide
+            Slide Focus
           </CardTitle>
           <CardDescription className="text-sm sm:text-base text-muted-foreground">
-            Tell us what you want to create
+            What do you want the focus of the content on this slide to be?
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="description">Slide Description</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={generateExampleDescription}
-                disabled={isGenerating}
-                className="gap-2 text-xs"
-              >
-                <Sparkles className="h-3 w-3" />
-                {isGenerating ? "Generating..." : "Generate Example"}
-              </Button>
+              <Label htmlFor="description">Slide Focus</Label>
+              <div className="flex items-center gap-1 sm:gap-2">
+                {isSpeechSupported && (
+                  <Button
+                    variant={isListening ? "destructive" : "ghost"}
+                    size="sm"
+                    onClick={isListening ? stopVoiceInput : startVoiceInput}
+                    className="gap-2 text-xs"
+                  >
+                    {isListening ? <Square className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
+                    {isListening ? "Stop" : "Voice Input"}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={generateExampleDescription}
+                  disabled={isGenerating}
+                  className="gap-2 text-xs"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {isGenerating ? "Generating..." : "Generate Example"}
+                </Button>
+              </div>
             </div>
             <textarea
               id="description"
-              placeholder="E.g., Create a professional quarterly business review presentation highlighting our Q3 achievements..."
+              placeholder="E.g., Focus on Q3 revenue growth, key wins, and next-quarter priorities for our product team..."
               className="w-full min-h-[120px] p-3 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={slideData.description}
               onChange={(e) => updateSlideData({ description: e.target.value })}
