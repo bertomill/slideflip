@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import QRCode from "react-qr-code";
+// Removed dynamic QR; we now show the branded static QR image
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-// import Image from "next/image"; // Removed: we now only show the dynamic QR
+import Image from "next/image";
 
 export default function WaitlistPage() {
   const [email, setEmail] = useState("");
@@ -90,10 +90,15 @@ export default function WaitlistPage() {
             <Card variant="glass">
               <CardContent className="p-6">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="bg-background p-6 rounded-xl border border-border shadow-inner">
-                    {waitlistUrl && (
-                      <QRCode value={waitlistUrl} size={320} fgColor="currentColor" />
-                    )}
+                  <div className="bg-background p-4 rounded-xl border border-border shadow-inner">
+                    <Image
+                      src="/slideo-waitlist.png"
+                      alt="Slideo waitlist QR"
+                      width={360}
+                      height={360}
+                      className="rounded"
+                      priority
+                    />
                   </div>
                   <span className="text-xs text-muted-foreground">Scan to join the waitlist</span>
                 </div>
