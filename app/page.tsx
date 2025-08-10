@@ -470,7 +470,7 @@ export default function Home() {
       </div>
       
       {/* Navigation bar with logo and authentication buttons */}
-      <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto">
+      <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto border-b border-border/50">
         {/* Logo and brand name */}
         <div className="flex items-center gap-2">
           <SlideoLogo className="h-8 w-8" />
@@ -534,24 +534,21 @@ export default function Home() {
 
             {/* Prompt Input Demo */}
             <div className="max-w-2xl mx-auto lg:mx-0">
-              <div className="relative">
+              <div className="flex gap-3 items-center">
                 <Input
                   placeholder="Try a prompt to create your own slide..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  className="pr-32 py-4 text-lg rounded-xl border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
+                  className="flex-1 py-4 text-lg rounded-xl border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
                   style={{ fontStyle: promptText ? 'normal' : 'italic' }}
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Button
-                    size="sm"
-                    className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-xl px-4"
-                    onClick={() => window.location.href = '/auth/sign-up'}
-                  >
-                    <ArrowRight className="h-4 w-4 mr-1" />
-                    Create
-                  </Button>
-                </div>
+                <Button
+                  className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-xl px-6 h-[60px] text-lg"
+                  onClick={() => window.location.href = '/auth/sign-up'}
+                >
+                  <ArrowRight className="h-4 w-4 mr-1" />
+                  Create
+                </Button>
               </div>
 
               <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
