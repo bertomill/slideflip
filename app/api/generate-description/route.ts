@@ -5,7 +5,7 @@ import OpenAI from 'openai';
  * API endpoint to generate slide descriptions using OpenAI GPT-3.5-turbo
  * 
  * This endpoint processes uploaded document metadata and generates AI-powered
- * slide descriptions for the SlideFlip presentation builder. The descriptions
+ * slide descriptions for the Slideo presentation builder. The descriptions
  * are concise, actionable, and include visual element suggestions.
  * 
  * @param request - Contains document metadata in JSON format

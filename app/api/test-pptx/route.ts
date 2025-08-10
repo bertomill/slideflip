@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     const pptx = new PptxGenJS();
     
     // Set presentation properties
-    pptx.author = 'SlideFlip AI';
-    pptx.company = 'SlideFlip';
+    pptx.author = 'Slideo AI';
+    pptx.company = 'Slideo';
     pptx.subject = 'Test Presentation';
     pptx.title = 'PPTX Generation Test';
 

@@ -82,7 +82,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                   <div className="h-3 w-3 bg-background rounded-sm"></div>
                 </div>
                 {!collapsed && (
-                  <span className="font-semibold text-foreground">SlideFlip</span>
+                  <span className="font-semibold text-foreground">Slideo</span>
                 )}
               </Link>
               

@@ -167,7 +167,7 @@ export default function Build() {
       } else if (message.type === 'file_upload_success') {
         console.log('File uploaded successfully:', message.data.filename);
       } else if (message.type === 'connection_established') {
-        console.log('Connected to SlideFlip Backend:', message.data.message);
+          console.log('Connected to Slideo Backend:', message.data.message);
       }
     },
     onError: (error) => {
@@ -480,7 +480,7 @@ export default function Build() {
             </div>
             {/* App name with responsive text sizing */}
             <span className="font-semibold text-foreground text-sm sm:text-base">
-              SlideFlip Builder
+              Slideo Builder
             </span>
           </NavigationBrand>
           {/* Right side controls */}
