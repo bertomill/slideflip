@@ -249,6 +249,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Recent Updates
 - Landing page CTAs updated: all "Get Started" buttons now navigate to `'/auth/login'` so users are prompted to sign in before creating content.
+- Landing page bottom CTA alignment: "View Examples" button height now matches "Start Free Trial" for a uniform appearance.
 
 ### Adding New Features
 
