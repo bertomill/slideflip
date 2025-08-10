@@ -260,6 +260,32 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
 - Landing page CTAs updated: all "Get Started" buttons now navigate to `'/auth/login'` so users are prompted to sign in before creating content.
 - Landing page bottom CTA alignment: "View Examples" button height now matches "Start Free Trial" for a uniform appearance.
+ - Added a new route `'/waitlist'` accessible from the sidebar as "Waitlist QR Code". Users can scan a QR or submit an email to join the waitlist. Emails are stored in Supabase table `waitlist_emails` (see migration `004_create_waitlist_emails.sql`).
+
+### Waitlist feature setup
+
+1. Install dependency for QR rendering in the frontend:
+
+```bash
+npm install react-qr-code
+```
+
+2. Apply Supabase migration to create the table:
+
+```sql
+-- supabase/migrations/004_create_waitlist_emails.sql
+CREATE TABLE IF NOT EXISTS waitlist_emails (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_unique_email ON waitlist_emails(email);
+```
+
+3. Usage
+
+- Navigate to `Waitlist QR Code` in the sidebar or go to `http://localhost:3000/waitlist`.
+- Scan the QR to open the page on mobile or submit an email in the form. Entries appear in the `waitlist_emails` table in Supabase.
 
 ### Adding New Features
 
