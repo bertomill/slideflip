@@ -2,8 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent horizontal scrolling globally */
+html, body {
+  overflow-x: hidden;
+}
+
 @layer base {
   :root {
+    /* Custom palette (HSL triplets) */
+    --manatee: 220 5% 60%;         /* #95989d */
+    --abbey: 220 6% 32%;           /* #4e5156 */
+    --woodsmoke: 240 4% 3%;        /* #060607 */
+    --pale-sky: 210 12% 45%;       /* #69757e */
+    --plantation: 190 27% 22%;     /* #2a4447 */
+    --shuttle-gray: 215 8% 43%;    /* #656b74 */
+    --baltic-sea: 260 5% 16%;      /* #29282c */
+    --charade: 215 11% 20%;        /* #2d333c */
+    --timber-green: 190 28% 14%;   /* #182b2e */
+    --old-lavender: 320 9% 43%;    /* #746473 */
+    --old-lavender-light: 320 12% 62%; /* lighter lavender for CTAs */
+
     /* Engineering-focused Light Theme - Practicality & Simplicity */
     --background: 0 0% 100%;
     --foreground: 0 0% 8%;
@@ -36,35 +54,35 @@
   }
   
   .dark {
-    /* Engineering-focused Dark Theme - Precision & Craftsmanship */
-    --background: 0 0% 4%;
-    --foreground: 0 0% 96%;
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 96%;
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 0 0% 96%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 8%;
-    --muted-foreground: 0 0% 60%;
-    --accent: 0 0% 8%;
-    --accent-foreground: 0 0% 96%;
-    --destructive: 0 72% 51%;
+    /* Muted palette mapped to theme tokens */
+    --background: var(--woodsmoke);
+    --foreground: 0 0% 94%;
+    --card: var(--charade);
+    --card-foreground: 0 0% 94%;
+    --popover: var(--baltic-sea);
+    --popover-foreground: 0 0% 94%;
+    --primary: 0 0% 94%;
+    --primary-foreground: var(--woodsmoke);
+    --secondary: var(--abbey);
+    --secondary-foreground: 0 0% 92%;
+    --muted: var(--baltic-sea);
+    --muted-foreground: var(--manatee);
+    --accent: var(--plantation);
+    --accent-foreground: 0 0% 92%;
+    --destructive: 0 65% 45%;
     --destructive-foreground: 0 0% 96%;
-    --border: 0 0% 8%;
-    --input: 0 0% 8%;
-    --ring: 0 0% 96%;
+    --border: var(--charade);
+    --input: var(--charade);
+    --ring: 0 0% 92%;
     --radius: 0.375rem;
-    
-    /* Engineering-inspired dark accent colors */
-    --engineering-primary: 0 0% 96%;
-    --engineering-secondary: 0 0% 60%;
-    --engineering-accent: 200 6% 90%;
-    --engineering-success: 142 71% 45%;
-    --engineering-warning: 38 92% 50%;
-    --engineering-error: 0 72% 51%;
+
+    /* Monochrome accents */
+    --engineering-primary: 0 0% 94%;
+    --engineering-secondary: 0 0% 62%;
+    --engineering-accent: 0 0% 18%;
+    --engineering-success: 142 40% 45%;
+    --engineering-warning: 38 60% 52%;
+    --engineering-error: 0 65% 45%;
   }
 }
 
@@ -145,5 +163,30 @@
      Ideal for hero sections, cards, and premium UI components */
   .gradient-premium {
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.5));
+  }
+  
+  /* Theme-responsive gradient - Adapts to light/dark mode
+     Creates appropriate atmosphere for both light and dark themes
+     Perfect for main app backgrounds and dashboard sections */
+  .gradient-dark-blue {
+    /* Neutral graphite gradient (keeps class name for compatibility) */
+    background: linear-gradient(
+      to bottom right,
+      hsl(var(--background)),
+      hsl(var(--muted) / 0.3),
+      hsl(var(--card))
+    );
+  }
+  
+  /* Legacy dark blue gradient - For specific dark-only use cases */
+  .gradient-dark-blue-legacy {
+    /* Legacy kept, but neutralized to charcoal spectrum */
+    background: linear-gradient(to bottom right, rgb(33 33 33), rgb(24 24 24), rgb(0 0 0));
+  }
+  
+  /* Subtle dark blue gradient for cards and components */
+  .gradient-dark-blue-subtle {
+    /* Subtle graphite gradient for cards */
+    background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
   }
 }

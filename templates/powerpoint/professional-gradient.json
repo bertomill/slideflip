@@ -1,0 +1,274 @@
+{
+  "template": {
+    "name": "Professional Gradient",
+    "id": "professional-gradient-ppt",
+    "description": "A modern professional PowerPoint template with gradient background and glass morphism effects",
+    "aspectRatio": "16:9",
+    "dimensions": {
+      "width": 720,
+      "height": 405,
+      "units": "points"
+    }
+  },
+  "background": {
+    "type": "gradient",
+    "colors": [
+      {
+        "color": "#667eea",
+        "position": 0
+      },
+      {
+        "color": "#764ba2", 
+        "position": 100
+      }
+    ],
+    "direction": 135,
+    "style": "linear"
+  },
+  "elements": [
+    {
+      "type": "textbox",
+      "id": "title",
+      "position": {
+        "x": 72,
+        "y": 72,
+        "width": 576,
+        "height": 100
+      },
+      "content": {
+        "text": "Your Main Title Here",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Segoe UI",
+          "size": 48,
+          "weight": "bold",
+          "color": "#ffffff"
+        },
+        "alignment": "center",
+        "effects": {
+          "shadow": {
+            "enabled": true,
+            "offsetX": 2,
+            "offsetY": 2,
+            "blur": 4,
+            "opacity": 0.3
+          }
+        }
+      }
+    },
+    {
+      "type": "textbox",
+      "id": "subtitle",
+      "position": {
+        "x": 72,
+        "y": 200,
+        "width": 576,
+        "height": 60
+      },
+      "content": {
+        "text": "Subtitle or Key Message",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Segoe UI",
+          "size": 25,
+          "weight": "normal",
+          "color": "#f0f0f0"
+        },
+        "alignment": "center"
+      }
+    },
+    {
+      "type": "shape",
+      "id": "stats-box",
+      "shape": "roundedRectangle",
+      "position": {
+        "x": 250,
+        "y": 300,
+        "width": 220,
+        "height": 80
+      },
+      "styling": {
+        "fill": {
+          "color": "#ffffff",
+          "opacity": 0.2
+        },
+        "border": {
+          "color": "#ffffff",
+          "opacity": 0.3,
+          "width": 1
+        },
+        "borderRadius": 15
+      },
+      "content": {
+        "text": "85%\nKey Statistic or Metric",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Segoe UI"
+        },
+        "alignment": "center",
+        "paragraphs": [
+          {
+            "index": 0,
+            "font": {
+              "size": 36,
+              "weight": "bold",
+              "color": "#ffffff"
+            }
+          },
+          {
+            "index": 1,
+            "font": {
+              "size": 14,
+              "weight": "normal",
+              "color": "#f0f0f0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "shape",
+      "id": "content-card-1",
+      "shape": "roundedRectangle",
+      "position": {
+        "x": 100,
+        "y": 420,
+        "width": 200,
+        "height": 120
+      },
+      "styling": {
+        "fill": {
+          "color": "#ffffff",
+          "opacity": 0.15
+        },
+        "border": {
+          "color": "#ffffff",
+          "opacity": 0.2,
+          "width": 1
+        },
+        "borderRadius": 20
+      },
+      "content": {
+        "text": "Key Point 1\nSupporting information and details that explain this important point.",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Segoe UI"
+        },
+        "paragraphs": [
+          {
+            "index": 0,
+            "font": {
+              "size": 18,
+              "weight": "semibold",
+              "color": "#ffffff"
+            }
+          },
+          {
+            "index": 1,
+            "font": {
+              "size": 12,
+              "weight": "normal",
+              "color": "#f0f0f0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "shape",
+      "id": "content-card-2",
+      "shape": "roundedRectangle",
+      "position": {
+        "x": 420,
+        "y": 420,
+        "width": 200,
+        "height": 120
+      },
+      "styling": {
+        "fill": {
+          "color": "#ffffff",
+          "opacity": 0.15
+        },
+        "border": {
+          "color": "#ffffff",
+          "opacity": 0.2,
+          "width": 1
+        },
+        "borderRadius": 20
+      },
+      "content": {
+        "text": "Key Point 2\nAdditional context and data that reinforces your message.",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Segoe UI"
+        },
+        "paragraphs": [
+          {
+            "index": 0,
+            "font": {
+              "size": 18,
+              "weight": "semibold",
+              "color": "#ffffff"
+            }
+          },
+          {
+            "index": 1,
+            "font": {
+              "size": 12,
+              "weight": "normal",
+              "color": "#f0f0f0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "textbox",
+      "id": "bullet-points",
+      "position": {
+        "x": 150,
+        "y": 580,
+        "width": 420,
+        "height": 100
+      },
+      "content": {
+        "text": "▶ Important bullet point with clear information\n▶ Second key takeaway for your audience\n▶ Final compelling point to remember",
+        "placeholder": true
+      },
+      "formatting": {
+        "font": {
+          "family": "Segoe UI",
+          "size": 13,
+          "weight": "normal",
+          "color": "#f0f0f0"
+        },
+        "lineSpacing": 1.6
+      }
+    }
+  ],
+  "instructions": {
+    "setup": [
+      "Create new PowerPoint presentation",
+      "Set slide size to 16:9 (720x405 points)",
+      "Apply gradient background as specified",
+      "Add elements in order with exact positioning",
+      "Apply formatting and styling as defined"
+    ],
+    "customization": [
+      "Replace placeholder text with actual content",
+      "Adjust colors to match brand guidelines",
+      "Modify element positions as needed",
+      "Add additional elements following the same pattern"
+    ]
+  }
+}

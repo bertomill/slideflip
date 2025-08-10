@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Gradient Slide</title>
+    <style>
+        .slide-container {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slide-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .slide-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            max-width: 1400px;
+        }
+        
+        .slide-container h1 {
+            color: #ffffff;
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            line-height: 1.2;
+        }
+        
+        .slide-container h2 {
+            color: #f0f0f0;
+            font-size: 2.5rem;
+            font-weight: 400;
+            margin-bottom: 3rem;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        
+        .slide-container .content-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+        
+        .slide-container .content-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .slide-container .content-card h3 {
+            color: #ffffff;
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        
+        .slide-container .content-card p {
+            color: #f0f0f0;
+            font-size: 1.2rem;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+        
+        .slide-container .highlight-stat {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-left: 5px solid #ffffff;
+        }
+        
+        .slide-container .highlight-stat .stat-number {
+            color: #ffffff;
+            font-size: 3rem;
+            font-weight: 700;
+            display: block;
+        }
+        
+        .slide-container .highlight-stat .stat-label {
+            color: #f0f0f0;
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+        
+        .slide-container ul {
+            text-align: left;
+            color: #f0f0f0;
+            font-size: 1.3rem;
+            line-height: 2;
+        }
+        
+        .slide-container li {
+            margin-bottom: 0.8rem;
+            position: relative;
+            padding-left: 2rem;
+        }
+        
+        .slide-container li::before {
+            content: '▶';
+            position: absolute;
+            left: 0;
+            color: #ffffff;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="slide-content">
+            <h1>Your Main Title Here</h1>
+            <h2>Subtitle or Key Message</h2>
+            
+            <div class="highlight-stat">
+                <span class="stat-number">85%</span>
+                <span class="stat-label">Key Statistic or Metric</span>
+            </div>
+            
+            <div class="content-grid">
+                <div class="content-card">
+                    <h3>Key Point 1</h3>
+                    <p>Supporting information and details that explain this important point.</p>
+                </div>
+                <div class="content-card">
+                    <h3>Key Point 2</h3>
+                    <p>Additional context and data that reinforces your message.</p>
+                </div>
+            </div>
+            
+            <ul>
+                <li>Important bullet point with clear information</li>
+                <li>Second key takeaway for your audience</li>
+                <li>Final compelling point to remember</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

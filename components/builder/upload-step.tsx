@@ -3,12 +3,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, X, ArrowRight, Type, Sparkles, Wifi, WifiOff, Globe } from "lucide-react";
-import { SlideData } from "@/app/builder/page";
-import { BackendFileInfo } from "@/types/backend";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles } from "lucide-react";
+import { SlideData } from "@/app/build/page";
 
+// Interface defining props for the UploadStep component
 interface UploadStepProps {
   slideData: SlideData;
   updateSlideData: (updates: Partial<SlideData>) => void;
@@ -35,11 +34,9 @@ export function UploadStep({
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [pastedText, setPastedText] = useState("");
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [urlInput, setUrlInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [backendFiles, setBackendFiles] = useState<BackendFileInfo[]>([]);
-  const [extractedImages, setExtractedImages] = useState<{[key: string]: any[]}>({});
+  const [isParsing, setIsParsing] = useState(false);
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
 
   // Handle backend messages
   useEffect(() => {
@@ -48,24 +45,13 @@ export function UploadStep({
       
       if (lastMessage.type === 'file_upload_success') {
         setUploadStatus(`Successfully uploaded ${lastMessage.data.filename}`);
-        
-        // Handle content information for HTML files
-        if (lastMessage.data.content_info) {
-          const contentInfo = lastMessage.data.content_info;
-          if (contentInfo.images && contentInfo.images.length > 0) {
-            setExtractedImages(prev => ({
-              ...prev,
-              [lastMessage.data.filename]: contentInfo.images
-            }));
-            setUploadStatus(`Successfully uploaded ${lastMessage.data.filename} with ${contentInfo.images_count} images`);
-          }
-        }
       } else if (lastMessage.type === 'file_upload_error') {
         setUploadStatus(`Failed to upload: ${lastMessage.data.error}`);
       }
     }
   }, [lastMessage]);
 
+  // Handle drag events for file upload area
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -76,6 +62,7 @@ export function UploadStep({
     }
   }, []);
 
+  // Handle file drop event
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -91,22 +78,19 @@ export function UploadStep({
       if (isConnected && sendFileUpload) {
         for (const file of files) {
           try {
-            console.log('Starting file upload for:', file.name);
+            console.log('Uploading file to backend:', file.name);
             setUploadStatus(`Uploading ${file.name}...`);
-            const result = await sendFileUpload(file);
-            console.log('File upload result:', result);
-            setUploadStatus(`Successfully uploaded ${file.name}`);
+            await sendFileUpload(file);
           } catch (error) {
-            console.error('Failed to upload file to backend:', error);
-            setUploadStatus(`Failed to upload ${file.name}: ${error}`);
+            console.error('Failed to upload file:', error);
+            setUploadStatus(`Failed to upload ${file.name}`);
           }
         }
-      } else {
-        console.log('Not connected or sendFileUpload not available:', { isConnected, sendFileUpload });
       }
     }
   }, [slideData.documents, updateSlideData, sendFileUpload, isConnected]);
 
+  // Handle file selection through input element
   const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
@@ -118,47 +102,40 @@ export function UploadStep({
       if (isConnected && sendFileUpload) {
         for (const file of files) {
           try {
-            console.log('Starting file upload for:', file.name);
+            console.log('Uploading file to backend:', file.name);
             setUploadStatus(`Uploading ${file.name}...`);
-            const result = await sendFileUpload(file);
-            console.log('File upload result:', result);
-            setUploadStatus(`Successfully uploaded ${file.name}`);
+            await sendFileUpload(file);
           } catch (error) {
-            console.error('Failed to upload file to backend:', error);
-            setUploadStatus(`Failed to upload ${file.name}: ${error}`);
+            console.error('Failed to upload file:', error);
+            setUploadStatus(`Failed to upload ${file.name}`);
           }
         }
-      } else {
-        console.log('Not connected or sendFileUpload not available:', { isConnected, sendFileUpload });
       }
     }
   };
 
+  // Remove a file from the uploaded documents list
   const removeFile = (index: number) => {
-    const newFiles = slideData.documents.filter((_, i) => i !== index);
+    const newFiles = slideData.documents.filter((_: File, i: number) => i !== index);
     updateSlideData({ documents: newFiles });
   };
 
+  // Convert pasted text into a virtual file and add to documents
   const handlePasteText = async () => {
     if (pastedText.trim()) {
-      // Create a virtual file from the pasted text
       const textFile = new File([pastedText], "pasted-text.txt", { type: "text/plain" });
       updateSlideData({ documents: [...slideData.documents, textFile] });
       
       // Upload to backend if connected
       if (isConnected && sendFileUpload) {
         try {
-          console.log('Starting pasted text upload');
+          console.log('Uploading pasted text to backend');
           setUploadStatus('Uploading pasted text...');
-          const result = await sendFileUpload(textFile);
-          console.log('Pasted text upload result:', result);
-          setUploadStatus('Successfully uploaded pasted text');
+          await sendFileUpload(textFile);
         } catch (error) {
-          console.error('Failed to upload pasted text to backend:', error);
+          console.error('Failed to upload pasted text:', error);
           setUploadStatus('Failed to upload pasted text');
         }
-      } else {
-        console.log('Not connected or sendFileUpload not available for pasted text');
       }
       
       setPastedText("");
@@ -166,94 +143,34 @@ export function UploadStep({
     }
   };
 
-  const handleUrlInput = async () => {
-    if (urlInput.trim()) {
-      try {
-        setUploadStatus('Fetching content from URL...');
-        
-        // Create a virtual HTML file from the URL
-        const htmlFile = new File([`<!-- Content from: ${urlInput} -->`], "webpage.html", { type: "text/html" });
-        updateSlideData({ documents: [...slideData.documents, htmlFile] });
-        
-        // Upload to backend if connected
-        if (isConnected && sendFileUpload) {
-          try {
-            console.log('Starting URL content upload');
-            setUploadStatus('Uploading URL content...');
-            const result = await sendFileUpload(htmlFile);
-            console.log('URL content upload result:', result);
-            setUploadStatus('Successfully uploaded URL content');
-          } catch (error) {
-            console.error('Failed to upload URL content to backend:', error);
-            setUploadStatus('Failed to upload URL content');
-          }
-        } else {
-          console.log('Not connected or sendFileUpload not available for URL content');
-        }
-        
-        setUrlInput("");
-        setShowUrlInput(false);
-      } catch (error) {
-        console.error('Failed to process URL:', error);
-        setUploadStatus('Failed to process URL');
-      }
-    }
-  };
-
+  // Generate an example description using AI or fallback to static examples
   const generateExampleDescription = async () => {
     setIsGenerating(true);
     
     try {
-      const response = await fetch('/api/generate-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          documents: slideData.documents.map(doc => ({ 
-            name: doc.name, 
-            type: doc.type,
-            size: doc.size 
-          }))
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate description');
-      }
-      
-      const data = await response.json();
-      if (data.description) {
-        updateSlideData({ description: data.description });
-      } else {
-        throw new Error('No description received');
-      }
-    } catch (error) {
-      console.error('Failed to generate description:', error);
-      
-      // Fallback to static examples if API fails
-      const fallbackExamples = [
-        "Create a professional slide summarizing quarterly financial performance with key metrics and clean charts.",
-        "Design an executive summary slide highlighting project milestones with timeline visualization.",
-        "Build a product launch slide showcasing key features and benefits with compelling visuals.",
-        "Generate a team performance slide displaying achievements and KPIs with data visualizations."
+      // For now, use static examples
+      const examples = [
+        "Create a quarterly business review presentation highlighting revenue growth, customer acquisition metrics, and strategic initiatives for the next quarter",
+        "Design an investor pitch deck showcasing our AI-powered SaaS platform, market opportunity, traction metrics, and funding requirements",
+        "Build a product launch presentation featuring our new mobile app, target audience demographics, key features, and go-to-market strategy"
       ];
       
-      const randomExample = fallbackExamples[Math.floor(Math.random() * fallbackExamples.length)];
+      const randomExample = examples[Math.floor(Math.random() * examples.length)];
       updateSlideData({ description: randomExample });
     } finally {
       setIsGenerating(false);
     }
   };
 
+  // Check if user can proceed to next step
   const canProceed = slideData.documents.length > 0 && slideData.description.trim().length > 0;
 
-  // Send description to backend when user clicks "Continue to Themes"
+  // Send description to backend when proceeding to next step
   const handleContinueToThemes = async () => {
     if (slideData.description.trim() && isConnected && sendSlideDescription) {
       try {
-        console.log('Sending slide description to backend before proceeding to themes');
+        console.log('Sending slide description to backend');
         sendSlideDescription(slideData.description);
-        // Add a small delay to ensure the message is sent before proceeding
-        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.error('Failed to send description to backend:', error);
       }
@@ -262,74 +179,69 @@ export function UploadStep({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Backend Connection Status */}
-      <Card variant="glass" className="mb-4">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {isConnected ? (
-                <Wifi className="h-4 w-4 text-green-500" />
-              ) : (
-                <WifiOff className="h-4 w-4 text-red-500" />
-              )}
-              <span className="text-sm font-medium">
-                Backend Connection: {connectionStatus}
-              </span>
-            </div>
-            {uploadStatus && (
-              <span className="text-sm text-muted-foreground">{uploadStatus}</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Connection Status Indicator */}
+      {connectionStatus && (
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-sm text-muted-foreground">
+            Backend: {connectionStatus}
+          </span>
+          {uploadStatus && (
+            <span className="text-sm text-muted-foreground ml-auto">{uploadStatus}</span>
+          )}
+        </div>
+      )}
 
+      {/* Document Upload Section */}
       <Card variant="elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <Upload className="h-6 w-6 text-primary" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-semibold tracking-tight">
+            <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             Upload Your Documents
           </CardTitle>
-          <CardDescription className="text-base text-muted-foreground">
+          <CardDescription className="text-sm sm:text-base text-muted-foreground">
             Upload documents that contain the content you want to include in your slide
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* File Upload Area */}
+        <CardContent className="space-y-4">
+          {/* Drag and Drop Area */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-premium cursor-pointer ${dragActive
-              ? "border-primary bg-primary/5"
+            className={`relative border-2 border-dashed rounded-lg p-8 sm:p-12 text-center cursor-pointer transition-all hover:bg-muted/50 ${
+              dragActive 
+              ? "border-primary bg-primary/5" 
               : "border-muted-foreground/25 hover:border-primary/50"
-              }`}
+            }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={() => document.getElementById('file-upload')?.click()}
           >
-            <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
-            <p className="text-base text-muted-foreground">
-              Supports PDF, DOCX, TXT, HTML, and more
+            <Upload className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+            <p className="text-lg sm:text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Supports PDF, DOCX, TXT, and more
             </p>
             <input
               id="file-upload"
               type="file"
               multiple
-              accept=".pdf,.docx,.txt,.md,.html,.htm"
+              accept=".pdf,.docx,.txt,.md"
               onChange={handleFileInput}
               className="hidden"
             />
           </div>
 
-          {/* Alternative: Paste Text */}
+          {/* Divider */}
           <div className="flex items-center gap-4">
             <div className="flex-1 h-px bg-border"></div>
             <span className="text-sm text-muted-foreground">or</span>
             <div className="flex-1 h-px bg-border"></div>
           </div>
 
-          <div className="text-center space-y-4">
+          {/* Paste Text Button */}
+          <div className="text-center">
             <Button
               variant="outline"
               onClick={() => setShowTextInput(!showTextInput)}
@@ -337,15 +249,6 @@ export function UploadStep({
             >
               <Type className="h-4 w-4" />
               Paste Text Content
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={() => setShowUrlInput(!showUrlInput)}
-              className="gap-2"
-            >
-              <Globe className="h-4 w-4" />
-              Add Webpage URL
             </Button>
           </div>
 
@@ -355,8 +258,8 @@ export function UploadStep({
               <Label htmlFor="paste-text">Paste your text content</Label>
               <textarea
                 id="paste-text"
-                placeholder="Paste your text content here..."
-                className="w-full h-32 px-3 py-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
+                placeholder="Paste your content here..."
+                className="w-full min-h-[150px] p-3 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
               />
@@ -383,115 +286,56 @@ export function UploadStep({
             </div>
           )}
 
-          {/* URL Input Area */}
-          {showUrlInput && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-              <Label htmlFor="url-input">Enter webpage URL</Label>
-              <input
-                id="url-input"
-                type="url"
-                placeholder="https://example.com"
-                className="w-full px-3 py-2 text-sm rounded-lg border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-              />
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowUrlInput(false);
-                    setUrlInput("");
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleUrlInput}
-                  disabled={!urlInput.trim()}
-                >
-                  Add Webpage
-                </Button>
-              </div>
+          {/* Document parsing status */}
+          {isParsing && (
+            <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+              <span className="text-sm text-primary font-medium">Parsing documents...</span>
             </div>
           )}
 
-          {/* Uploaded Files */}
+          {/* Display uploaded files list */}
           {slideData.documents.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Uploaded Files</h3>
+            <div className="space-y-2">
+              <Label>Uploaded Files ({slideData.documents.length})</Label>
               <div className="space-y-2">
                 {slideData.documents.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                  <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{file.name}</p>
-                        <p className="text-sm text-muted-foreground">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{file.name}</span>
+                        <span className="text-xs text-muted-foreground">
                           {(file.size / 1024).toFixed(1)} KB
-                        </p>
-                        {extractedImages[file.name] && extractedImages[file.name].length > 0 && (
-                          <p className="text-sm text-blue-600">
-                            {extractedImages[file.name].length} image(s) found
-                          </p>
-                        )}
+                        </span>
                       </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => removeFile(index)}
-                      className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
               </div>
-              
-              {/* Display extracted images */}
-              {Object.keys(extractedImages).length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="text-md font-semibold">Extracted Images</h4>
-                  {Object.entries(extractedImages).map(([fileName, images]) => (
-                    <div key={fileName} className="space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        From {fileName}:
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {images.map((img, imgIndex) => (
-                          <div key={imgIndex} className="p-2 border rounded bg-background">
-                            <div className="text-xs space-y-1">
-                              <p className="font-medium truncate">{img.alt || 'No alt text'}</p>
-                              <p className="text-muted-foreground truncate">{img.src}</p>
-                              {img.width && img.height && (
-                                <p className="text-muted-foreground">
-                                  {img.width} × {img.height}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Slide Description Section */}
       <Card variant="glass">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold tracking-tight">Describe Your Slide</CardTitle>
-          <CardDescription className="text-base text-muted-foreground">
-            Tell us what kind of slide you want to create and any specific requirements
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="text-lg sm:text-xl font-semibold tracking-tight">
+            Describe Your Slide
+          </CardTitle>
+          <CardDescription className="text-sm sm:text-base text-muted-foreground">
+            Tell us what you want to create
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="description">Slide Description</Label>
@@ -502,16 +346,17 @@ export function UploadStep({
                 disabled={isGenerating}
                 className="gap-2 text-xs"
               >
-                <Sparkles className={`h-3 w-3 ${isGenerating ? 'animate-spin' : ''}`} />
-                {isGenerating ? 'Generating...' : 'Generate Example'}
+                <Sparkles className="h-3 w-3" />
+                {isGenerating ? "Generating..." : "Generate Example"}
               </Button>
             </div>
             <textarea
               id="description"
-              placeholder="e.g., Create a professional slide about quarterly sales results with charts and key insights..."
-              className="w-full h-32 px-3 py-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-premium"
+              placeholder="E.g., Create a professional quarterly business review presentation highlighting our Q3 achievements..."
+              className="w-full min-h-[120px] p-3 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={slideData.description}
               onChange={(e) => updateSlideData({ description: e.target.value })}
+              maxLength={500}
             />
             <p className="text-xs text-muted-foreground">
               {slideData.description.length}/500 characters
@@ -520,31 +365,18 @@ export function UploadStep({
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        {/* Show progress when generating slide */}
-        {slideData.isGenerating ? (
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-muted-foreground">
-              {slideData.generationStatus || "Generating slide..."}
-            </div>
-            <div className="w-32 bg-muted rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${slideData.generationProgress || 0}%` }}
-              />
-            </div>
-          </div>
-        ) : (
-          <Button
-            variant="engineering"
-            size="lg"
-            onClick={handleContinueToThemes}
-            disabled={!canProceed}
-          >
-            Continue to Themes
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        )}
+      {/* Continue button */}
+      <div className="flex justify-end pt-2">
+        <Button
+          variant="engineering"
+          size="default"
+          className="w-full sm:w-auto"
+          onClick={handleContinueToThemes}
+          disabled={!canProceed}
+        >
+          Continue to Themes
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
       </div>
     </div>
   );

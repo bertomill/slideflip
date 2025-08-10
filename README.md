@@ -1,10 +1,10 @@
-# SlideFlip
+# Slideo
 
 A modern, AI-powered presentation generator that transforms documents into professional slides with real-time collaboration features.
 
 ## 🚀 Overview
 
-SlideFlip is a full-stack application that combines the power of AI with modern web technologies to create stunning presentations. Users can upload documents (PDF, DOCX, TXT, MD), and the system will automatically generate professional slides with customizable themes and layouts.
+Slideo is a full-stack application that combines the power of AI with modern web technologies to create stunning presentations. Users can upload documents (PDF, DOCX, TXT, MD), and the system will automatically generate professional slides with customizable themes and layouts.
 
 ## ✨ Features
 
@@ -301,4 +301,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by the SlideFlip Team**
+**Made with ❤️ by the Slideo Team**

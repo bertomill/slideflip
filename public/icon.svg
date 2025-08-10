@@ -1,0 +1,21 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="90" cy="90" r="90" fill="#3B82F6"/>
+  
+  <!-- Slide background -->
+  <rect x="45" y="60" width="90" height="60" rx="4" fill="white" stroke="#1E40AF" stroke-width="2"/>
+  
+  <!-- Slide content area -->
+  <rect x="50" y="65" width="80" height="50" rx="2" fill="white"/>
+  
+  <!-- Title bar -->
+  <rect x="50" y="65" width="80" height="8" fill="#E5E7EB"/>
+  
+  <!-- Content lines -->
+  <rect x="55" y="80" width="70" height="3" rx="1" fill="#6B7280"/>
+  <rect x="55" y="86" width="50" height="3" rx="1" fill="#9CA3AF"/>
+  <rect x="55" y="92" width="60" height="3" rx="1" fill="#9CA3AF"/>
+  
+  <!-- Slide shadow -->
+  <rect x="50" y="120" width="80" height="4" rx="2" fill="#1E40AF" opacity="0.3"/>
+</svg> 

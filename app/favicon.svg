@@ -1,0 +1,32 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="slideo-favicon-g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6B7280" />
+      <stop offset="100%" stop-color="#93C5FD" />
+    </linearGradient>
+  </defs>
+
+  <!-- Slide canvas -->
+  <rect
+    x="4"
+    y="5.33"
+    width="24"
+    height="18.67"
+    rx="4"
+    fill="url(#slideo-favicon-g)"
+    stroke="#374151"
+    stroke-width="1.33"
+  />
+
+  <!-- Text lines -->
+  <rect x="8" y="9.33" width="12" height="2.13" rx="1.07" fill="white" opacity="0.85" />
+  <rect x="8" y="13.33" width="16" height="2.13" rx="1.07" fill="white" opacity="0.85" />
+  <rect x="8" y="17.33" width="9.33" height="2.13" rx="1.07" fill="white" opacity="0.85" />
+
+  <!-- Sparkle to suggest AI/magic -->
+  <path
+    d="M24 8.67l.8 1.6 1.6.8-1.6.8-.8 1.6-.8-1.6-1.6-.8 1.6-.8z"
+    fill="#C084FC"
+    opacity="0.95"
+  />
+</svg> 

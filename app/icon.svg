@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background square -->
+  <rect width="512" height="512" rx="96" fill="#3B82F6"/>
+  
+  <!-- Inner square representing a slide -->
+  <rect x="128" y="128" width="256" height="256" rx="32" fill="white"/>
+  
+  <!-- Small accent square -->
+  <rect x="192" y="192" width="128" height="128" rx="16" fill="#3B82F6"/>
+  
+  <!-- Flip indicator - small arrow -->
+  <path d="M320 256L288 224L288 288L320 256Z" fill="white"/>
+</svg> 

@@ -56,12 +56,13 @@ export async function updateSession(request: NextRequest) {
   const user = data?.claims;
 
   // Redirect unauthenticated users to login page for protected routes
-  // Allows access to: home page ("/"), login pages, and all auth-related pages
+  // Allows access to: home page ("/"), login pages, auth-related pages, and API routes
   if (
     request.nextUrl.pathname !== "/" &&
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
+    !request.nextUrl.pathname.startsWith("/auth") &&
+    !request.nextUrl.pathname.startsWith("/api")
   ) {
     // Create redirect URL to login page while preserving the original destination
     const url = request.nextUrl.clone();

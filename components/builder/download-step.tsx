@@ -4,92 +4,64 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, ArrowLeft, CheckCircle, FileText, Share, Star } from "lucide-react";
-import { SlideData } from "@/app/builder/page";
+import { Download, FileText, Code, ArrowLeft, Share2, Copy, Check } from "lucide-react";
+import { SlideData } from "@/app/build/page";
+import { DownloadPptxButton } from "@/components/download-pptx-button";
+import { GoogleSlidesButton } from "@/components/google-slides-button";
 
 interface DownloadStepProps {
   slideData: SlideData;
   onPrev: () => void;
+  onComplete: () => void;
 }
 
-export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportComplete, setExportComplete] = useState(false);
+export function DownloadStep({ slideData, onPrev, onComplete }: DownloadStepProps) {
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isDownloadingHtml, setIsDownloadingHtml] = useState(false);
 
-  const downloadPPTX = async () => {
-    setIsExporting(true);
-    
+  const downloadHtml = async () => {
     try {
-      if (slideData.pptFilePath) {
-        console.log('Downloading PPT file from:', slideData.pptFilePath);
-        
-        // First, let's check if the file exists using the debug endpoint
-        const checkUrl = `http://localhost:8000/debug/check-file/${slideData.pptFilePath}`;
-        console.log('Checking file existence at:', checkUrl);
-        
-        try {
-          const checkResponse = await fetch(checkUrl);
-          const checkResult = await checkResponse.json();
-          console.log('File check result:', checkResult);
-        } catch (checkError) {
-          console.log('File check failed:', checkError);
-        }
-        
-        // Download the actual PPT file from the backend
-        const downloadUrl = `http://localhost:8000/download/${slideData.pptFilePath}`;
-        console.log('Downloading from URL:', downloadUrl);
-        
-        const response = await fetch(downloadUrl, {
-          method: 'GET',
-        });
-        
-        console.log('Download response status:', response.status, response.statusText);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to download PPT file: ${response.status} ${response.statusText}`);
-        }
-        
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = slideData.pptFilePath.split('/').pop() || 'slideflip-presentation.pptx';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        console.log('PPT file downloaded successfully');
-        setExportComplete(true);
-      } else {
-        throw new Error('No PPT file available for download. Please regenerate the slide.');
+      setIsDownloadingHtml(true);
+      if (!slideData.slideHtml || slideData.slideHtml === "cat-slide-placeholder") {
+        throw new Error("No slide content available for download");
       }
+      const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${extractTitle(
+        slideData.description
+      )}</title><style>body{margin:0;padding:20px;background:#f5f5f5;font-family:system-ui,-apple-system,sans-serif}.slide-wrapper{max-width:1200px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.1);overflow:hidden}.slide-content{transform-origin:top left;transform:scale(.8);width:125%}@media print{body{background:#fff;padding:0}.slide-wrapper{box-shadow:none;border-radius:0}.slide-content{transform:scale(1);width:100%}}</style></head><body><div class="slide-wrapper"><div class="slide-content">${slideData.slideHtml}</div></div></body></html>`;
+      const blob = new Blob([htmlContent], { type: "text/html" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `slide-${generateFileName()}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error downloading PPT file:', error);
-      
-      // Show user-friendly error message
-      alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}. Using fallback download.`);
-      
-      // Fallback to mock download for now
-      const blob = new Blob(['Mock PPTX content'], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'slideflip-presentation.pptx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      setExportComplete(true);
+      console.error("Error downloading HTML:", error);
     } finally {
-      setIsExporting(false);
+      setIsDownloadingHtml(false);
     }
   };
 
-  const createNewSlide = () => {
-    window.location.href = '/builder';
+  const copyShareLink = async () => {
+    try {
+      const shareUrl = `${window.location.origin}/shared/${generateShareId()}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (error) {
+      console.error("Error copying link:", error);
+    }
   };
+
+  const extractTitle = (description: string) => description?.split(".")[0]?.substring(0, 50)?.trim() || "AI Generated Slide";
+  const generateFileName = () => {
+    const ts = new Date().toISOString().slice(0, 10);
+    const topic = (slideData.description || "slide").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, "-").substring(0, 20) || "slide";
+    return `${topic}-${ts}`;
+  };
+  const generateShareId = () => Math.random().toString(36).substring(2, 15);
 
   return (
     <div className="space-y-6">
@@ -97,211 +69,157 @@ export function DownloadStep({ slideData, onPrev }: DownloadStepProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="h-5 w-5 text-primary" />
-            Download Your Presentation
+            Download Your Slide
           </CardTitle>
-          <CardDescription>
-            Your slide is ready! Download it as a PowerPoint presentation or share it with others.
-          </CardDescription>
+          <CardDescription>Choose your preferred format and share your AI-generated presentation</CardDescription>
         </CardHeader>
       </Card>
 
-      {/* Slide Summary */}
-      <Card variant="premium">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            Slide Complete
-          </CardTitle>
-          <CardDescription>
-            Here's a summary of your generated presentation
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">Documents</span>
-              </div>
-              <p className="text-2xl font-bold">{slideData.documents.length}</p>
-              <p className="text-xs text-muted-foreground">files processed</p>
-            </div>
-            
-            <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Star className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">Theme</span>
-              </div>
-              <p className="text-lg font-bold capitalize">{slideData.selectedTheme}</p>
-              <p className="text-xs text-muted-foreground">design applied</p>
-            </div>
-            
-            <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Share className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">Research</span>
-              </div>
-              <p className="text-lg font-bold">{slideData.wantsResearch ? 'Enhanced' : 'Standard'}</p>
-              <p className="text-xs text-muted-foreground">content level</p>
-            </div>
-          </div>
-          
-          <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-            <p className="text-sm font-medium mb-2">Slide Description:</p>
-            <p className="text-sm text-muted-foreground italic">"{slideData.description}"</p>
-          </div>
-          
-          {/* Generation Summary */}
-          <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
-            <p className="text-sm font-medium mb-2">Generated Content:</p>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-sm">
-                {slideData.slideHtml ? (
-                  <>
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                    <span>HTML preview generated</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="h-3 w-3 border border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                    <span>HTML preview pending</span>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                {slideData.pptFilePath ? (
-                  <>
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                    <span>PPT file generated</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="h-3 w-3 border border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                    <span>PPT file pending</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Download Options */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card variant="glass">
           <CardHeader>
-            <CardTitle className="text-lg">PowerPoint Download</CardTitle>
-            <CardDescription>
-              Download as a .pptx file that you can edit in PowerPoint or Google Slides
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-500" />
+                  PowerPoint Format
+                </CardTitle>
+                <CardDescription>Download as .pptx file for editing in PowerPoint</CardDescription>
+              </div>
+              <Badge variant="secondary">Recommended</Badge>
+            </div>
           </CardHeader>
           <CardContent>
-            {/* File Status Indicator */}
-            <div className="mb-4 p-3 rounded-lg border">
-              <div className="flex items-center gap-2">
-                {slideData.pptFilePath ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-green-700 dark:text-green-400">
-                      PPT file ready for download
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <div className="h-4 w-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm text-yellow-700 dark:text-yellow-400">
-                      PPT file not available
-                    </span>
-                  </>
-                )}
-              </div>
-              {slideData.pptFilePath && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  File: {slideData.pptFilePath.split('/').pop()}
-                </p>
-              )}
+            <div className="space-y-3">
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Fully editable in PowerPoint</li>
+                <li>• Professional formatting preserved</li>
+                <li>• Compatible with Office 365</li>
+                <li>• Perfect for presentations</li>
+              </ul>
+              <DownloadPptxButton slideData={slideData} variant="default" size="lg" className="w-full" />
             </div>
-            
-            <Button 
-              variant="engineering" 
-              size="lg" 
-              className="w-full"
-              onClick={downloadPPTX}
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PPTX
-                </>
-              )}
-            </Button>
-            
-            {exportComplete && (
-              <div className="mt-4 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">Download complete!</span>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
 
         <Card variant="glass">
           <CardHeader>
-            <CardTitle className="text-lg">Share & Collaborate</CardTitle>
-            <CardDescription>
-              Get a shareable link or export in other formats
-            </CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Share2 className="h-5 w-5 text-red-500" />
+              Google Slides
+            </CardTitle>
+            <CardDescription>Open in Google Slides for online editing</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full" disabled>
-              <Share className="h-4 w-4 mr-2" />
-              Get Shareable Link
-              <Badge variant="secondary" className="ml-2">Coming Soon</Badge>
-            </Button>
-            <Button variant="outline" className="w-full" disabled>
-              <FileText className="h-4 w-4 mr-2" />
-              Export as PDF
-              <Badge variant="secondary" className="ml-2">Coming Soon</Badge>
-            </Button>
+          <CardContent>
+            <div className="space-y-3">
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Edit online with Google Slides</li>
+                <li>• Real-time collaboration</li>
+                <li>• Automatic cloud saving</li>
+                <li>• Share with team members</li>
+              </ul>
+              <GoogleSlidesButton slideData={slideData} variant="outline" size="lg" className="w-full" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Code className="h-5 w-5 text-green-500" />
+              HTML Format
+            </CardTitle>
+            <CardDescription>Download as standalone HTML file</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Works in any web browser</li>
+                <li>• Preserves all styling and effects</li>
+                <li>• Easy to share via email</li>
+                <li>• Print-friendly format</li>
+              </ul>
+              <Button onClick={downloadHtml} disabled={isDownloadingHtml || !slideData.slideHtml} variant="outline" size="lg" className="w-full">
+                {isDownloadingHtml ? (
+                  <>
+                    <Download className="h-4 w-4 mr-2 animate-pulse" />
+                    Preparing HTML...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download HTML
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Next Steps */}
-      <Card variant="elevated">
+      <Card variant="glass">
         <CardHeader>
-          <CardTitle>What's Next?</CardTitle>
-          <CardDescription>
-            Continue building amazing presentations with SlideFlip
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Share2 className="h-5 w-5 text-purple-500" />
+            Share Your Slide
+          </CardTitle>
+          <CardDescription>Generate a shareable link for others to view your presentation</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button variant="engineering" onClick={createNewSlide} className="flex-1">
-              Create Another Slide
-            </Button>
-            <Button variant="outline" className="flex-1" disabled>
-              View My Presentations
-              <Badge variant="secondary" className="ml-2">Soon</Badge>
+          <div className="flex gap-3">
+            <Button onClick={copyShareLink} variant="outline" className="flex-1">
+              {copiedLink ? (
+                <>
+                  <Check className="h-4 w-4 mr-2 text-green-500" />
+                  Link Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Share Link
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-start">
+      <Card variant="glass">
+        <CardHeader>
+          <CardTitle className="text-lg">Slide Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="font-medium text-muted-foreground">Theme</p>
+              <p className="font-semibold">{slideData.selectedTheme || "Professional"}</p>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground">Research</p>
+              <p className="font-semibold">{slideData.wantsResearch ? "Included" : "Not included"}</p>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground">Documents</p>
+              <p className="font-semibold">{slideData.documents?.length || 0} uploaded</p>
+            </div>
+            <div>
+              <p className="font-medium text-muted-foreground">Feedback</p>
+              <p className="font-semibold">{slideData.userFeedback ? "Applied" : "None"}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Preview
+        </Button>
+        <Button variant="engineering" size="lg" onClick={onComplete}>
+          Create Another Slide
         </Button>
       </div>
     </div>
   );
 }
+

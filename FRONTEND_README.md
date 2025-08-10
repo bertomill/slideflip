@@ -1,4 +1,4 @@
-# SlideFlip Frontend
+# Slideo Frontend
 
 A modern Next.js application for generating professional presentations with real-time collaboration and AI-powered slide generation.
 
@@ -79,7 +79,7 @@ services/
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd slideflip
+cd slideflip
    ```
 
 2. **Install dependencies**:

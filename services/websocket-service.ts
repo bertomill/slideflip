@@ -58,7 +58,8 @@ class WebSocketService {
       this.isConnecting = true;
       this.connectionStatus = 'connecting';
 
-      const wsUrl = `ws://localhost:8000/ws/${clientId}`;
+      const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://localhost:8000';
+      const wsUrl = `${backendWsUrl}/ws/${clientId}`;
       
       try {
         const ws = new WebSocket(wsUrl);
@@ -92,7 +93,7 @@ class WebSocketService {
           }
           
           this.callbacks.onOpen?.();
-          console.log('Connected to SlideFlip Backend');
+          console.log('Connected to Slideo Backend');
           resolve(true);
         };
 
@@ -138,7 +139,7 @@ class WebSocketService {
           this.socket = null;
           this.isConnecting = false;
           this.connectionStatus = 'disconnected';
-          console.log('Disconnected from SlideFlip Backend', event.code, event.reason);
+          console.log('Disconnected from Slideo Backend', event.code, event.reason);
           this.callbacks.onClose?.();
 
           // Only attempt to reconnect if not manually closed and we've successfully connected before
