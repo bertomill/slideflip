@@ -10,7 +10,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Slideo - Create Stunning Presentations",
+  title: "Slideo - AI slide builder",
   description: "Build beautiful presentations with AI-powered slide creation and design tools",
   keywords: ["presentations", "slides", "AI", "design", "presentation builder", "slide creation"],
   authors: [{ name: "Slideo Team" }],
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     apple: '/icon.svg',
   },
   openGraph: {
-  title: "Slideo - Create Stunning Presentations",
+  title: "Slideo - AI slide builder",
     description: "Build beautiful presentations with AI-powered slide creation and design tools",
     type: "website",
     url: defaultUrl,
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-  title: "Slideo - Create Stunning Presentations",
+  title: "Slideo - AI slide builder",
     description: "Build beautiful presentations with AI-powered slide creation and design tools",
     images: ["/twitter-image.png"],
   },

@@ -542,10 +542,10 @@ export default function Home() {
                   className="pr-32 py-4 text-lg rounded-xl border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
                   style={{ fontStyle: promptText ? 'normal' : 'italic' }}
                 />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <Button
                     size="sm"
-                    className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-lg px-4"
+                    className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-xl px-4"
                     onClick={() => window.location.href = '/auth/sign-up'}
                   >
                     <ArrowRight className="h-4 w-4 mr-1" />
