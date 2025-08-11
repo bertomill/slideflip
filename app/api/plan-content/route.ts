@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logEvent, saveContentPlan } from '@/lib/flow-logging';
 
 // ============================================================================
 // CONTENT PLANNING API ENDPOINT
@@ -28,7 +29,15 @@ export async function POST(request: NextRequest) {
         // REQUEST PARSING: Extract all planning parameters from request body
         // These inputs come from the slide builder workflow and determine plan structure
         const body = await request.json();
-        const { description, selectedTheme, hasResearch, researchData, documentCount } = body;
+        const { description, selectedTheme, hasResearch, researchData, documentCount, flow_id } = body;
+        // Log request event (optional)
+        await logEvent({
+            flowId: flow_id,
+            step: 'content',
+            actor: 'user',
+            eventType: 'plan_requested',
+            payload: { description, selectedTheme, hasResearch, documentCount }
+        });
 
         // INPUT VALIDATION: Ensure minimum required data is present
         // Description is essential as it forms the foundation of the content plan
@@ -113,6 +122,22 @@ export async function POST(request: NextRequest) {
 
         // CLOSING SUMMARY: Reinforce the plan's alignment with user preferences
         contentPlan += `The slide will be optimized for ${selectedTheme || 'professional'} presentation style and designed to effectively communicate your message.`;
+
+        // Persist the plan artifact if flow_id provided
+        await saveContentPlan({
+            flowId: flow_id,
+            planningContext: { description, selectedTheme, hasResearch, researchData, documentCount },
+            aiPlan: contentPlan,
+            finalPlan: contentPlan
+        });
+
+        await logEvent({
+            flowId: flow_id,
+            step: 'content',
+            actor: 'ai',
+            eventType: 'plan_generated',
+            payload: { length: contentPlan.length }
+        });
 
         // SUCCESS RESPONSE: Return the completed content plan to the client
         return NextResponse.json({
