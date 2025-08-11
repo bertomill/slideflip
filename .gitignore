@@ -13,8 +13,30 @@
 # testing
 /coverage
 backend/uploads
+backend/kg
 
-*/backend/__pycache__
+# Python
+**/__pycache__/
+**/*.py[cod]
+*$py.class
+**/*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # next.js
 /.next/
@@ -33,7 +55,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (opt-in for committing if needed)
 .env*.local
 .env
 
