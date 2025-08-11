@@ -38,6 +38,23 @@ wheels/
 *.egg
 MANIFEST
 
+# Virtual environments
+**/venv/
+**/env/
+**/.venv/
+**/.env/
+**/ENV/
+**/env.bak/
+**/venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
 # next.js
 /.next/
 /out/
@@ -46,7 +63,6 @@ MANIFEST
 /build
 
 # misc
-.DS_Store
 *.pem
 
 # debug
