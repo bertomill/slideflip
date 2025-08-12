@@ -25,6 +25,11 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   const slideContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!slideData.slideHtml) {
+      updateSlideData({
+        slideHtml: `<div><h2>Test Slide</h2><ul><li>Bullet 1</li><li>Bullet 2</li></ul></div>`
+      });
+    }
     const container = slideContainerRef.current;
     if (!container) return;
     const resizeObserver = new ResizeObserver((entries) => {
