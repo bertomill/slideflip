@@ -243,6 +243,35 @@ python -m pytest tests/
 2. Configure environment variables in Vercel dashboard
 3. Deploy automatically on push to main branch
 
+#### Note on bundling Node-only modules
+
+The app uses `pptxgenjs` for PPTX export in the browser. Some versions of this library include conditional imports of Node built-ins like `node:fs` and `node:https` inside the ESM bundle, which can cause bundlers to error when creating client chunks. To prevent this, the Next.js config stubs these modules for the browser build via aliases in `next.config.ts`:
+
+```ts
+// next.config.ts (excerpt)
+webpack: (config, { isServer }) => {
+  if (!isServer) {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      'node:fs': false,
+      'node:https': false,
+      fs: false,
+      https: false,
+      'image-size': false,
+      path: false,
+      os: false,
+      'node:path': false,
+    };
+    // Optional compatibility fallbacks
+    // @ts-ignore
+    config.resolve.fallback = { ...(config.resolve.fallback || {}), fs: false, https: false, path: false, os: false };
+  }
+  return config;
+}
+```
+
+This ensures successful builds on Vercel while keeping runtime behavior unchanged in the browser.
+
 ### Backend (Docker)
 ```dockerfile
 FROM python:3.11-slim
@@ -258,6 +287,12 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Recent Updates
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
+
+- Added reusable card style `card-contrast` in `app/globals.css` for high-emphasis cards with thin white borders on dark backgrounds. Apply it via `className="card-contrast"` alongside `variant="glass"` on `Card` components.
+
+- Theme step UX: the Template selection and Color Palette sections are now collapsible using shadcn/ui `Accordion`. This makes the page easier to scan while preserving all functionality.
+  - New component: `components/ui/accordion.tsx`
+  - Updated: `components/builder/theme-step.tsx`
 
 ### Assets
 - `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).

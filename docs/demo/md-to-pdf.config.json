@@ -1,0 +1,8 @@
+{
+  "stylesheet": ["docs/demo/initiatives-pdf.css"],
+  "pdf_options": {
+    "format": "A4",
+    "printBackground": true,
+    "preferCSSPageSize": true
+  }
+}

@@ -297,7 +297,7 @@ export function UploadStep({
       )}
 
       {/* Document Upload Section */}
-      <Card variant="elevated">
+      <Card variant="glass" className="card-contrast">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-semibold tracking-tight">
             <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />

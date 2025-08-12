@@ -1,13 +1,20 @@
+// Client-side component for theme selection and customization
 "use client";
 
+// Import necessary React hooks and types
 import { useEffect, useRef, useState } from "react";
 import type { ClipboardEvent as ReactClipboardEvent } from 'react';
+
+// Import UI components
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Sparkles, Image as ImageIcon } from "lucide-react";
 import { SlideData } from "@/app/build/page";
+// Accordion primitives for collapsible sections
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
+// Props interface for ThemeStep component
 interface ThemeStepProps {
   slideData: SlideData;
   updateSlideData: (updates: Partial<SlideData>) => void;
@@ -15,9 +22,22 @@ interface ThemeStepProps {
   onPrev: () => void;
 }
 
+// Shared type for curated example entries
+type CuratedExample = {
+  id: string;
+  name: string;
+  theme: string;
+  description: string;
+  aspect_ratio: string;
+  html: string;
+};
+
 export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeStepProps) {
-  const [examples, setExamples] = useState<Array<{id:string;name:string;theme:string;description:string;aspect_ratio:string;html:string}>>([]);
+  // State for managing examples and loading state
+  const [examples, setExamples] = useState<CuratedExample[]>([]);
   const [loadingExamples, setLoadingExamples] = useState(false);
+  
+  // State for palette selection and customization
   const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
   const [paletteMode, setPaletteMode] = useState<'logo' | 'ai' | 'manual'>('logo');
   const [manualColors, setManualColors] = useState<string[]>(['#980000', '#111111', '#333333', '#b3b3b3', '#ffffff']);
@@ -26,6 +46,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
   const [isPaletteLoading, setIsPaletteLoading] = useState(false);
   const pasteZoneRef = useRef<HTMLDivElement | null>(null);
 
+  // Load examples on component mount
   useEffect(() => {
     const load = async () => {
       try {
@@ -33,8 +54,8 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         // Try Supabase-powered curated examples first
         const exRes = await fetch('/api/examples/list');
         const exData = await exRes.json();
-        const curated: Array<{id:string;name:string;theme:string;description:string;aspect_ratio:string;html:string}> = (exData.examples || []);
-        let onlyOne = curated.find((e) => e.id === 'imported-02') || curated[0];
+        const curated: CuratedExample[] = (exData.examples || []);
+        let onlyOne: CuratedExample | undefined = curated.find((e) => e.id === 'imported-02') || curated[0];
 
         // Fallback: if we have no curated examples (e.g., Supabase not configured),
         // load the local HTML template so the user always sees a live preview.
@@ -50,7 +71,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                 description: 'Local fallback curated example',
                 aspect_ratio: '16:9',
                 html: fbData.slideHtml as string,
-              } as any;
+              };
             }
           } catch {
             // ignore; we'll show no examples
@@ -67,8 +88,10 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     load();
   }, []);
 
+  // Check if user can proceed to next step
   const canProceed = slideData.selectedTheme !== "";
 
+  // Component for rendering slide preview with proper scaling
   const SlidePreview = ({ html }: { html: string }) => {
     const ref = useRef<HTMLDivElement | null>(null);
     const [scale, setScale] = useState(0.6);
@@ -90,10 +113,12 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     );
   };
 
+  // Predefined color palettes for curated examples
   const curatedPalettes: Record<string, string[]> = {
     'imported-02': ['#980000', '#111111', '#333333', '#b3b3b3', '#ffffff'],
   };
 
+  // Function to apply a predefined palette
   const applyPalette = (id: string) => {
     const colors = curatedPalettes[id];
     if (!colors) return;
@@ -101,12 +126,15 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     updateSlideData({ ...( {} as Partial<SlideData>), ...( { selectedPalette: colors } as Partial<SlideData>) });
   };
 
+  // Function to apply a custom color palette
   const applyCustomPalette = (colors: string[]) => {
     updateSlideData({ ...( {} as Partial<SlideData>), ...( { selectedPalette: colors } as Partial<SlideData>) });
   };
 
+  // Utility function to convert RGB to hex color
   const rgbToHex = (r: number, g: number, b: number) => '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
 
+  // Function to extract color palette from uploaded image using k-means clustering
   const extractPaletteFromImage = async (file: File, k: number = 5) => {
     return new Promise<string[]>((resolve, reject) => {
       const reader = new FileReader();
@@ -171,6 +199,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     });
   };
 
+  // Handler for pasting images
   const handlePasteImage = async (e: ReactClipboardEvent<HTMLDivElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -190,6 +219,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     }
   };
 
+  // Function to generate color palette based on text prompt
   const generatePaletteFromPrompt = (prompt: string): string[] => {
     const p = prompt.toLowerCase();
     if (p.includes('modern')) return ['#0F172A', '#3B82F6', '#22D3EE', '#E2E8F0', '#FFFFFF'];
@@ -201,6 +231,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
 
   return (
     <div className="space-y-6">
+      {/* Header card */}
       <Card variant="elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -213,139 +244,164 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         </CardHeader>
       </Card>
 
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-foreground mb-2">Curated Examples</h3>
-        <p className="text-sm text-muted-foreground mb-6">Verified 1:1 PPTX/HTML pairs stored in Supabase.</p>
-        {loadingExamples ? (
-          <div className="text-sm text-muted-foreground">Loading examples…</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {examples.map((ex) => {
-              const isSelected = slideData.selectedTheme === ex.id;
-              return (
-                <Card key={ex.id} variant={isSelected ? 'premium' : 'glass'} className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`} onClick={() => updateSlideData({ selectedTheme: ex.id })}>
-                  <SlidePreview html={ex.html} />
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-sm">{ex.name}</h4>
-                      <Badge variant="outline" className="text-xs">Curated</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{ex.description}</p>
-                    <div className="mt-3">
-                      <div className="text-xs text-muted-foreground mb-2">Primary colors</div>
-                      <div className="flex items-center gap-2">
-                        {(curatedPalettes[ex.id] || []).map((colorHexVal) => (
-                          <div key={colorHexVal} className="w-5 h-5 rounded-full border" style={{ backgroundColor: colorHexVal }} title={colorHexVal} />
-                        ))}
-                        <Button size="sm" variant="outline" className="ml-2" onClick={() => applyPalette(ex.id)}>
-                          Use palette
-                        </Button>
-                        {selectedPaletteId === ex.id && (
-                          <span className="text-xs text-primary ml-2">Applied</span>
+      {/* Collapsible content sections using Accordion */}
+      <Accordion type="multiple" className="w-full" defaultValue={["templates", "palette"]}>
+        {/* Curated examples section (collapsible) */}
+        <AccordionItem value="templates">
+          <AccordionTrigger>
+            <div className="flex flex-col items-start">
+              <h3 className="text-lg font-semibold text-foreground">Curated Examples</h3>
+              <p className="text-sm text-muted-foreground">Verified 1:1 PPTX/HTML pairs stored in Supabase.</p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            {loadingExamples ? (
+              <div className="text-sm text-muted-foreground">Loading examples…</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {examples.map((ex) => {
+                  const isSelected = slideData.selectedTheme === ex.id;
+                  return (
+                    <Card
+                      key={ex.id}
+                      variant={isSelected ? 'premium' : 'glass'}
+                      className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}
+                      onClick={() => updateSlideData({ selectedTheme: ex.id })}
+                    >
+                      <SlidePreview html={ex.html} />
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-sm">{ex.name}</h4>
+                          <Badge variant="outline" className="text-xs">Curated</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{ex.description}</p>
+                        <div className="mt-3">
+                          <div className="text-xs text-muted-foreground mb-2">Primary colors</div>
+                          <div className="flex items-center gap-2">
+                            {(curatedPalettes[ex.id] || []).map((colorHexVal) => (
+                              <div key={colorHexVal} className="w-5 h-5 rounded-full border" style={{ backgroundColor: colorHexVal }} title={colorHexVal} />
+                            ))}
+                            <Button size="sm" variant="outline" className="ml-2" onClick={() => applyPalette(ex.id)}>
+                              Use palette
+                            </Button>
+                            {selectedPaletteId === ex.id && (
+                              <span className="text-xs text-primary ml-2">Applied</span>
+                            )}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div className="mt-2 flex items-center gap-1 text-primary">
+                            <Sparkles className="h-3 w-3" />
+                            <span className="text-xs font-medium">Selected</span>
+                          </div>
                         )}
-                      </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Color palette section (collapsible) */}
+        <AccordionItem value="palette">
+          <AccordionTrigger>
+            <div className="flex flex-col items-start">
+              <h3 className="text-lg font-semibold text-foreground">Color Palette</h3>
+              <p className="text-sm text-muted-foreground">Pick a palette in one of three ways: upload a logo, describe a style, or pick manually.</p>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="flex flex-wrap gap-3 mb-4">
+              <Button variant={paletteMode === 'logo' ? 'default' : 'outline'} size="sm" onClick={() => setPaletteMode('logo')}>From Logo</Button>
+              <Button variant={paletteMode === 'ai' ? 'default' : 'outline'} size="sm" onClick={() => setPaletteMode('ai')}>AI Suggestion</Button>
+              <Button variant={paletteMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setPaletteMode('manual')}>Manual</Button>
+            </div>
+
+            {/* Logo-based palette selection */}
+            {paletteMode === 'logo' && (
+              <Card variant="glass" className="p-4">
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <input type="file" accept="image/*" onChange={async (e) => {
+                        const f = e.target.files && e.target.files[0];
+                        if (!f) return;
+                        const colors = await extractPaletteFromImage(f, 5);
+                        setManualColors(colors);
+                        applyCustomPalette(colors);
+                      }} />
                     </div>
-                    {isSelected && (
-                      <div className="mt-2 flex items-center gap-1 text-primary">
-                        <Sparkles className="h-3 w-3" />
-                        <span className="text-xs font-medium">Selected</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Color Palette</h3>
-        <p className="text-sm text-muted-foreground mb-6">Pick a palette in one of three ways: upload a logo, describe a style, or pick manually.</p>
-
-        <div className="flex flex-wrap gap-3 mb-4">
-          <Button variant={paletteMode === 'logo' ? 'default' : 'outline'} size="sm" onClick={() => setPaletteMode('logo')}>From Logo</Button>
-          <Button variant={paletteMode === 'ai' ? 'default' : 'outline'} size="sm" onClick={() => setPaletteMode('ai')}>AI Suggestion</Button>
-          <Button variant={paletteMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setPaletteMode('manual')}>Manual</Button>
-        </div>
-
-        {paletteMode === 'logo' && (
-          <Card variant="glass" className="p-4">
-            <div className="flex flex-col md:flex-row md:items-center gap-4">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3">
-                  <input type="file" accept="image/*" onChange={async (e) => {
-                    const f = e.target.files && e.target.files[0];
-                    if (!f) return;
-                    const colors = await extractPaletteFromImage(f, 5);
-                    setManualColors(colors);
-                    applyCustomPalette(colors);
-                  }} />
+                    <p className="text-xs text-muted-foreground">Upload a logo or paste an image (Cmd/Ctrl+V) to extract a 5‑color palette.</p>
+                  </div>
+                  {logoPreview && (
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={logoPreview} alt="logo preview" className="h-16 w-auto rounded border" />
+                      <button type="button" aria-label="Remove image" className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/70 text-white text-xs" onClick={() => setLogoPreview(null)}>×</button>
+                    </div>
+                  )}
+                  <div ref={pasteZoneRef} onPaste={handlePasteImage} className="ml-auto rounded border border-dashed px-3 py-2 text-xs text-muted-foreground" title="Click here and press Cmd/Ctrl+V to paste an image" contentEditable={false}>
+                    Click here and press Cmd/Ctrl+V to paste an image
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    {manualColors.map((colorHexVal, idx) => (
+                      <div key={`${colorHexVal}-${idx}`} className="w-6 h-6 rounded-full border" style={{ backgroundColor: colorHexVal }} title={colorHexVal} />
+                    ))}
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Upload a logo or paste an image (Cmd/Ctrl+V) to extract a 5‑color palette.</p>
-              </div>
-              {logoPreview && (
-                <div className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={logoPreview} alt="logo preview" className="h-16 w-auto rounded border" />
-                  <button type="button" aria-label="Remove image" className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/70 text-white text-xs" onClick={() => setLogoPreview(null)}>×</button>
+              </Card>
+            )}
+
+            {/* AI-based palette generation */}
+            {paletteMode === 'ai' && (
+              <Card variant="glass" className="p-4 space-y-3">
+                <input className="w-full rounded border px-3 py-2 text-sm bg-background" placeholder="Describe the style (e.g., modern tech with clean blue accents)" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+                <div className="flex items-center gap-2">
+                  {generatePaletteFromPrompt(aiPrompt).map((c, i) => (
+                    <div key={i} className="w-6 h-6 rounded-full border" style={{ backgroundColor: c }} title={c} />
+                  ))}
+                  <Button size="sm" disabled={isPaletteLoading} onClick={async () => {
+                    setIsPaletteLoading(true);
+                    try {
+                      const res = await fetch('/api/color-palette/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: aiPrompt }) });
+                      const data = await res.json();
+                      const colors: string[] = data.colors || [];
+                      if (colors.length) { setManualColors(colors); applyCustomPalette(colors); }
+                    } catch {
+                      applyCustomPalette(generatePaletteFromPrompt(aiPrompt));
+                    } finally {
+                      setIsPaletteLoading(false);
+                    }
+                  }}>
+                    {isPaletteLoading ? 'Generating…' : 'Generate colors'}
+                  </Button>
                 </div>
-              )}
-              <div ref={pasteZoneRef} onPaste={handlePasteImage} className="ml-auto rounded border border-dashed px-3 py-2 text-xs text-muted-foreground" title="Click here and press Cmd/Ctrl+V to paste an image" contentEditable={false}>
-                Click here and press Cmd/Ctrl+V to paste an image
-              </div>
-              <div className="flex items-center gap-2 ml-auto">
-                {manualColors.map((colorHexVal, idx) => (
-                  <div key={`${colorHexVal}-${idx}`} className="w-6 h-6 rounded-full border" style={{ backgroundColor: colorHexVal }} title={colorHexVal} />
-                ))}
-              </div>
-            </div>
-          </Card>
-        )}
+              </Card>
+            )}
 
-        {paletteMode === 'ai' && (
-          <Card variant="glass" className="p-4 space-y-3">
-            <input className="w-full rounded border px-3 py-2 text-sm bg-background" placeholder="Describe the style (e.g., modern tech with clean blue accents)" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
-            <div className="flex items-center gap-2">
-              {generatePaletteFromPrompt(aiPrompt).map((c, i) => (
-                <div key={i} className="w-6 h-6 rounded-full border" style={{ backgroundColor: c }} title={c} />
-              ))}
-              <Button size="sm" disabled={isPaletteLoading} onClick={async () => {
-                setIsPaletteLoading(true);
-                try {
-                  const res = await fetch('/api/color-palette/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: aiPrompt }) });
-                  const data = await res.json();
-                  const colors: string[] = data.colors || [];
-                  if (colors.length) { setManualColors(colors); applyCustomPalette(colors); }
-                } catch {
-                  applyCustomPalette(generatePaletteFromPrompt(aiPrompt));
-                } finally {
-                  setIsPaletteLoading(false);
-                }
-              }}>
-                {isPaletteLoading ? 'Generating…' : 'Generate colors'}
-              </Button>
-            </div>
-          </Card>
-        )}
+            {/* Manual color selection */}
+            {paletteMode === 'manual' && (
+              <Card variant="glass" className="p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  {manualColors.map((c, i) => (
+                    <input key={i} type="color" value={c} onChange={(e) => {
+                      const next = [...manualColors];
+                      next[i] = e.target.value.toUpperCase();
+                      setManualColors(next);
+                      applyCustomPalette(next);
+                    }} className="w-10 h-10 rounded border p-0" />
+                  ))}
+                  <Button size="sm" variant="outline" onClick={() => { const next = [...manualColors, '#FFFFFF']; setManualColors(next); applyCustomPalette(next); }}>+ Add Color</Button>
+                </div>
+              </Card>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
-        {paletteMode === 'manual' && (
-          <Card variant="glass" className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              {manualColors.map((c, i) => (
-                <input key={i} type="color" value={c} onChange={(e) => {
-                  const next = [...manualColors];
-                  next[i] = e.target.value.toUpperCase();
-                  setManualColors(next);
-                  applyCustomPalette(next);
-                }} className="w-10 h-10 rounded border p-0" />
-              ))}
-              <Button size="sm" variant="outline" onClick={() => { const next = [...manualColors, '#FFFFFF']; setManualColors(next); applyCustomPalette(next); }}>+ Add Color</Button>
-            </div>
-          </Card>
-        )}
-      </div>
-
+      {/* AI theme suggestions */}
       {slideData.selectedTheme && (
         <Card variant="glass">
           <CardContent className="p-6">
@@ -371,6 +427,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         </Card>
       )}
 
+      {/* Navigation buttons */}
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -384,4 +441,3 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     </div>
   );
 }
-

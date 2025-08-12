@@ -1,0 +1,15 @@
+@page { margin: 24mm 22mm; }
+:root { --brand:#111827; --accent:#3B82F6; --accent2:#8B5CF6; }
+html, body { font-family: Inter, Segoe UI, Roboto, system-ui, -apple-system, Helvetica, Arial, sans-serif; color: var(--brand); }
+
+h1 { font-size: 28pt; font-weight: 800; letter-spacing: -0.2pt; margin: 0 0 10pt 0; }
+
+h1::after { content: ""; display: block; height: 3px; width: 72px; margin-top: 12pt; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; }
+
+ul { margin: 12pt 0 0 0; padding-left: 14pt; }
+li { margin: 8pt 0; line-height: 1.45; }
+
+/* subtle page number footer (optional) */
+@media print {
+  body { counter-reset: page; }
+}

@@ -252,7 +252,7 @@ export default function Build() {
             connectionStatus={connectionStatus}
             sendFileUpload={sendFileUpload}
             sendSlideDescription={sendSlideDescription}
-            lastMessage={lastMessage}
+             lastMessage={lastMessage as any}
           />
         );
       case 2:
@@ -261,8 +261,7 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-            onPrev={prevStep}
-            sendThemeSelection={sendThemeSelection}
+             onPrev={prevStep}
           />
         );
       case 3:
@@ -271,8 +270,7 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-            onPrev={prevStep}
-            sendGenerateSlide={sendGenerateSlide}
+             onPrev={prevStep}
           />
         );
       case 4:
@@ -291,7 +289,6 @@ export default function Build() {
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
             onPrev={prevStep}
-            sendGenerateSlide={sendGenerateSlide}
           />
         );
       // case 6: Download step removed - export functionality moved to Preview step
@@ -342,10 +339,10 @@ export default function Build() {
                     } ${step.id < currentStep ? "hover:scale-[1.02]" : ""}`}
                 >
                   <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "border-muted-foreground text-muted-foreground"
-                      } text-sm font-medium`}
+                    className={`step-indicator w-8 h-8 ${currentStep >= step.id
+                      ? "step-indicator-active"
+                      : "step-indicator-inactive"
+                      }`}
                   >
                     {step.id}
                   </div>
@@ -366,17 +363,17 @@ export default function Build() {
                     {/* Step indicator column */}
                     <div className="flex flex-col items-center mr-3 flex-shrink-0">
                       <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-muted-foreground text-muted-foreground"
-                          } text-sm font-medium`}
+                        className={`step-indicator w-8 h-8 ${currentStep >= step.id
+                          ? "step-indicator-active"
+                          : "step-indicator-inactive"
+                          }`}
                       >
                         {step.id}
                       </div>
                       {/* Connecting line */}
                       {index < steps.length - 1 && (
                         <div
-                          className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                          className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "step-connector-active" : "step-connector-inactive"
                             }`}
                         />
                       )}
@@ -522,16 +519,16 @@ export default function Build() {
                         >
                           <div className="flex flex-col items-center mr-3 flex-shrink-0">
                             <div
-                              className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-muted-foreground text-muted-foreground"
-                                } text-sm font-medium`}
+                              className={`step-indicator w-8 h-8 ${currentStep >= step.id
+                                ? "step-indicator-active"
+                                : "step-indicator-inactive"
+                                }`}
                             >
                               {step.id}
                             </div>
                             {index < steps.length - 1 && (
                               <div
-                                className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                                className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "step-connector-active" : "step-connector-inactive"
                                   }`}
                               />
                             )}

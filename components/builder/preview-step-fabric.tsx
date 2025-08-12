@@ -6,16 +6,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowLeft, ArrowRight, RefreshCw, MessageSquare, Sparkles, Download } from "lucide-react";
+import { Eye, ArrowLeft, RefreshCw, MessageSquare, Sparkles, Download } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 import { Canvas } from "fabric";
-import { createSlideCanvas, calculateOptimalScale, SLIDE_WIDTH_PX, SLIDE_HEIGHT_PX } from "@/lib/slide-to-fabric";
+import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
 import { SlideDefinition } from "@/lib/slide-types";
-import PptxGenJS from "pptxgenjs";
+// Load PptxGenJS UMD bundle at runtime via CDN to avoid bundling Node-only imports
+// We'll access it via the global `window.PptxGenJS` exposed by the minified browser build
+type PptxWindow = Window & { PptxGenJS?: unknown };
+interface PptxPresentation {
+  layout: string;
+  author: string;
+  title: string;
+  addSlide: () => unknown;
+  writeFile: (opts: { fileName: string }) => Promise<unknown>;
+}
+type PptxGenConstructor = new () => PptxPresentation;
+async function loadPptxGenJsUMD() {
+  if (typeof window === 'undefined') return null;
+  const w = window as PptxWindow;
+  if (w.PptxGenJS) return w.PptxGenJS;
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector('script[data-lib="pptxgenjs"]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load PptxGenJS')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.min.js';
+    script.async = true;
+    script.defer = true;
+    script.setAttribute('data-lib', 'pptxgenjs');
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load PptxGenJS'));
+    document.head.appendChild(script);
+  });
+  return (window as PptxWindow).PptxGenJS ?? null;
+}
 
 interface PreviewStepProps {
   slideData: SlideData;
-  updateSlideData: (updates: Partial<SlideData>) => void;
+  updateSlideData: (updates: Partial<SlideData & { slideJson?: SlideDefinition }>) => void;
   onNext: () => void;
   onPrev: () => void;
 }
@@ -25,7 +57,7 @@ interface ExtendedSlideData extends SlideData {
   slideJson?: SlideDefinition;
 }
 
-export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: PreviewStepProps) {
+export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -34,7 +66,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const extendedSlideData = slideData as ExtendedSlideData;
+  const extendedSlideData: ExtendedSlideData = slideData as ExtendedSlideData;
 
   // Build request body for slide generation API
   const buildRequestPayload = (overrideFeedback?: string) => {
@@ -74,7 +106,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       if (response.ok) {
         const data = await response.json();
         if (data?.success && data?.slideJson) {
-          updateSlideData({ slideJson: data.slideJson } as any);
+           updateSlideData({ slideJson: data.slideJson });
           return;
         }
       }
@@ -116,7 +148,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           }
         ]
       };
-      updateSlideData({ slideJson: sampleSlide } as any);
+      updateSlideData({ slideJson: sampleSlide });
     } catch (err) {
       console.error("Slide generation error:", err);
       // Create a basic slide as fallback
@@ -140,7 +172,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           }
         ]
       };
-      updateSlideData({ slideJson: fallbackSlide } as any);
+      updateSlideData({ slideJson: fallbackSlide });
     } finally {
       setIsGenerating(false);
     }
@@ -172,7 +204,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     if (!extendedSlideData.slideJson && slideData.description) {
       generateSlide();
     }
-  }, []);
+  }, [extendedSlideData.slideJson, slideData.description]);
 
   const regenerateWithFeedback = async () => {
     if (!feedback.trim()) return;
@@ -219,19 +251,26 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   };
 
   // Export to PowerPoint
-  const exportToPowerPoint = () => {
+  const exportToPowerPoint = async () => {
     if (!extendedSlideData.slideJson) return;
-    
+    const PptxGenJS = (await loadPptxGenJsUMD()) as unknown as PptxGenConstructor | null;
+    if (!PptxGenJS) return;
+
     const pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_16x9';
     pptx.author = 'SlideFlip';
     pptx.title = slideData.description || 'Presentation';
     
-    const slide = pptx.addSlide();
+    const slide = pptx.addSlide() as unknown as {
+      background?: { color?: string };
+      addText: (text: string, opts: Record<string, unknown>) => void;
+      addShape: (shape: string, opts: Record<string, unknown>) => void;
+    };
     
     // Set background
     if (extendedSlideData.slideJson.background?.color) {
-      slide.background = { color: extendedSlideData.slideJson.background.color };
+      const bgColor = extendedSlideData.slideJson.background.color;
+      slide.background = { color: typeof bgColor === 'string' ? bgColor : undefined };
     }
     
     // Add objects
@@ -270,7 +309,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       }
     });
     
-    pptx.writeFile({ fileName: 'slide-export.pptx' });
+    await pptx.writeFile({ fileName: 'slide-export.pptx' });
   };
 
   const canProceed = extendedSlideData.slideJson && !isGenerating && !isRegenerating;
@@ -372,7 +411,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
                 Provide Feedback
               </CardTitle>
               <CardDescription>
-                Tell us what you'd like to change or improve about the slide
+                Tell us what you&apos;d like to change or improve about the slide
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
