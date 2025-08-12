@@ -42,7 +42,7 @@ html, body {
     --border: 0 0% 92%;
     --input: 0 0% 97%;
     --ring: 0 0% 8%;
-    --radius: 9999px;
+    --radius: 0.375rem;
     
     /* Engineering-inspired accent colors - Subtle & Purposeful */
     --engineering-primary: 0 0% 8%;
@@ -74,7 +74,7 @@ html, body {
     --border: var(--charade);
     --input: var(--charade);
     --ring: 0 0% 92%;
-    --radius: 9999px;
+    --radius: 0.375rem;
 
     /* Monochrome accents */
     --engineering-primary: 0 0% 94%;
