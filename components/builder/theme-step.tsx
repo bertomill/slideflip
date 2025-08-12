@@ -124,18 +124,27 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [canvas, setCanvas] = useState<Canvas | null>(null);
+    const initializedRef = useRef(false);
     useEffect(() => {
       if (!containerRef.current || !canvasRef.current) return;
       const containerWidth = containerRef.current.clientWidth;
       const containerHeight = containerRef.current.clientHeight || 300;
       const s = calculateOptimalScale(containerWidth, containerHeight);
-      if (!canvas) {
+      if (!initializedRef.current) {
         const c = createSlideCanvas(canvasRef.current, slide, s);
         setCanvas(c);
-      } else {
+        initializedRef.current = true;
+      } else if (canvas) {
         import('@/lib/slide-to-fabric').then(mod => mod.renderSlideOnCanvas(canvas, slide, s));
       }
-    }, [slide, canvas]);
+      return () => {
+        if (canvas) {
+          canvas.dispose();
+          setCanvas(null);
+          initializedRef.current = false;
+        }
+      };
+    }, [slide]);
     return (
       <div ref={containerRef} className="relative w-full aspect-[16/9] overflow-hidden rounded-t-lg bg-white">
         <div className="absolute inset-0 flex items-center justify-center">

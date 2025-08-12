@@ -20,18 +20,28 @@ function JsonPreview({ slide }: { slide: SlideDefinition }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const initializedRef = useRef(false);
   useEffect(() => {
     if (!containerRef.current || !canvasRef.current) return;
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight || 360;
     const s = calculateOptimalScale(width, height);
-    if (!canvas) {
+    if (!initializedRef.current) {
       const c = createSlideCanvas(canvasRef.current, slide, s);
       setCanvas(c);
-    } else {
+      initializedRef.current = true;
+    } else if (canvas) {
       import("@/lib/slide-to-fabric").then((m) => m.renderSlideOnCanvas(canvas, slide, s));
     }
-  }, [slide, canvas]);
+    return () => {
+      // Dispose on unmount to avoid "already initialized" errors in dev/StrictMode
+      if (canvas) {
+        canvas.dispose();
+        setCanvas(null);
+        initializedRef.current = false;
+      }
+    };
+  }, [slide]);
   return (
     <div ref={containerRef} className="relative w-full aspect-[16/9] bg-white rounded-md">
       <div className="absolute inset-0 flex items-center justify-center">
