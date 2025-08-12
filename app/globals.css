@@ -242,7 +242,8 @@ html, body {
     background-image:
       radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.08) 1px, transparent 1px),
       radial-gradient(circle at 0.5px 0.5px, hsl(var(--muted-foreground) / 0.06) 0.5px, transparent 0.5px);
-    background-size: 12px 12px, 16px 16px;
+    /* Increase spacing for a more dispersed dot pattern */
+    background-size: 18px 18px, 26px 26px;
   }
 
   /* Ensure dark mode maintains appropriate contrast for the builder background */

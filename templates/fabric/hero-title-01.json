@@ -1,0 +1,55 @@
+{
+  "id": "hero-title-01",
+  "title": "Hero Title",
+  "background": { "color": "0F172A" },
+  "objects": [
+    {
+      "type": "shape",
+      "shape": "roundRect",
+      "options": { "x": 0, "y": 0, "w": 10, "h": 0.6, "fill": { "color": "111827" } }
+    },
+    {
+      "type": "shape",
+      "shape": "roundRect",
+      "options": { "x": 0.5, "y": 0.9, "w": 9, "h": 4.2, "fill": { "color": "111827" }, "rectRadius": 0.15 }
+    },
+    {
+      "type": "shape",
+      "shape": "roundRect",
+      "options": { "x": 0.6, "y": 1.0, "w": 8.8, "h": 4.0, "fill": { "color": "0B1220" }, "rectRadius": 0.15 }
+    },
+    {
+      "type": "text",
+      "text": "Your Presentation Title",
+      "options": { "x": 0.9, "y": 1.2, "w": 8.2, "h": 1.2, "fontSize": 44, "fontFace": "Segoe UI", "bold": true, "color": "FFFFFF", "align": "left", "valign": "middle" }
+    },
+    {
+      "type": "text",
+      "text": "Subtitle or tagline goes here",
+      "options": { "x": 0.9, "y": 2.2, "w": 8.2, "h": 0.7, "fontSize": 22, "fontFace": "Segoe UI", "color": "93C5FD", "align": "left" }
+    },
+    {
+      "type": "shape",
+      "shape": "rect",
+      "options": { "x": 0.9, "y": 3.2, "w": 2.3, "h": 0.8, "fill": { "color": "1E293B" }, "rectRadius": 0.1 }
+    },
+    {
+      "type": "text",
+      "text": "Get Started",
+      "options": { "x": 1.05, "y": 3.28, "w": 2.0, "h": 0.65, "fontSize": 18, "fontFace": "Segoe UI", "bold": true, "color": "FFFFFF", "align": "center", "valign": "middle" }
+    },
+    {
+      "type": "shape",
+      "shape": "ellipse",
+      "options": { "x": 7.6, "y": 3.2, "w": 1.8, "h": 1.8, "fill": { "color": "1D4ED8", "transparency": 0.1 } }
+    },
+    {
+      "type": "shape",
+      "shape": "ellipse",
+      "options": { "x": 8.1, "y": 3.5, "w": 1.5, "h": 1.5, "fill": { "color": "10B981", "transparency": 0.15 } }
+    }
+  ],
+  "notes": "Hero slide with layered dark cards, CTA button and decorative blobs"
+}
+
+

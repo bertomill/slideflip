@@ -300,6 +300,20 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
   - Added migration `009_update_slide_templates_for_fabric.sql` to add `slide_json JSONB` to `slide_templates`.
   - API `app/api/examples/list` now prefers `slide_templates` with `slide_json` and falls back to legacy HTML examples.
   - Template cards in `ThemeStep` can preview either HTML or Fabric JSON.
+  - Seed examples: `templates/fabric/hero-title-01.json`, `templates/fabric/three-column-kpis-01.json`.
+  - Upsert endpoint: `POST /api/templates/upsert-fabric` with body `{ id, name, description?, theme?, aspect_ratio?, tags? }` reads `templates/fabric/{id}.json` and stores it as `slide_json`.
+
+### Seeding Fabric templates
+
+```bash
+curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"hero-title-01","name":"Hero Title"}'
+
+curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"three-column-kpis-01","name":"Three Column KPIs"}'
+```
 
 ### Assets
 - `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).

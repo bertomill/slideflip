@@ -298,8 +298,8 @@ export function UploadStep({
 
       {/* Document Upload Section */}
       <Card variant="glass" className="card-contrast">
-        <CardHeader className="pb-3 sm:pb-6">
-          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-semibold tracking-tight">
+        <CardHeader className="p-3 sm:p-4">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-semibold tracking-tight">
             <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             Upload Your Documents
           </CardTitle>
@@ -307,10 +307,10 @@ export function UploadStep({
             Upload documents that contain the content you want to include in your slide
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 p-3 pt-0 sm:p-4 sm:pt-0">
           {/* Drag and Drop Area */}
           <div
-            className={`relative border-2 border-dashed rounded-lg p-8 sm:p-12 text-center cursor-pointer transition-all hover:bg-muted/50 ${
+            className={`relative border-2 border-dashed rounded-lg p-4 sm:p-6 text-center cursor-pointer transition-all hover:bg-muted/50 ${
               dragActive 
               ? "border-primary bg-primary/5" 
               : "border-muted-foreground/25 hover:border-primary/50"
@@ -322,7 +322,7 @@ export function UploadStep({
             onClick={() => document.getElementById('file-upload')?.click()}
           >
             <Upload className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-            <p className="text-lg sm:text-xl font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
+            <p className="text-base sm:text-lg font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
             <p className="text-sm sm:text-base text-muted-foreground">
               Supports PDF, DOCX, TXT, and more
             </p>
@@ -357,12 +357,12 @@ export function UploadStep({
 
           {/* Text Input Area */}
           {showTextInput && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
+            <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
               <Label htmlFor="paste-text">Paste your text content</Label>
               <textarea
                 id="paste-text"
                 placeholder="Paste your content here..."
-                className="w-full min-h-[150px] p-3 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full min-h-[100px] p-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
               />
@@ -430,15 +430,15 @@ export function UploadStep({
 
       {/* Slide Focus / Description Section */}
       <Card variant="glass">
-        <CardHeader className="pb-3 sm:pb-6">
-          <CardTitle className="text-lg sm:text-xl font-semibold tracking-tight">
+        <CardHeader className="p-3 sm:p-4">
+          <CardTitle className="text-base sm:text-lg font-semibold tracking-tight">
             Slide Focus
           </CardTitle>
           <CardDescription className="text-sm sm:text-base text-muted-foreground">
             What do you want the focus of the content on this slide to be?
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 p-3 sm:p-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="description">Slide Focus</Label>
@@ -469,7 +469,7 @@ export function UploadStep({
             <textarea
               id="description"
               placeholder="E.g., Focus on Q3 revenue growth, key wins, and next-quarter priorities for our product team..."
-              className="w-full min-h-[120px] p-3 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="w-full min-h-[80px] p-2 text-sm rounded-lg border border-input bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={slideData.description}
               onChange={(e) => updateSlideData({ description: e.target.value })}
               maxLength={500}
