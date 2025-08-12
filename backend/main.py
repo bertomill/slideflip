@@ -22,12 +22,11 @@ from src.services.file_service import FileService
 from src.services.slide_service import SlideService
 from src.services.kg_task_manager import KnowledgeGraphTaskManager
 from src.services.kg_processing import perform_final_clustering
-from src.api.kg_debug_endpoints import kg_debug_router, init_kg_debug_endpoints
 
 # Import routers
 from src.routers.root import router as root_router
 from src.routers.api import router as api_router
-from src.routers.debug import router as debug_router
+from src.routers.debug import router as debug_router, init_debug_endpoints
 from src.routers.websocket import websocket_endpoint
 
 # Configure logging
@@ -51,13 +50,15 @@ kg_task_manager = KnowledgeGraphTaskManager()
 websocket_manager = WebSocketManager()
 
 # Background task for cleaning up stale connections
+
+
 async def cleanup_stale_connections():
     """Periodically clean up stale WebSocket connections"""
     while True:
         try:
             await asyncio.sleep(30)  # Run every 30 seconds instead of 60
             await websocket_manager.cleanup_stale_connections()
-            
+
             # Log connection statistics
             stats = websocket_manager.get_connection_stats()
             if stats["total_connections"] > 0:
@@ -65,22 +66,27 @@ async def cleanup_stale_connections():
         except Exception as e:
             logger.error(f"Error in cleanup task: {e}")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("Starting SlideFlip Backend...")
-    
+
     # Create necessary directories
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.TEMP_DIR, exist_ok=True)
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
-    
+
+    # Initialize debug endpoints with required services
+    init_debug_endpoints(file_service, websocket_manager,
+                         kg_task_manager, slide_service)
+
     # Start background cleanup task
     cleanup_task = asyncio.create_task(cleanup_stale_connections())
-    
+
     logger.info("Backend started successfully")
     yield
-    
+
     # Graceful shutdown - wait for all knowledge graph tasks to complete
     logger.info("Waiting for knowledge graph tasks to complete...")
     try:
@@ -88,26 +94,27 @@ async def lifespan(app: FastAPI):
         for client_id in list(kg_task_manager.client_tasks.keys()):
             await kg_task_manager.wait_for_client_tasks(client_id)
             logger.info(f"Completed all tasks for client {client_id}")
-        
+
         # Perform final clustering for any clients that need it
         for client_id in list(kg_task_manager.client_kg_services.keys()):
             if await kg_task_manager.is_clustering_needed(client_id):
-                logger.info(f"Performing final clustering for client {client_id}")
+                logger.info(
+                    f"Performing final clustering for client {client_id}")
                 kg_service = kg_task_manager.client_kg_services[client_id]
                 await perform_final_clustering(client_id, kg_service, kg_task_manager)
                 await kg_task_manager.mark_clustering_completed(client_id)
-        
+
         logger.info("All knowledge graph tasks completed")
     except Exception as e:
         logger.error(f"Error during graceful shutdown: {e}")
-    
+
     # Cancel cleanup task
     cleanup_task.cancel()
     try:
         await cleanup_task
     except asyncio.CancelledError:
         pass
-    
+
     logger.info("Shutting down SlideFlip Backend...")
 
 # Create FastAPI app
@@ -127,18 +134,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize knowledge graph debug endpoints
-init_kg_debug_endpoints(kg_task_manager, file_service, slide_service)
-
 # Include all routers
 app.include_router(root_router)
 app.include_router(api_router)
 app.include_router(debug_router)
 
-# Include the knowledge graph debug router
-app.include_router(kg_debug_router)
-
 # WebSocket endpoint
+
+
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint_route(websocket: WebSocket, client_id: str):
     """WebSocket endpoint for real-time communication with frontend"""
@@ -151,4 +154,4 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
         log_level="info"
-    ) 
+    )
