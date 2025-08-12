@@ -18,8 +18,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import AutoTokenizer
 import hashlib
-from sentence_transformers import SentenceTransformer
-import torch
+import openai
 
 from src.models.message_models import FileInfo
 from src.core.config import Settings
@@ -55,10 +54,10 @@ class KnowledgeGraphService:
         # Embedding storage
         self.node_embeddings: Dict[str, np.ndarray] = {}
         self.edge_embeddings: Dict[Tuple[str, str], np.ndarray] = {}
-        self.embedding_model: Optional[SentenceTransformer] = None
+        self.openai_client: Optional[openai.OpenAI] = None
         
-        # Initialize embedding model
-        self._initialize_embedding_model()
+        # Initialize OpenAI client
+        self._initialize_openai_client()
     
     def _create_output_directories(self):
         """Create necessary output directories"""
@@ -698,7 +697,7 @@ class KnowledgeGraphService:
         logger.info(f"Clustered {len(entity_mapping)} entities into {len(unified_entities)} unified entities")
         
         # Generate embeddings for the clustered graph
-        if self.embedding_model:
+        if self.openai_client:
             logger.info("Generating embeddings for clustered graph...")
             # Temporarily set the graph to generate embeddings
             temp_graph = self.graph
@@ -1228,20 +1227,23 @@ class KnowledgeGraphService:
                 "completion_percentage": 0
             }
 
-    def _initialize_embedding_model(self):
-        """Initialize the sentence transformer model for generating embeddings"""
+    def _initialize_openai_client(self):
+        """Initialize the OpenAI client for generating embeddings"""
         try:
-            # Use a lightweight but effective model
-            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Embedding model initialized successfully")
+            if self.settings.OPENAI_API_KEY:
+                self.openai_client = openai.OpenAI(api_key=self.settings.OPENAI_API_KEY)
+                logger.info("OpenAI client initialized successfully")
+            else:
+                logger.warning("No OpenAI API key found. Embedding features will be disabled.")
+                self.openai_client = None
         except Exception as e:
-            logger.warning(f"Could not initialize embedding model: {e}")
+            logger.warning(f"Could not initialize OpenAI client: {e}")
             logger.info("Embedding features will be disabled")
-            self.embedding_model = None
+            self.openai_client = None
     
     def _generate_node_embedding(self, node_id: str, node_attrs: dict) -> Optional[np.ndarray]:
-        """Generate embedding for a node based on its attributes"""
-        if not self.embedding_model:
+        """Generate embedding for a node using OpenAI API"""
+        if not self.openai_client:
             return None
         
         try:
@@ -1259,11 +1261,18 @@ class KnowledgeGraphService:
             # Add description if available
             if 'description' in node_attrs:
                 text_parts.append(f"Description: {node_attrs['description']}")
+            
             # Combine all text parts
             node_text = " | ".join(text_parts)
             
-            # Generate embedding
-            embedding = self.embedding_model.encode(node_text, convert_to_tensor=False)
+            # Generate embedding using OpenAI API
+            response = self.openai_client.embeddings.create(
+                model="text-embedding-3-small",
+                input=node_text
+            )
+            
+            # Extract embedding from response
+            embedding = np.array(response.data[0].embedding)
             return embedding
             
         except Exception as e:
@@ -1271,8 +1280,8 @@ class KnowledgeGraphService:
             return None
     
     def _generate_edge_embedding(self, source: str, target: str, edge_attrs: dict) -> Optional[np.ndarray]:
-        """Generate embedding for an edge based on its attributes"""
-        if not self.embedding_model:
+        """Generate embedding for an edge using OpenAI API"""
+        if not self.openai_client:
             return None
         
         try:
@@ -1283,11 +1292,21 @@ class KnowledgeGraphService:
             edge_type = edge_attrs.get('edge_type', 'relationship')
             text_parts.append(f"Edge Type: {edge_type}")
             
+            # Add relationship type if available
+            if 'relationship_type' in edge_attrs:
+                text_parts.append(f"Relationship: {edge_attrs['relationship_type']}")
+            
             # Combine all text parts
             edge_text = " | ".join(text_parts)
             
-            # Generate embedding
-            embedding = self.embedding_model.encode(edge_text, convert_to_tensor=False)
+            # Generate embedding using OpenAI API
+            response = self.openai_client.embeddings.create(
+                model="text-embedding-3-small",
+                input=edge_text
+            )
+            
+            # Extract embedding from response
+            embedding = np.array(response.data[0].embedding)
             return embedding
             
         except Exception as e:
@@ -1296,9 +1315,9 @@ class KnowledgeGraphService:
     
     def generate_graph_embeddings(self) -> Dict[str, Any]:
         """Generate embeddings for all nodes and edges in the current graph"""
-        if not self.graph or not self.embedding_model:
-            logger.warning("No graph available or embedding model not initialized")
-            return {"error": "No graph available or embedding model not initialized"}
+        if not self.graph or not self.openai_client:
+            logger.warning("No graph available or OpenAI client not initialized")
+            return {"error": "No graph available or OpenAI client not initialized"}
         
         try:
             logger.info("Generating embeddings for graph nodes and edges...")
@@ -1343,7 +1362,7 @@ class KnowledgeGraphService:
     
     def get_similar_nodes(self, node_id: str, top_k: int = 5) -> List[Tuple[str, float]]:
         """Find nodes similar to the given node based on embedding similarity"""
-        if not self.embedding_model or node_id not in self.node_embeddings:
+        if not self.openai_client or node_id not in self.node_embeddings:
             return []
         
         try:
@@ -1368,7 +1387,7 @@ class KnowledgeGraphService:
     
     def get_similar_edges(self, source: str, target: str, top_k: int = 5) -> List[Tuple[Tuple[str, str], float]]:
         """Find edges similar to the given edge based on embedding similarity"""
-        if not self.embedding_model or (source, target) not in self.edge_embeddings:
+        if not self.openai_client or (source, target) not in self.edge_embeddings:
             return []
         
         try:
@@ -1397,7 +1416,7 @@ class KnowledgeGraphService:
             "node_embeddings": {},
             "edge_embeddings": {},
             "metadata": {
-                "embedding_model": "all-MiniLM-L6-v2",
+                "embedding_model": "text-embedding-3-small",
                 "embedding_dimension": None,
                 "total_nodes": len(self.node_embeddings),
                 "total_edges": len(self.edge_embeddings),
@@ -1559,7 +1578,8 @@ class KnowledgeGraphService:
         """Get statistics about the current embeddings"""
         try:
             stats = {
-                "embedding_model_available": self.embedding_model is not None,
+                "embedding_model_available": self.openai_client is not None,
+                "embedding_model": "text-embedding-3-small" if self.openai_client else "none",
                 "node_embeddings_count": len(self.node_embeddings),
                 "edge_embeddings_count": len(self.edge_embeddings),
                 "total_nodes_in_graph": len(self.graph.nodes) if self.graph else 0,
