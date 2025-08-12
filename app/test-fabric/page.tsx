@@ -71,10 +71,11 @@ export default function TestFabricTemplates() {
   const current = examples[active];
 
   const load = async () => {
-    const res = await fetch("/api/examples/list");
+    const res = await fetch("/api/examples/list", { cache: "no-store" });
     const data = await res.json();
     setExamples(data.examples || []);
     setActive(0);
+    console.log("examples:", data.examples);
   };
 
   useEffect(() => {

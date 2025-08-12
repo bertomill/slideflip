@@ -148,6 +148,8 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
   // Predefined color palettes for curated examples
   const curatedPalettes: Record<string, string[]> = {
     'imported-02': ['#980000', '#111111', '#333333', '#b3b3b3', '#ffffff'],
+    'Hero Title': ['#0B1220', '#1D4ED8', '#10B981', '#FFFFFF', '#111827'],
+    'Three Column KPIs': ['#1F2937', '#3B82F6', '#10B981', '#F59E0B', '#6B7280'],
   };
 
   // Function to apply a predefined palette

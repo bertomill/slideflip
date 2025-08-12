@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest) {
     // Prefer new slide_templates with Fabric-compatible JSON. Fallback to legacy table if empty.
     const { data: modern, error: modernError } = await supabase
       .from('slide_templates')
-      .select('id,name,tags,aspect_ratio,slide_json,description,created_at')
+      .select('id,name,tags,aspect_ratio,slide_json,html_content,description,created_at')
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(24);
@@ -27,9 +27,9 @@ export async function GET(_req: NextRequest) {
         theme: 'Curated',
         description: (row.description as string) || 'Curated Fabric template',
         aspect_ratio: (row.aspect_ratio as string) || '16:9',
-        // expose as html empty; we’ll rely on slide_json on the client
-        html: '',
-        slide_json: row.slide_json ?? null,
+        // Provide fallback HTML if present in slide_templates.html_content
+        html: (row as any).html_content || '',
+        slide_json: (row as any).slide_json ?? null,
         tags: (row.tags as string[]) || [],
       }));
       return NextResponse.json({ examples });
