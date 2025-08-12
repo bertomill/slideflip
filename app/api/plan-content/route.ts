@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
         // These inputs come from the slide builder workflow and determine plan structure
         const body = await request.json();
         const { description, selectedTheme, hasResearch, researchData, documentCount, flow_id } = body;
-        // Log request event (optional)
+        // Flow logging to Supabase:
+        // - Inserts an event row into `flow_events` marking that a content plan was requested
+        //   step: 'content', actor: 'user', event_type: 'plan_requested', payload: minimal context
         await logEvent({
             flowId: flow_id,
             step: 'content',
@@ -123,7 +125,8 @@ export async function POST(request: NextRequest) {
         // CLOSING SUMMARY: Reinforce the plan's alignment with user preferences
         contentPlan += `The slide will be optimized for ${selectedTheme || 'professional'} presentation style and designed to effectively communicate your message.`;
 
-        // Persist the plan artifact if flow_id provided
+        // Persist the plan artifact to Supabase:
+        // - Inserts a row into `flow_content_plans` capturing planning_context, ai_plan, and final_plan
         await saveContentPlan({
             flowId: flow_id,
             planningContext: { description, selectedTheme, hasResearch, researchData, documentCount },
@@ -131,6 +134,7 @@ export async function POST(request: NextRequest) {
             finalPlan: contentPlan
         });
 
+        // Log plan completion to `flow_events` with the generated size for debugging/analytics
         await logEvent({
             flowId: flow_id,
             step: 'content',

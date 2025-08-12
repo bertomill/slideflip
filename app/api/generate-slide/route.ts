@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getTemplatesForAI } from '@/lib/local-templates';
+import { logEvent, savePreview } from '@/lib/flow-logging';
 
 // ============================================================================
 // OPENAI CLIENT INITIALIZATION
@@ -29,6 +30,10 @@ const openai = new OpenAI({
  * @returns JSON response with generated slideHtml or error details
  */
 export async function POST(request: NextRequest) {
+  // Hoisted so we can log in catch
+  let flow_id: string | undefined;
+  let description: string | undefined;
+  let theme: string | undefined;
   try {
     // Extract slide generation parameters from request body
     // - description: User's description of what the slide should contain
@@ -37,7 +42,23 @@ export async function POST(request: NextRequest) {
     // - contentPlan: AI-generated content plan from content planning step
     // - userFeedback: User's additional requirements and modifications
     // - documents: Optional uploaded files for additional context
-    const { description, theme, researchData, contentPlan, userFeedback, documents } = await request.json();
+    const parsed = await request.json();
+    description = parsed.description;
+    theme = parsed.theme;
+    const researchData = parsed.researchData;
+    const contentPlan = parsed.contentPlan;
+    const userFeedback = parsed.userFeedback;
+    const documents = parsed.documents;
+    flow_id = parsed.flow_id;
+    // Flow logging to Supabase:
+    // - Record request intent in `flow_events`
+    await logEvent({
+      flowId: flow_id,
+      step: 'preview',
+      actor: 'user',
+      eventType: 'slide_generation_requested',
+      payload: { hasPlan: !!contentPlan, hasResearch: !!researchData }
+    });
 
     // Validate required parameters - description is mandatory for slide generation
     if (!description) {
@@ -275,6 +296,10 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
       console.log('Warning: Generated content may not be valid HTML');
     }
 
+    // Persist preview artifact to `flow_previews` and log completion event
+    await savePreview({ flowId: flow_id, requestPayload: { description, theme, hasPlan: !!contentPlan, hasResearch: !!researchData }, model: 'gpt-4', slideHtml, success: true });
+    await logEvent({ flowId: flow_id, step: 'preview', actor: 'ai', eventType: 'slide_generated', payload: { length: slideHtml.length } });
+
     // Return successful response with generated slide HTML
     return NextResponse.json({
       success: true,
@@ -285,6 +310,10 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
   } catch (error) {
     // Log error details for debugging and monitoring
     console.error('Slide generation error:', error);
+
+    // Persist failure in `flow_previews` and log failure event
+    await savePreview({ flowId: flow_id, requestPayload: {}, model: 'gpt-4', slideHtml: null, success: false });
+    await logEvent({ flowId: flow_id, step: 'preview', actor: 'system', eventType: 'slide_generation_failed', payload: { message: error instanceof Error ? error.message : 'unknown' } });
 
     // Return user-friendly error response with details for troubleshooting
     return NextResponse.json(

@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
     reqDescription = parsed.description as string | undefined;
     reqOptions = parsed.options as any | undefined;
 
+    // Flow logging to Supabase:
+    // - Inserts an event row into `flow_events` for the research request
     await logEvent({
       flowId: flow_id,
       step: 'research',
@@ -113,7 +115,9 @@ export async function POST(request: NextRequest) {
 
     // SEARCH RESULT PROCESSING: Handle empty or insufficient search results gracefully
     if (!data.results || data.results.length === 0) {
+      // Persist no-result research run to `flow_research_runs`
       await saveResearchRun({ flowId: flow_id, query: reqQuery as string, options: searchOptions, result: null, sources: [], answer: data.answer || null, status: 'no_results', durationMs });
+      // Log completion event to `flow_events`
       await logEvent({ flowId: flow_id, step: 'research', actor: 'ai', eventType: 'research_completed', payload: { status: 'no_results' } });
       return NextResponse.json({
         success: true,
@@ -174,6 +178,7 @@ Key Takeaways:
 • Focus areas: industry trends, best practices, supporting data
 • Research confidence: ${Math.round(researchInsights.reduce((acc: number, r: { score: number }) => acc + r.score, 0) / researchInsights.length * 100)}%`;
 
+    // Persist successful research run to `flow_research_runs`, then log completion event
     await saveResearchRun({ flowId: flow_id, query: reqQuery as string, options: searchOptions, result: formattedResearch, sources: researchInsights, answer: data.answer || null, status: 'success', durationMs });
     await logEvent({ flowId: flow_id, step: 'research', actor: 'ai', eventType: 'research_completed', payload: { status: 'success', sources: researchInsights.length } });
 
@@ -191,6 +196,7 @@ Key Takeaways:
     const fallbackFlowId = flow_id;
     const fallbackQuery = typeof reqQuery === 'string' ? (reqQuery as string) : '';
     const fallbackOptions = reqOptions as any;
+    // Persist error outcome to `flow_research_runs`, then log failure event
     await saveResearchRun({ flowId: fallbackFlowId, query: fallbackQuery, options: fallbackOptions, result: null, sources: null, answer: null, status: 'error' });
     await logEvent({ flowId: fallbackFlowId, step: 'research', actor: 'system', eventType: 'research_failed', payload: { message: (error as Error)?.message ?? 'unknown' } });
     return NextResponse.json(
