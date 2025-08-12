@@ -322,6 +322,7 @@ curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
 - Visit `/test-fabric` to load all templates from `/api/examples/list` and preview them.
 - The page renders Fabric JSON on a canvas and shows the raw JSON for quick inspection.
  - Sidebar includes "My Templates" entry linking to `/templates`.
+ - New page: `/templates` lists templates from `slide_templates` with Fabric and HTML previews.
 
 ### Assets
 - `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).
