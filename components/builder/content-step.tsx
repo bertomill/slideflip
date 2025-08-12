@@ -1,12 +1,22 @@
 "use client";
 
 // React hooks for component state and lifecycle management
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import MarkdownWysiwyg from "@/components/markdown-wysiwyg";
 // UI components for building the content planning interface
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 // Lucide icons for visual elements and user interface
 import { ArrowLeft, ArrowRight, MessageSquare, Brain, FileText, Lightbulb, Edit3, CheckCircle, ChevronDown, ChevronRight, Eye, Save, X } from "lucide-react";
 // Type definitions from the main build page component
@@ -64,6 +74,10 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
   // UNUSED STATE: These variables are declared but not currently used in the component
   const [isEditingPlan, setIsEditingPlan] = useState(false);           // Edit mode toggle (reserved for future inline editing feature)
 
+  // DOCUMENT DIALOG STATE: Controls the documents modal and selected document view
+  const [isDocsDialogOpen, setIsDocsDialogOpen] = useState(false);
+  const [selectedDocIndex, setSelectedDocIndex] = useState<number | null>(null);
+
   // ============================================================================
   // CONTENT PLAN GENERATION: AI-powered analysis and planning
   // ============================================================================
@@ -110,7 +124,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
    * - Theme-appropriate styling recommendations
    * - User feedback solicitation for refinements
    */
-  const generateContentPlan = async () => {
+  const generateContentPlan = useCallback(async () => {
     // SET LOADING STATE: Show spinner and disable interactions during AI processing
     setIsGeneratingPlan(true);
 
@@ -118,12 +132,20 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
       // CONTEXT PREPARATION: Compile all user inputs for AI analysis
       // This comprehensive context ensures the AI has all necessary information
       // to create a relevant and personalized content plan
-      const planningContext = {
+  const planningContext: {
+    description: string;
+    selectedTheme: string | undefined;
+    hasResearch: boolean;
+    researchData: unknown;
+    documentCount: number;
+    model?: string;
+  } = {
         description: slideData.description,           // User's slide description and requirements
         selectedTheme: slideData.selectedTheme,       // Visual theme choice (Professional, Modern, etc.)
         hasResearch: slideData.wantsResearch,         // Boolean flag for research inclusion
         researchData: slideData.researchData,         // External research insights from Tavily API
         documentCount: slideData.documents.length,    // Number of uploaded files for context
+    model: (slideData as unknown as { selectedModel?: string }).selectedModel || undefined,
       };
 
       // API REQUEST: Send planning context to AI content planning service
@@ -132,7 +154,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
       const response = await fetch('/api/plan-content', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(planningContext),
       });
@@ -158,7 +180,23 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
       console.error('Content planning error:', error);
 
       // FALLBACK STRATEGY: Generate local plan to ensure workflow continuity
-      const fallbackPlan = generateFallbackPlan();
+      let fallbackPlan = `Based on your description: "${slideData.description}"\n\n`;
+      fallbackPlan += `I'm planning to create a slide with the following structure:\n\n`;
+      fallbackPlan += `📋 **Main Content:**\n`;
+      fallbackPlan += `• Title based on your description\n`;
+      fallbackPlan += `• Key points extracted from your uploaded documents\n`;
+      fallbackPlan += `• Supporting details and context\n\n`;
+      if (slideData.wantsResearch && slideData.researchData) {
+        fallbackPlan += `🔍 **Research Integration:**\n`;
+        fallbackPlan += `• Industry insights and trends\n`;
+        fallbackPlan += `• Supporting statistics and data\n`;
+        fallbackPlan += `• Best practice recommendations\n\n`;
+      }
+      fallbackPlan += `🎨 **Visual Design:**\n`;
+      fallbackPlan += `• ${slideData.selectedTheme} theme styling\n`;
+      fallbackPlan += `• Professional layout and typography\n`;
+      fallbackPlan += `• Balanced content hierarchy\n\n`;
+      fallbackPlan += `Is there anything you'd like me to add, remove, or modify?`;
       setContentPlan(fallbackPlan);                    // Set fallback as original
       setEditableContentPlan(fallbackPlan);            // Set fallback as editable
       setPlanGenerated(true);                          // Allow user to proceed
@@ -166,54 +204,9 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
       // CLEANUP: Always clear loading state regardless of success/failure
       setIsGeneratingPlan(false);
     }
-  };
+  }, [slideData]);
 
-  /**
-   * Generate fallback content plan when AI service is unavailable
-   * 
-   * FALLBACK STRATEGY:
-   * - Uses available slide data to create basic content structure
-   * - Ensures user workflow continues even when AI planning fails
-   * - Provides reasonable default recommendations based on user inputs
-   * - Maintains consistent format with AI-generated plans
-   * 
-   * CONTENT STRUCTURE:
-   * - Main content section based on user description
-   * - Research integration (if applicable)
-   * - Theme-appropriate visual design notes
-   * - User feedback solicitation
-   */
-  const generateFallbackPlan = (): string => {
-    // BUILD FALLBACK PLAN: Create structured content plan using available user data
-    // This ensures users can continue their workflow even when AI services are unavailable
-    let plan = `Based on your description: "${slideData.description}"\n\n`;
-    plan += `I'm planning to create a slide with the following structure:\n\n`;
-
-    // MAIN CONTENT SECTION: Core slide structure based on user inputs
-    plan += `📋 **Main Content:**\n`;
-    plan += `• Title based on your description\n`;
-    plan += `• Key points extracted from your uploaded documents\n`;
-    plan += `• Supporting details and context\n\n`;
-
-    // CONDITIONAL RESEARCH SECTION: Only include if user requested research
-    if (slideData.wantsResearch && slideData.researchData) {
-      plan += `🔍 **Research Integration:**\n`;
-      plan += `• Industry insights and trends\n`;
-      plan += `• Supporting statistics and data\n`;
-      plan += `• Best practice recommendations\n\n`;
-    }
-
-    // VISUAL DESIGN SECTION: Theme-appropriate styling recommendations
-    plan += `🎨 **Visual Design:**\n`;
-    plan += `• ${slideData.selectedTheme} theme styling\n`;
-    plan += `• Professional layout and typography\n`;
-    plan += `• Balanced content hierarchy\n\n`;
-
-    // USER FEEDBACK PROMPT: Encourage user input for plan refinement
-    plan += `Is there anything specific you'd like me to add, remove, or modify?`;
-
-    return plan;
-  };
+  // Fallback plan generator removed; logic is inlined in generateContentPlan error handler.
 
   /**
    * Handle user feedback submission and proceed to slide generation
@@ -272,9 +265,9 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
    */
   useEffect(() => {
     if (!planGenerated && !isGeneratingPlan) {
-      generateContentPlan();
+      void generateContentPlan();
     }
-  }, []);
+  }, [planGenerated, isGeneratingPlan, generateContentPlan]);
 
   // ============================================================================
   // NAVIGATION LOGIC: Control when user can proceed to next step
@@ -300,7 +293,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
             Content Planning
           </CardTitle>
           <CardDescription>
-            Let's review what will go on your slide and gather any additional input
+            Let&#39;s review what will go on your slide and gather any additional input
           </CardDescription>
         </CardHeader>
       </Card>
@@ -364,7 +357,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
                   Proposed Slide Content
                 </CardTitle>
                 <CardDescription>
-                  Here's what I'm planning to include on your slide based on all the information gathered
+                  Here&#39;s what I&#39;m planning to include on your slide based on all the information gathered
                 </CardDescription>
               </div>
               <Button
@@ -403,16 +396,24 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
             {/* Visual summary of data sources used in content planning */}
             {/* Helps users understand what information influenced the AI's recommendations */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              {/* DOCUMENTS SOURCE INDICATOR */}
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+              {/* DOCUMENTS SOURCE INDICATOR (clickable) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDocsDialogOpen(true);
+                  setSelectedDocIndex(0);
+                }}
+                className="flex w-full items-center gap-2 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors text-left"
+                aria-label="View uploaded documents"
+              >
                 <FileText className="h-4 w-4 text-primary" />
                 <div>
                   <div className="text-sm font-medium">Documents</div>
                   <div className="text-xs text-muted-foreground">
-                    {slideData.documents.length} file{slideData.documents.length !== 1 ? 's' : ''} uploaded
+                    {slideData.documents.length} file{slideData.documents.length !== 1 ? "s" : ""} uploaded
                   </div>
                 </div>
-              </div>
+              </button>
 
               {/* RESEARCH SOURCE INDICATOR */}
               <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
@@ -439,6 +440,86 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
           </CardContent>
         </Card>
       )}
+
+      {/* DOCUMENTS DIALOG: List uploaded docs and preview extracted text */}
+      <Dialog open={isDocsDialogOpen} onOpenChange={setIsDocsDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Uploaded Documents</DialogTitle>
+            <DialogDescription>
+              Click a document to preview the extracted text used in planning.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Two-column layout: list on the left, preview on the right */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Document list */}
+            <div className="sm:col-span-1 border rounded-lg overflow-hidden">
+              <div className="bg-muted/40 px-3 py-2 text-xs text-muted-foreground">Documents</div>
+              <div className="max-h-72 overflow-y-auto">
+                {(slideData.parsedDocuments && slideData.parsedDocuments.length > 0
+                  ? slideData.parsedDocuments
+                  : []).map((doc, idx) => (
+                  <button
+                    key={doc.filename}
+                    type="button"
+                    onClick={() => setSelectedDocIndex(idx)}
+                    className={`w-full px-3 py-2 text-left border-b last:border-b-0 hover:bg-muted/40 transition-colors ${
+                      selectedDocIndex === idx ? "bg-muted/30" : ""
+                    }`}
+                    aria-label={`View ${doc.filename}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-sm">{doc.filename}</div>
+                      <Badge variant={doc.success ? "default" : "destructive"} className="text-[10px]">
+                        {doc.success ? "Parsed" : "Failed"}
+                      </Badge>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {doc.content.length.toLocaleString()} chars
+                    </div>
+                  </button>
+                ))}
+
+                {/* Fallback list if no parsedDocuments yet */}
+                {(!slideData.parsedDocuments || slideData.parsedDocuments.length === 0) && (
+                  <div className="p-3 text-xs text-muted-foreground">
+                    Parsed content not available yet. {slideData.documents.length} file
+                    {slideData.documents.length !== 1 ? "s" : ""} uploaded.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Preview panel */}
+            <div className="sm:col-span-2 border rounded-lg p-3 min-h-48">
+              {slideData.parsedDocuments &&
+              slideData.parsedDocuments.length > 0 &&
+              selectedDocIndex !== null ? (
+                <div className="space-y-2 h-full">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium text-sm truncate">
+                      {slideData.parsedDocuments[selectedDocIndex].filename}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {slideData.parsedDocuments[selectedDocIndex].content.length.toLocaleString()} characters
+                    </div>
+                  </div>
+                  <div className="border rounded-md bg-muted/20 p-2 h-64 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed">
+                    {slideData.parsedDocuments[selectedDocIndex].success
+                      ? slideData.parsedDocuments[selectedDocIndex].content
+                      : "Failed to extract content from this document."}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">
+                  Select a document to preview its extracted text.
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ========================================================================
           DOCUMENT PREVIEW SECTION: Show parsed document content for transparency
@@ -469,7 +550,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
               Your Input
             </CardTitle>
             <CardDescription>
-              Is there anything you'd like to add, remove, or modify in the planned content?
+              Is there anything you&#39;d like to add, remove, or modify in the planned content?
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -484,7 +565,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
 
             {/* USAGE INSTRUCTIONS: Clarifies that feedback is optional */}
             <div className="text-xs text-muted-foreground">
-              Leave blank if you're satisfied with the proposed content plan above.
+              Leave blank if you&#39;re satisfied with the proposed content plan above.
             </div>
           </CardContent>
         </Card>
@@ -530,88 +611,50 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
  * - Uses consistent styling with the rest of the application
  */
 function FormattedContentPlan({ content }: { content: string }) {
-  // CONTENT PARSING: Convert plain text content plan into structured sections for better display
-  const parseContent = (text: string) => {
-    const lines = text.split('\n');
-    const sections: Array<{ type: 'text' | 'header' | 'list' | 'bold'; content: string; level?: number }> = [];
+  // MARKDOWN NORMALIZATION: Convert common unicode bullets to Markdown dashes
+  const normalizeMarkdownContent = (text: string) =>
+    text.replace(/^\s*[•]\s?/gm, "- ");
 
-    // PARSE EACH LINE: Identify content type and structure for appropriate rendering
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue; // Skip empty lines
-
-      // MARKDOWN HEADERS: Detect **bold text** as secondary headers
-      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
-        sections.push({
-          type: 'header',
-          content: trimmed.slice(2, -2), // Remove ** markers
-          level: 2
-        });
-      }
-      // BULLET POINTS: Detect various bullet point formats (•, -, *)
-      else if (trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*')) {
-        sections.push({
-          type: 'list',
-          content: trimmed.substring(1).trim() // Remove bullet character
-        });
-      }
-      // EMOJI HEADERS: Detect lines starting with emojis as primary section headers
-      // Matches common presentation emojis used in AI-generated content plans
-      else if (/^[📋🔍🎨💡📊🚀✨🎯📈🔧⚡🌟💼🎪🎭🎨🎯📝💻🔥⭐🎊🎉]\s/.test(trimmed)) {
-        sections.push({
-          type: 'header',
-          content: trimmed,
-          level: 1 // Primary header level for emoji sections
-        });
-      }
-      // REGULAR TEXT: Default case for paragraph content
-      else {
-        sections.push({
-          type: 'text',
-          content: trimmed
-        });
-      }
-    }
-
-    return sections;
-  };
-
-  // PARSE CONTENT: Convert raw text into structured sections for rendering
-  const sections = parseContent(content);
+  const normalized = normalizeMarkdownContent(content || "");
 
   return (
-    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
-      {sections.map((section, index) => {
-        switch (section.type) {
-          case 'header':
-            return (
-              <div
-                key={index}
-                className={`font-semibold ${section.level === 1
-                  ? 'text-base text-primary mb-2'
-                  : 'text-sm text-foreground mt-4 mb-1'
-                  }`}
-              >
-                {section.content}
-              </div>
-            );
-          case 'list':
-            return (
-              <div key={index} className="flex items-start gap-2 text-sm text-foreground ml-4">
-                <span className="text-primary mt-1">•</span>
-                <span className="leading-relaxed">{section.content}</span>
-              </div>
-            );
-          case 'text':
-            return (
-              <div key={index} className="text-sm text-foreground leading-relaxed">
-                {section.content}
-              </div>
-            );
-          default:
-            return null;
-        }
-      })}
+    <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm as unknown as never]}
+        components={{
+          h1: ({ ...props }: Record<string, unknown>) => (
+            <h1 className="text-lg font-semibold text-primary mb-2" {...props} />
+          ),
+          h2: ({ ...props }: Record<string, unknown>) => (
+            <h2 className="text-base font-semibold text-foreground mt-4 mb-1" {...props} />
+          ),
+          h3: ({ ...props }: Record<string, unknown>) => (
+            <h3 className="text-sm font-semibold text-foreground mt-3 mb-1" {...props} />
+          ),
+          p: ({ ...props }: Record<string, unknown>) => (
+            <p className="text-sm text-foreground leading-relaxed" {...props} />
+          ),
+          li: ({ ...props }: Record<string, unknown>) => (
+            <li className="ml-5 list-disc text-sm leading-relaxed" {...props} />
+          ),
+          ul: ({ ...props }: Record<string, unknown>) => (
+            <ul className="space-y-1" {...props} />
+          ),
+          ol: ({ ...props }: Record<string, unknown>) => (
+            <ol className="space-y-1 list-decimal ml-5" {...props} />
+          ),
+          code: ({ className, children, ...props }: { className?: string; children?: React.ReactNode }) => (
+            <code
+              className={`rounded bg-muted px-1.5 py-0.5 text-xs ${className || ""}`}
+              {...props}
+            >
+              {children}
+            </code>
+          ),
+        }}
+      >
+        {normalized}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -636,21 +679,14 @@ function EditableContentPlan({
 }) {
   return (
     <div className="space-y-3">
-      <Textarea
-        value={content}
-        onChange={(e) => onChange(e.target.value)}
-        className="min-h-[300px] p-4 text-sm leading-relaxed resize-none bg-primary/5 border-primary/20"
-        placeholder="Edit your content plan here..."
-      />
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-muted-foreground">
-          Use ** for headers, • for bullet points. Changes will be applied to your slide generation.
-        </div>
-        <Button
-          onClick={onSave}
-          size="sm"
-          className="flex items-center gap-2"
-        >
+      <div className="text-xs text-muted-foreground">
+        Edit using a formatted Markdown editor. Supports headings, lists, bold/italics, tables (GFM), and more.
+      </div>
+
+      <MarkdownWysiwyg value={content} onChange={onChange} height="360px" />
+
+      <div className="flex items-center justify-end">
+        <Button onClick={onSave} size="sm" className="flex items-center gap-2">
           <Save className="h-4 w-4" />
           Save Changes
         </Button>

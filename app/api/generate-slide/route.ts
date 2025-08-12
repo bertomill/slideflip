@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
   let flow_id: string | undefined;
   let description: string | undefined;
   let theme: string | undefined;
+  let requestedModel: string | undefined;
   try {
     // Extract slide generation parameters from request body
     // - description: User's description of what the slide should contain
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const userFeedback = parsed.userFeedback;
     const documents = parsed.documents;
     flow_id = parsed.flow_id;
+    requestedModel = parsed.model;
     // Flow logging to Supabase:
     // - Record request intent in `flow_events`
     await logEvent({
@@ -243,7 +245,7 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
     // Make API call to OpenAI GPT-4 for slide generation
     // Using specific model, temperature, and token limits for optimal results
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: requestedModel || "gpt-4",
       messages: [
         {
           role: "system",
@@ -297,7 +299,7 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
     }
 
     // Persist preview artifact to `flow_previews` and log completion event
-    await savePreview({ flowId: flow_id, requestPayload: { description, theme, hasPlan: !!contentPlan, hasResearch: !!researchData }, model: 'gpt-4', slideHtml, success: true });
+    await savePreview({ flowId: flow_id, requestPayload: { description, theme, hasPlan: !!contentPlan, hasResearch: !!researchData }, model: requestedModel || 'gpt-4', slideHtml, success: true });
     await logEvent({ flowId: flow_id, step: 'preview', actor: 'ai', eventType: 'slide_generated', payload: { length: slideHtml.length } });
 
     // Return successful response with generated slide HTML
@@ -312,7 +314,7 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
     console.error('Slide generation error:', error);
 
     // Persist failure in `flow_previews` and log failure event
-    await savePreview({ flowId: flow_id, requestPayload: {}, model: 'gpt-4', slideHtml: null, success: false });
+    await savePreview({ flowId: flow_id, requestPayload: {}, model: requestedModel || 'gpt-4', slideHtml: null, success: false });
     await logEvent({ flowId: flow_id, step: 'preview', actor: 'system', eventType: 'slide_generation_failed', payload: { message: error instanceof Error ? error.message : 'unknown' } });
 
     // Return user-friendly error response with details for troubleshooting

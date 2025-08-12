@@ -17,6 +17,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
 import type { SlideDefinition } from "@/lib/slide-types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Props interface for ThemeStep component
 interface ThemeStepProps {
@@ -38,6 +39,8 @@ type CuratedExample = {
 };
 
 export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeStepProps) {
+  type ModelAwareSlideData = SlideData & { selectedModel?: string };
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
   // State for managing examples and loading state
   const [examples, setExamples] = useState<CuratedExample[]>([]);
   const [loadingExamples, setLoadingExamples] = useState(false);
@@ -98,9 +101,11 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
   const canProceed = slideData.selectedTheme !== "";
 
   // Component for rendering slide preview with proper scaling
-  const SlidePreview = ({ html }: { html: string }) => {
+  const SlidePreview = ({ html, palette }: { html: string; palette?: string[] }) => {
     const ref = useRef<HTMLDivElement | null>(null);
     const [scale, setScale] = useState(0.6);
+    const [modifiedHtml, setModifiedHtml] = useState(html);
+    
     useEffect(() => {
       const update = () => {
         if (!ref.current) return;
@@ -112,39 +117,135 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
       window.addEventListener('resize', update);
       return () => window.removeEventListener('resize', update);
     }, []);
+    
+    useEffect(() => {
+      if (!palette || palette.length === 0) {
+        setModifiedHtml(html);
+        return;
+      }
+      
+      // Apply color palette to HTML
+      let updatedHtml = html;
+      
+      // Replace primary color (first color in palette)
+      if (palette[0]) {
+        updatedHtml = updatedHtml.replace(/#980000/gi, palette[0]);
+      }
+      
+      // Replace secondary colors
+      if (palette[1]) {
+        updatedHtml = updatedHtml.replace(/#111111/gi, palette[1]);
+      }
+      
+      if (palette[2]) {
+        updatedHtml = updatedHtml.replace(/#333333/gi, palette[2]);
+      }
+      
+      if (palette[3]) {
+        updatedHtml = updatedHtml.replace(/#b3b3b3/gi, palette[3]);
+      }
+      
+      if (palette[4]) {
+        updatedHtml = updatedHtml.replace(/#ffffff/gi, palette[4]);
+      }
+      
+      setModifiedHtml(updatedHtml);
+    }, [html, palette]);
+    
     return (
       <div ref={ref} className="relative w-full aspect-[16/9] overflow-hidden rounded-t-lg bg-white">
-        <div className="absolute left-0 top-0 origin-top-left" style={{ width: '960px', height: '540px', transform: `scale(${scale})` }} dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="absolute left-0 top-0 origin-top-left" style={{ width: '960px', height: '540px', transform: `scale(${scale})` }} dangerouslySetInnerHTML={{ __html: modifiedHtml }} />
       </div>
     );
   };
 
   // Component to preview a Fabric/PptxGen-compatible slide JSON
-  const SlidePreviewJSON = ({ slide }: { slide: SlideDefinition }) => {
+  const SlidePreviewJSON = ({ slide, palette }: { slide: SlideDefinition; palette?: string[] }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const [canvas, setCanvas] = useState<Canvas | null>(null);
-    const initializedRef = useRef(false);
+    const canvasInstanceRef = useRef<Canvas | null>(null);
+    const [modifiedSlide, setModifiedSlide] = useState(slide);
+    
+    useEffect(() => {
+      if (!palette || palette.length === 0) {
+        setModifiedSlide(slide);
+        return;
+      }
+      
+      // Deep clone the slide and apply the palette colors
+      const slideClone = JSON.parse(JSON.stringify(slide));
+      const defaultColors = ['#980000', '#111111', '#333333', '#b3b3b3', '#ffffff'];
+      
+      // Helper function to replace color in object
+      const replaceColor = (color: unknown) => {
+        if (!color) return color;
+        if (typeof color === 'string') {
+          const colorLower = color.toLowerCase();
+          for (let i = 0; i < defaultColors.length && i < palette.length; i++) {
+            if (colorLower === defaultColors[i].toLowerCase()) {
+              return palette[i];
+            }
+          }
+        }
+        return color;
+      };
+      
+      // Apply palette to slide objects
+      if (slideClone.objects) {
+        slideClone.objects.forEach((obj: { options?: { color?: unknown; fill?: { color?: unknown }; line?: { color?: unknown } } }) => {
+          if (obj.options) {
+            // Text color
+            if (obj.options.color) {
+              obj.options.color = replaceColor(obj.options.color);
+            }
+            // Shape fill color
+            if (obj.options.fill?.color) {
+              obj.options.fill.color = replaceColor(obj.options.fill.color);
+            }
+            // Shape line color
+            if (obj.options.line?.color) {
+              obj.options.line.color = replaceColor(obj.options.line.color);
+            }
+          }
+        });
+      }
+      
+      // Apply palette to background
+      if (slideClone.background?.color) {
+        slideClone.background.color = replaceColor(slideClone.background.color);
+      }
+      
+      setModifiedSlide(slideClone);
+    }, [slide, palette]);
+    
     useEffect(() => {
       if (!containerRef.current || !canvasRef.current) return;
-      const containerWidth = containerRef.current.clientWidth;
-      const containerHeight = containerRef.current.clientHeight || 300;
-      const s = calculateOptimalScale(containerWidth, containerHeight);
-      if (!initializedRef.current) {
-        const c = createSlideCanvas(canvasRef.current, slide, s);
-        setCanvas(c);
-        initializedRef.current = true;
-      } else if (canvas) {
-        import('@/lib/slide-to-fabric').then(mod => mod.renderSlideOnCanvas(canvas, slide, s));
-      }
+      
+      const renderCanvas = () => {
+        const containerWidth = containerRef.current!.clientWidth;
+        const containerHeight = containerRef.current!.clientHeight || 300;
+        const s = calculateOptimalScale(containerWidth, containerHeight);
+        
+        // Dispose of existing canvas
+        if (canvasInstanceRef.current) {
+          canvasInstanceRef.current.dispose();
+        }
+        
+        // Create new canvas
+        canvasInstanceRef.current = createSlideCanvas(canvasRef.current!, modifiedSlide, s);
+      };
+      
+      renderCanvas();
+      
+      // Cleanup function
       return () => {
-        if (canvas) {
-          canvas.dispose();
-          setCanvas(null);
-          initializedRef.current = false;
+        if (canvasInstanceRef.current) {
+          canvasInstanceRef.current.dispose();
+          canvasInstanceRef.current = null;
         }
       };
-    }, [slide]);
+    }, [modifiedSlide]);
+    
     return (
       <div ref={containerRef} className="relative w-full aspect-[16/9] overflow-hidden rounded-t-lg bg-white">
         <div className="absolute inset-0 flex items-center justify-center">
@@ -283,6 +384,24 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         <p className="text-sm text-muted-foreground">
           Select a slide template that matches your presentation style and industry
         </p>
+        {/* AI Model Toggle */}
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">AI Model</span>
+          <Select
+            value={modelAwareSlideData.selectedModel || "gpt-4"}
+            onValueChange={(value) =>
+              updateSlideData({ ...( {} as Partial<SlideData>), ...( { selectedModel: value } as Partial<SlideData>) })
+            }
+          >
+            <SelectTrigger className="w-[220px] h-8 rounded-full">
+              <SelectValue placeholder="Select model" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gpt-4">GPT-4 (current)</SelectItem>
+              <SelectItem value="gpt-5-2025-08-07">GPT-5 (2025-08-07)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Collapsible content sections using Accordion */}
@@ -310,9 +429,9 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                       onClick={() => updateSlideData({ selectedTheme: ex.id })}
                     >
                       {ex.slide_json ? (
-                        <SlidePreviewJSON slide={ex.slide_json} />
+                        <SlidePreviewJSON slide={ex.slide_json} palette={slideData.selectedPalette} />
                       ) : (
-                        <SlidePreview html={ex.html || ''} />
+                        <SlidePreview html={ex.html || ''} palette={slideData.selectedPalette} />
                       )}
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-2">

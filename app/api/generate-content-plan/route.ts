@@ -30,6 +30,7 @@ const openai = new OpenAI({
  */
 export async function POST(request: NextRequest) {
   const supabase = createClient();
+  let flowIdVar: string | undefined;
   
   try {
     // ========================================================================
@@ -43,8 +44,11 @@ export async function POST(request: NextRequest) {
       hasResearch,        // Whether research was conducted
       researchData,       // Research insights from Tavily
       documentCount,      // Number of uploaded documents
-      documentTypes       // Metadata about uploaded files
+      documentTypes,       // Metadata about uploaded files
+      model: requestedModel
     } = await request.json();
+
+    flowIdVar = flowId;
 
     // INPUT VALIDATION: Ensure we have minimum required information
     if (!description) {
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
     // PROMPT CONSTRUCTION: Build comprehensive planning prompt
     // ========================================================================
     
-    let prompt = `You are an expert presentation designer creating a detailed content plan for a professional slide. Analyze the provided information and create a structured plan that shows exactly what will appear on the final slide.
+    let prompt = `You are an expert powerpoint/google slides/canva presentation designer creating a detailed content plan for a professional slide. Analyze the provided information and create a structured plan that shows exactly what will appear on the final slide.
 
 USER'S SLIDE DESCRIPTION:
 ${description}
@@ -84,10 +88,10 @@ ${researchData}
     }
 
     // Add document context information
-    if (documentCount > 0) {
+    if (Array.isArray(documentTypes) && documentTypes.length > 0) {
       prompt += `DOCUMENT CONTEXT:
-- Number of uploaded documents: ${documentCount}
-- Document types: ${documentTypes?.map((doc: any) => `${doc.name} (${doc.type})`).join(', ') || 'Various files'}
+      - Number of uploaded documents: ${documentTypes.length}
+      - Document types: ${documentTypes.map((doc: { name: string; type?: string }) => `${doc.name}${doc.type ? ` (${doc.type})` : ''}`).join(', ')}
 
 `;
     }
@@ -100,16 +104,14 @@ Create a detailed, structured content plan that includes:
 1. SLIDE TITLE: A compelling, clear title that captures the main message
 2. SUBTITLE/KEY MESSAGE: Supporting text that reinforces the main point
 3. MAIN CONTENT SECTIONS: 
-   - Key bullet points (3-5 maximum for readability)
-   - Important statistics or data points to highlight
-   - Supporting information that reinforces the message
+   - Key points
+   - Important statistics or data points
+   - Supporting information
 4. VISUAL ELEMENTS: Describe what visual components will enhance the content
-5. CONTENT HIERARCHY: Show how information will be organized and prioritized
+5. CONTENT HIERARCHY: Show how information will be organized
 
 PLANNING GUIDELINES:
-- Focus on clarity and impact - what are the most important points?
 - Consider the ${selectedTheme || 'Professional'} theme in your content suggestions
-- Ensure content is appropriate for a single slide (not overwhelming)
 - Prioritize information that directly supports the user's description
 - If research data is available, identify the most relevant insights to include
 - Make the plan specific enough that someone could create the slide from it
@@ -124,19 +126,11 @@ SLIDE STRUCTURE:
 • Subtitle: [Supporting message]
 • Theme: ${selectedTheme || 'Professional'}
 
-MAIN CONTENT:
-• [Bullet point 1 - most important message]
-• [Bullet point 2 - supporting information]
-• [Bullet point 3 - additional context]
-• [Additional points as needed, max 5 total]
+MAIN CONTENT
 
-KEY STATISTICS/DATA:
-• [Specific number or percentage]: [What it represents]
-• [Additional metrics if available from research]
+KEY STATISTICS/DATA
 
-VISUAL ELEMENTS:
-• [Description of charts, graphics, or visual emphasis needed]
-• [Color scheme and styling notes based on theme]
+VISUAL ELEMENTS
 
 CONTENT SOURCES:
 • User description: [How it's being interpreted]
@@ -150,18 +144,18 @@ Make this plan detailed enough that the user can clearly see what their final sl
     // ========================================================================
     
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: requestedModel || "gpt-4",
       messages: [
         {
           role: "system",
-          content: "You are an expert presentation designer who creates detailed, structured content plans. You analyze user requirements and create comprehensive plans that clearly show what will appear on the final slide. You focus on clarity, impact, and professional presentation standards. You always provide specific, actionable content suggestions rather than vague descriptions."
+          content: "You are an expert powerpoint/google slides/canva presentation designer who creates detailed, structured content plans. You analyze user requirements and create comprehensive plans that clearly show what will appear on the final slide. You focus on clarity, impact, and professional presentation standards. You always provide specific, actionable content suggestions rather than vague descriptions."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 1500,  // Sufficient for detailed planning
+      max_tokens: 3000,  // Sufficient for detailed planning
       temperature: 0.7,  // Balanced creativity and consistency
     });
 
@@ -176,9 +170,10 @@ Make this plan detailed enough that the user can clearly see what their final sl
     // LOG PLANNING EVENT TO SUPABASE
     // ========================================================================
     
-    if (flowId) {
-      await supabase.from('flow_events').insert({
-        flow_id: flowId,
+    if (typeof flowIdVar === 'string' && flowIdVar) {
+      const sb = await supabase;
+      await sb.from('flow_events').insert({
+        flow_id: flowIdVar,
         step: 'content',
         actor: 'ai',
         event_type: 'content_plan_generated',
@@ -186,7 +181,7 @@ Make this plan detailed enough that the user can clearly see what their final sl
           contentPlan,
           theme: selectedTheme,
           hasResearch,
-          documentCount
+          documentCount: documentCount || 0
         }
       });
     }
@@ -215,9 +210,10 @@ Make this plan detailed enough that the user can clearly see what their final sl
     
     console.error('Content planning error:', error);
     
-    if (flowId) {
-      await supabase.from('flow_events').insert({
-        flow_id: flowId,
+    if (typeof flowIdVar === 'string' && flowIdVar) {
+      const sb = await supabase;
+      await sb.from('flow_events').insert({
+        flow_id: flowIdVar,
         step: 'content',
         actor: 'ai',
         event_type: 'content_plan_error',

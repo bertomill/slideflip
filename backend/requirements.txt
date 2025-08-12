@@ -18,3 +18,6 @@ networkx
 scikit-learn
 numpy
 tiktoken
+pdfminer.six
+python-docx
+pydantic-settings

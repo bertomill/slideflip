@@ -29,6 +29,8 @@ interface ResearchStepProps {
  * Provides customizable research options and handles the research API integration
  */
 export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendGenerateSlide }: ResearchStepProps) {
+  type ModelAwareSlideData = SlideData & { selectedModel?: string };
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
   // UI State Management: Track research process status
   const [isResearching, setIsResearching] = useState(false);        // Loading state during API call
   const [researchComplete, setResearchComplete] = useState(false);  // Success state after research completion
@@ -200,6 +202,22 @@ Your slide will be created using the uploaded documents and description provided
           <CardDescription>
             Would you like AI to conduct additional research to enhance your slide content?
           </CardDescription>
+          {/* Inline AI model toggle for convenience */}
+          <div className="mt-3 flex items-center gap-3">
+            <Label className="text-xs">AI Model</Label>
+            <Select
+              value={modelAwareSlideData.selectedModel || "gpt-4"}
+              onValueChange={(value) => updateSlideData({ selectedModel: value } as Partial<SlideData>)}
+            >
+              <SelectTrigger className="w-[220px] h-8 rounded-full">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gpt-4">GPT-4 (current)</SelectItem>
+                <SelectItem value="gpt-5-2025-08-07">GPT-5 (2025-08-07)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
       </Card>
 

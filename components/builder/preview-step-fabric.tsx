@@ -52,6 +52,8 @@ interface ExtendedSlideData extends SlideData {
   slideJson?: SlideDefinition;
 }
 
+type ModelAwareSlideData = SlideData & { selectedModel?: string };
+
 export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -62,6 +64,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const containerRef = useRef<HTMLDivElement>(null);
   
   const extendedSlideData: ExtendedSlideData = slideData as ExtendedSlideData;
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
 
   // Build request body for slide generation API
   const buildRequestPayload = (overrideFeedback?: string) => {
@@ -84,6 +87,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
       documents: simplifiedDocs,
       format: "json" // Request JSON format instead of HTML
+      , model: modelAwareSlideData.selectedModel || undefined
     };
   };
 

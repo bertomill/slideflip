@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
     const {
       currentPlan,      // The existing content plan to be refined
       userFeedback,     // User's specific feedback and requested changes
-      originalContext   // Original slide data for context preservation
+      originalContext,   // Original slide data for context preservation
+      model: requestedModel
     } = await request.json();
 
     // INPUT VALIDATION: Ensure we have required information for refinement
@@ -98,7 +99,7 @@ Provide the refined content plan that incorporates the user's feedback while mai
     // ========================================================================
     
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: requestedModel || "gpt-4",
       messages: [
         {
           role: "system",

@@ -68,15 +68,14 @@ export async function POST(request: NextRequest) {
                 if (file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
                     textContent = await file.text();
                 }
-                // PDF FILES: Placeholder for future PDF parsing implementation
-                // TODO: Integrate pdf-parse or similar library for actual PDF text extraction
+                // PDF FILES: Basic extraction via browser PDF text layer is not reliable.
+                // For now, store a short notice; backend WebSocket flow will perform server-side parsing.
                 else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-                    textContent = `[PDF Document: ${file.name}]\nPDF parsing not yet implemented. Please convert to text format or use the text paste feature.`;
+                    textContent = `[PDF Document: ${file.name}] Uploaded for server-side parsing.`;
                 }
-                // DOCX FILES: Placeholder for future Word document parsing
-                // TODO: Integrate mammoth.js or similar library for DOCX text extraction
+                // DOCX FILES: Client-side parsing is skipped; backend handles extraction.
                 else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')) {
-                    textContent = `[DOCX Document: ${file.name}]\nDOCX parsing not yet implemented. Please convert to text format or use the text paste feature.`;
+                    textContent = `[DOCX Document: ${file.name}] Uploaded for server-side parsing.`;
                 }
                 // FALLBACK HANDLING: Attempt text extraction for unknown file types
                 // Many file formats are actually text-based and can be read directly

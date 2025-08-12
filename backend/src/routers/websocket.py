@@ -513,10 +513,8 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 client_id
             )
 
-            # Extract content (text and images) for HTML files
-            content_info = None
-            if file_data.filename.lower().endswith(('.html', '.htm', '.txt', '.md')):
-                content_info = await file_service.extract_content_from_file(str(file_path))
+            # Extract content (text and images) for all supported files
+            content_info = await file_service.extract_content_from_file(str(file_path))
 
             # Store extracted content in slide service
             if client_id:
@@ -582,10 +580,8 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 client_id
             )
 
-            # Extract content (text and images) for HTML files
-            content_info = None
-            if file_data.filename.lower().endswith(('.html', '.htm', '.txt', '.md')):
-                content_info = await file_service.extract_content_from_file(str(file_path))
+            # Extract content (text and images) for all supported files
+            content_info = await file_service.extract_content_from_file(str(file_path))
 
             # Store extracted content in slide service
             if client_id:
@@ -646,10 +642,8 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
             client_id
         )
 
-        # Extract content (text and images) for HTML files
-        content_info = None
-        if file_data.filename.lower().endswith(('.html', '.htm', '.txt', '.md')):
-            content_info = await file_service.extract_content_from_file(str(file_path))
+        # Extract content (text and images) for all supported files
+        content_info = await file_service.extract_content_from_file(str(file_path))
 
         # Store extracted content in slide service
         if client_id:

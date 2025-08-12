@@ -450,34 +450,23 @@ export default function Build() {
         } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-80'
         }`}>
         {/* ====================================================================
-            TOP NAVIGATION: Branding and controls
+            MINIMAL HEADER: Just theme toggle and mobile menu
             ====================================================================
             - Mobile menu toggle for responsive navigation
-            - SlideFlip Builder branding with logo
             - Theme toggle for light/dark mode switching
+            - Company branding now handled by sidebar
             ==================================================================== */}
-        <Navigation variant="premium">
-          <NavigationBrand>
-            {/* Mobile menu toggle - only visible on small screens */}
-            <MobileMenuButton
-              isOpen={mobileMenuOpen}
-              onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="mr-2"
-            />
-            {/* App logo - simple geometric design */}
-            <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-              <div className="h-3 w-3 bg-background rounded-sm"></div>
-            </div>
-            {/* App name with responsive text sizing */}
-            <span className="font-semibold text-foreground text-sm sm:text-base">
-              Slideo Builder
-            </span>
-          </NavigationBrand>
-          {/* Right side controls */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
-          </div>
-        </Navigation>
+        <div className="flex justify-between items-center p-4">
+          {/* Mobile menu toggle - only visible on small screens */}
+          <MobileMenuButton
+            isOpen={mobileMenuOpen}
+            onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden"
+          />
+          <div className="hidden md:block" /> {/* Spacer for desktop */}
+          {/* Theme toggle */}
+          <ThemeToggle />
+        </div>
 
         {/* MAIN CONTAINER: Full-width container with responsive padding */}
         <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">

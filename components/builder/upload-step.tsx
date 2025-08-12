@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, FileText, X, ArrowRight, Type, Sparkles, Mic, Square } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 
@@ -54,6 +55,8 @@ export function UploadStep({
   sendSlideDescription,
   lastMessage
 }: UploadStepProps) {
+  type ModelAwareSlideData = SlideData & { selectedModel?: string };
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
   const [dragActive, setDragActive] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [showTextInput, setShowTextInput] = useState(false);
@@ -282,7 +285,7 @@ export function UploadStep({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto px-4">
       {/* Connection Status Indicator */}
       {connectionStatus && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
@@ -299,18 +302,18 @@ export function UploadStep({
       {/* Document Upload Section */}
       <Card variant="glass" className="card-contrast">
         <CardHeader className="p-3 sm:p-4">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-semibold tracking-tight">
-            <Upload className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-            Upload Your Documents
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <Upload className="h-5 w-5 text-primary" />
+            Upload Documents
           </CardTitle>
-          <CardDescription className="text-sm sm:text-base text-muted-foreground">
-            Upload documents that contain the content you want to include in your slide
+          <CardDescription className="text-sm text-muted-foreground">
+            Add content for your slide
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-3 pt-0 sm:p-4 sm:pt-0">
           {/* Drag and Drop Area */}
           <div
-            className={`relative border-2 border-dashed rounded-lg p-4 sm:p-6 text-center cursor-pointer transition-all hover:bg-muted/50 ${
+            className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all hover:bg-muted/50 ${
               dragActive 
               ? "border-primary bg-primary/5" 
               : "border-muted-foreground/25 hover:border-primary/50"
@@ -321,10 +324,10 @@ export function UploadStep({
             onDrop={handleDrop}
             onClick={() => document.getElementById('file-upload')?.click()}
           >
-            <Upload className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-            <p className="text-base sm:text-lg font-semibold tracking-tight mb-2">Drop files here or click to upload</p>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Supports PDF, DOCX, TXT, and more
+            <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-base font-medium mb-1">Drop files or click to upload</p>
+            <p className="text-sm text-muted-foreground">
+              PDF, DOCX, TXT
             </p>
             <input
               id="file-upload"
@@ -336,14 +339,6 @@ export function UploadStep({
             />
           </div>
 
-          {/* Divider */}
-          <div className="flex items-center gap-4">
-            <div className="flex-1 h-px bg-border"></div>
-            <span className="text-sm text-muted-foreground">or</span>
-            <div className="flex-1 h-px bg-border"></div>
-          </div>
-
-          {/* Paste Text Button */}
           <div className="text-center">
             <Button
               variant="outline"
@@ -351,7 +346,7 @@ export function UploadStep({
               className="gap-2"
             >
               <Type className="h-4 w-4" />
-              Paste Text Content
+              Paste Text
             </Button>
           </div>
 
@@ -439,6 +434,22 @@ export function UploadStep({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-3 sm:p-4">
+          {/* Global AI Model selection (available early) */}
+          <div className="flex items-center gap-3">
+            <Label className="min-w-[80px]">AI Model</Label>
+            <Select
+              value={modelAwareSlideData.selectedModel || "gpt-4"}
+              onValueChange={(value) => updateSlideData({ selectedModel: value } as Partial<SlideData>)}
+            >
+              <SelectTrigger className="w-[220px] h-8 rounded-full">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gpt-4">GPT-4 (current)</SelectItem>
+                <SelectItem value="gpt-5-2025-08-07">GPT-5 (2025-08-07)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="description">Slide Focus</Label>

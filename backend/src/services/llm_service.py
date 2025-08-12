@@ -29,8 +29,8 @@ class LLMService:
             else:
                 logger.warning("OpenAI API key not found. LLM features will be disabled.")
                 logger.info("Please check:")
-                logger.info("1. .env.local file exists in backend directory")
-                logger.info("2. OPENAI_API_KEY is set in .env.local file")
+                logger.info("1. .env file exists in backend directory")
+                logger.info("2. OPENAI_API_KEY is set in .env file")
                 logger.info("3. File format: OPENAI_API_KEY=your_api_key_here")
                 self.client = None
         except Exception as e:

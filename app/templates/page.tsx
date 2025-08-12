@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Navigation, NavigationBrand } from "@/components/ui/navigation";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-import { Layers, Sun, Moon } from "lucide-react";
+import { Layers, Sun, Moon, Plus, Edit2 } from "lucide-react";
 import Link from "next/link";
 import type { SlideDefinition } from "@/lib/slide-types";
 import { Canvas } from "fabric";
@@ -169,39 +169,57 @@ export default function TemplatesPage() {
               <h1 className="text-3xl font-bold text-foreground">My Templates</h1>
               <p className="text-muted-foreground mt-2">Browse and manage your slide templates</p>
             </div>
-            <Link href="/test-fabric">
-              <Button variant="outline">
-                <Layers className="h-4 w-4 mr-2" />
-                Open Template Tester
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href="/template-editor">
+                <Button variant="default">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Template
+                </Button>
+              </Link>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mt-8">
             {templates.map((t) => (
-              <Card key={t.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg font-semibold truncate">{t.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>
+              <Card key={t.id} className="group hover:shadow-md transition-all duration-200 border-0 shadow-sm bg-card/50 backdrop-blur-sm">
+                <div className="p-0">
+                  {/* Image Preview on Top */}
+                  <div className="relative overflow-hidden rounded-t-lg">
+                    {t.slide_json ? (
+                      <FabricThumb slide={t.slide_json as SlideDefinition} />
+                    ) : t.html_content ? (
+                      <HtmlThumb html={t.html_content} />
+                    ) : (
+                      <div className="relative w-full bg-muted/30 flex items-center justify-center text-muted-foreground/50" style={{ paddingBottom: "56.25%" }}>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Layers className="h-8 w-8" />
+                        </div>
+                      </div>
+                    )}
+                    {/* Edit button overlay */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Link href={`/template-editor?id=${t.id}`}>
+                        <Button variant="secondary" size="sm" className="h-8 w-8 p-0 bg-background/80 backdrop-blur-sm border-0 shadow-sm hover:bg-background/90">
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      </Link>
                     </div>
-                    <Badge variant="secondary" className="ml-2">{t.theme}</Badge>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {t.slide_json ? (
-                    <FabricThumb slide={t.slide_json as SlideDefinition} />
-                  ) : t.html_content ? (
-                    <HtmlThumb html={t.html_content} />
-                  ) : (
-                    <div className="text-xs text-muted-foreground mb-3">No preview available</div>
-                  )}
-                  <div className="flex items-center justify-between mt-3 text-sm text-muted-foreground">
-                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
-                    <span>{t.slide_json ? "Fabric" : t.html_content ? "HTML" : "Empty"}</span>
+                  
+                  {/* Content Section */}
+                  <div className="p-3">
+                    <div className="flex items-start justify-between mb-1.5">
+                      <h3 className="font-medium text-foreground/90 text-xs truncate flex-1">{t.name}</h3>
+                      <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0.5 border-muted-foreground/20 text-muted-foreground/70 hidden sm:inline-flex">{t.theme}</Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/60 line-clamp-1 leading-tight mb-2">{t.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground/50">
+                        {new Date(t.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>

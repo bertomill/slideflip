@@ -234,22 +234,26 @@ html, body {
     border-width: 0.5px; /* hairline */
   }
 
-  /* Builder background: subtle pointillism (Supabase-like) with a welcoming dark tone
-     - Applies a dotted pattern over a slightly-lighter-than-black surface
+  /* Builder background: subtle pointillism (Supabase-like) responsive to theme
+     - Applies a dotted pattern over theme-appropriate surface
      - Use on containers that wrap the builder UI */
   .builder-background {
-    /* Slightly lighter than pitch black for a more welcoming feel */
-    background-color: hsl(220 10% 7%);
-    /* Pointillism pattern */
+    /* Light theme: clean white background */
+    background-color: hsl(var(--background));
+    /* Pointillism pattern with theme-aware dots */
     background-image:
-      radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.08) 1px, transparent 1px),
-      radial-gradient(circle at 0.5px 0.5px, hsl(var(--muted-foreground) / 0.06) 0.5px, transparent 0.5px);
+      radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.12) 1px, transparent 1px),
+      radial-gradient(circle at 0.5px 0.5px, hsl(var(--muted-foreground) / 0.08) 0.5px, transparent 0.5px);
     /* Increase spacing for a more dispersed dot pattern */
     background-size: 18px 18px, 26px 26px;
   }
 
-  /* Ensure dark mode maintains appropriate contrast for the builder background */
+  /* Dark theme: maintain the welcoming dark tone */
   .dark .builder-background {
     background-color: hsl(220 10% 7%);
+    /* Adjust dot opacity for dark theme */
+    background-image:
+      radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.08) 1px, transparent 1px),
+      radial-gradient(circle at 0.5px 0.5px, hsl(var(--muted-foreground) / 0.06) 0.5px, transparent 0.5px);
   }
 }

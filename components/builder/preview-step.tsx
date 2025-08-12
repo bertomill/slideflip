@@ -17,6 +17,8 @@ interface PreviewStepProps {
 }
 
 export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: PreviewStepProps) {
+  type ModelAwareSlideData = SlideData & { selectedModel?: string };
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -55,6 +57,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       contentPlan: slideData.contentPlan,
       userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
       documents: simplifiedDocs,
+      model: modelAwareSlideData.selectedModel || undefined,
     };
   };
 

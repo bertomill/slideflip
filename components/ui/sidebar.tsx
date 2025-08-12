@@ -14,7 +14,12 @@ import {
   QrCode,
   ChevronLeft,
   ChevronRight,
-  Layers
+  Layers,
+  ChevronDown,
+  User,
+  UserPlus,
+  Plus,
+  Edit
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -37,6 +42,22 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
   ({ className, user, collapsed = false, onCollapsedChange, isOpen = false, onToggle, ...props }, ref) => {
     const router = useRouter();
+    const [showUserMenu, setShowUserMenu] = React.useState(false);
+    const userMenuRef = React.useRef<HTMLDivElement>(null);
+
+    // Close dropdown when clicking outside
+    React.useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+          setShowUserMenu(false);
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, []);
 
     const logout = async () => {
       const supabase = createClient();
@@ -105,10 +126,13 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
 
             {/* User Profile Section */}
             {user && (
-              <div className={cn("border-b border-border", collapsed ? "p-3" : "p-6")}>
+              <div className="border-b border-border relative" ref={userMenuRef}>
                 {collapsed ? (
-                  <div className="flex justify-center">
-                    <div className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-primary">
+                  <div className="p-3 flex justify-center">
+                    <button
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-primary hover:opacity-80 transition-opacity"
+                    >
                       {user.user_metadata?.avatar_url ? (
                         <img
                           src={user.user_metadata.avatar_url}
@@ -120,40 +144,104 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                           {getInitials(user.email, user.user_metadata?.full_name)}
                         </div>
                       )}
-                    </div>
+                    </button>
                   </div>
                 ) : (
-                  <Card variant="glass">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary">
-                          {user.user_metadata?.avatar_url ? (
-                            <img
-                              src={user.user_metadata.avatar_url}
-                              alt={user.user_metadata?.full_name || user.email || ""}
-                              className="aspect-square h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
-                              {getInitials(user.email, user.user_metadata?.full_name)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {user.user_metadata?.full_name || "User"}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {user.email}
-                          </p>
-                          <Badge variant="secondary" className="mt-1 text-xs">
-                            <Crown className="h-3 w-3 mr-1" />
-                            Premium
-                          </Badge>
-                        </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="flex-1 px-6 py-4 flex items-center gap-3 hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="relative flex h-6 w-6 shrink-0 overflow-hidden rounded-full bg-primary">
+                        {user.user_metadata?.avatar_url ? (
+                          <img
+                            src={user.user_metadata.avatar_url}
+                            alt={user.user_metadata?.full_name || user.email || ""}
+                            className="aspect-square h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                            {getInitials(user.email, user.user_metadata?.full_name)}
+                          </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-medium text-foreground">
+                          {user.user_metadata?.full_name ? `${user.user_metadata.full_name.split(' ')[0]}'s Workspace` : "My Workspace"}
+                        </p>
+                      </div>
+                      <ChevronDown className={cn(
+                        "h-4 w-4 text-muted-foreground transition-transform",
+                        showUserMenu && "rotate-180"
+                      )} />
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mr-4 h-8 w-8 p-0 hover:bg-accent"
+                      onClick={() => {
+                        router.push("/build");
+                        onToggle?.();
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* User Dropdown Menu */}
+                {showUserMenu && (
+                  <div className={cn(
+                    "absolute z-50 mt-1 bg-background border border-border rounded-md shadow-lg min-w-48",
+                    collapsed ? "left-0" : "left-4 right-4"
+                  )}>
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          router.push("/build");
+                          setShowUserMenu(false);
+                          onToggle?.();
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        <Layers className="h-4 w-4 mr-3" />
+                        Build
+                      </button>
+                      <button
+                        onClick={() => {
+                          router.push("/settings");
+                          setShowUserMenu(false);
+                          onToggle?.();
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        <Settings className="h-4 w-4 mr-3" />
+                        Settings
+                      </button>
+                      <button
+                        onClick={() => {
+                          router.push("/profile");
+                          setShowUserMenu(false);
+                          onToggle?.();
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        <User className="h-4 w-4 mr-3" />
+                        Profile
+                      </button>
+                      <div className="border-t border-border my-1" />
+                      <button
+                        onClick={() => {
+                          logout();
+                          setShowUserMenu(false);
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      >
+                        <LogOut className="h-4 w-4 mr-3" />
+                        Sign out
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -214,39 +302,27 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                   <History className={cn("h-4 w-4", !collapsed && "mr-3")} />
                   {!collapsed && "Recent"}
                 </Button>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full text-left",
-                    collapsed ? "justify-center px-2" : "justify-start"
-                  )}
-                  onClick={() => {
-                    router.push("/settings");
-                    onToggle?.();
-                  }}
-                >
-                  <Settings className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                  {!collapsed && "Settings"}
-                </Button>
               </div>
             </nav>
 
-            {/* Bottom Actions */}
-            {user && (
-              <div className="p-4 border-t border-border">
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full text-left text-muted-foreground hover:text-foreground",
-                    collapsed ? "justify-center px-2" : "justify-start"
-                  )}
-                  onClick={logout}
-                >
-                  <LogOut className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                  {!collapsed && "Sign Out"}
-                </Button>
-              </div>
-            )}
+            {/* Invite Members */}
+            <div className="p-4 border-t border-border">
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full text-left text-muted-foreground hover:text-foreground",
+                  collapsed ? "justify-center px-2" : "justify-start"
+                )}
+                onClick={() => {
+                  // Add invite members functionality here
+                  console.log("Invite members clicked");
+                }}
+              >
+                <UserPlus className={cn("h-4 w-4", !collapsed && "mr-3")} />
+                {!collapsed && "Invite members"}
+              </Button>
+            </div>
+
           </div>
         </div>
       </>

@@ -73,15 +73,27 @@ cd slideflip
 # Install dependencies
 npm install
 
-# Set up environment variables
-cp .env.example .env.local
+# Set up environment variables (preferred)
+cp .env.example .env
 # Also copy for the backend runtime
-cp .env.example backend/.env.local
+cp .env.example backend/.env
 # Edit both files with your credentials and keys
 
 # Start development server
 npm run dev
 ```
+
+#### Markdown rendering in Content Planning
+
+The Content Planning step now renders the proposed plan using Markdown and uses a formatted WYSIWYG editor for changes (no raw Markdown or preview pane during editing).
+
+Install the required packages (already listed in `package.json`):
+
+```bash
+npm install react-markdown remark-gfm marked turndown
+```
+
+No additional configuration is required.
 
 ### 3. Backend Setup
 ```bash
@@ -97,6 +109,15 @@ pip install -r requirements.txt
 # Start backend server
 python main.py
 ```
+
+#### PDF and DOCX parsing
+
+The backend now supports server-side text extraction from PDF and DOCX uploads using `pdfminer.six` and `python-docx`.
+
+- Ensure you have the virtual environment activated (`source venv/bin/activate`).
+- Dependencies are included in `backend/requirements.txt` and are installed with the step above.
+- The WebSocket upload flow automatically extracts text for `.pdf` and `.docx` files via the backend.
+- The REST endpoint `POST /api/parse-documents` will mark PDFs/DOCX as “Uploaded for server-side parsing” and rely on the WebSocket pipeline for full extraction.
 
 ### 4. Access the Application
 - **Frontend**: http://localhost:3000
@@ -129,9 +150,9 @@ python main.py
 
 ### Environment Variables
 
-All variables are demonstrated in `.env.example` at the repo root. Copy it to `.env.local` (root) for the frontend and to `backend/.env.local` for the Python backend.
+All variables are demonstrated in `.env.example` at the repo root. Copy it to `.env` (root) for the frontend and to `backend/.env` for the Python backend.
 
-#### Root `.env.local` (Next.js / server routes)
+#### Root `.env` (Next.js / server routes)
 ```env
 # Supabase client (required)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -203,7 +224,7 @@ Troubleshooting
 - If logging in on localhost sends you to production, your localhost URL is likely missing from Supabase “Redirect URLs,” so Supabase falls back to the Site URL.
 - After changing Google or Supabase settings, wait 1–2 minutes, sign out, and retry. Clearing cookies for localhost and your prod domain can also help.
 
-#### Backend `backend/.env.local` (FastAPI)
+#### Backend `backend/.env` (FastAPI)
 ```env
 # Host/port and operational flags
 HOST=0.0.0.0

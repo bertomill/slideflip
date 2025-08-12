@@ -6,16 +6,23 @@ IMPORTANT FOR FRONTEND DEVELOPERS:
 - WebSocket connections use WEBSOCKET_PING_INTERVAL/TIMEOUT settings
 - File uploads are limited by MAX_FILE_SIZE (50MB) and ALLOWED_FILE_TYPES
 - Processing operations timeout after MAX_PROCESSING_TIME (5 minutes)
-- All environment variables should be set in .env file (not .env.local)
+- Environment variables are read from `.env.local` (if present) and then `.env`
 """
 
 import os
 from pathlib import Path
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings"""
+    # Load from .env.local first (developer overrides), then .env
+    # Paths are relative to backend working directory
+    model_config = SettingsConfigDict(
+        env_file=(".env.local", ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
     
     # Server settings - Frontend should connect to these endpoints
     HOST: str = "0.0.0.0"  # Backend server host
@@ -57,9 +64,4 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30         # Token expiry time
     
     # OpenAI settings - Required for AI-powered slide generation
-    OPENAI_API_KEY: Optional[str] = None          # Set this in .env file
-    
-    class Config:
-        env_file = ".env"          # Frontend devs: use .env file (NOT .env.local)
-        env_file_encoding = "utf-8"
-        case_sensitive = True 
+    OPENAI_API_KEY: Optional[str] = None          # Set this in .env.local or .env
