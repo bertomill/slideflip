@@ -95,6 +95,34 @@ class ErrorMessage(BaseModel):
     details: Optional[str] = None
     code: Optional[str] = None
 
+# Knowledge Graph related message models
+class KGStatusMessage(BaseModel):
+    """Model for knowledge graph status request messages"""
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class KGStatusResponseMessage(BaseModel):
+    """Model for knowledge graph status response messages"""
+    processing_status: Dict[str, Any] = Field(..., description="Current processing status")
+    graph_statistics: Dict[str, Any] = Field(..., description="Graph statistics and metadata")
+
+class ForceClusteringMessage(BaseModel):
+    """Model for force clustering request messages"""
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class ForceClusteringResponseMessage(BaseModel):
+    """Model for force clustering response messages"""
+    message: str = Field(..., description="Response message")
+    timestamp: str = Field(..., description="Timestamp of the operation")
+
+class ClearKGMessage(BaseModel):
+    """Model for knowledge graph clear request messages"""
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class ClearKGResponseMessage(BaseModel):
+    """Model for knowledge graph clear response messages"""
+    message: str = Field(..., description="Response message")
+    timestamp: str = Field(..., description="Timestamp of the operation")
+
 class StatusMessage(BaseModel):
     """Model for status messages"""
     status: ProcessingStatus

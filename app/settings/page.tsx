@@ -88,7 +88,7 @@ export default function SettingsPage() {
                 <div className="h-3 w-3 bg-background rounded-sm"></div>
               </div>
               <span className="font-semibold text-foreground">
-                SlideFlip
+                Slideo
               </span>
             </Link>
           </NavigationBrand>

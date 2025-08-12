@@ -1,4 +1,7 @@
+"use client";
+
 import { LoginForm } from "@/components/login-form";
+import Image from "next/image";
 
 export default function Page() {
   return (
@@ -10,50 +13,76 @@ export default function Page() {
         </div>
       </div>
       
-      {/* Right side - Creative design assets */}
+      {/* Right side - Creative slide gallery */}
       <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-[hsl(var(--charade))] via-[hsl(var(--woodsmoke))] to-black relative overflow-hidden">
-        {/* Design assets overlay */}
-        <div className="absolute inset-0 opacity-20">
-          {/* Magazine covers and design elements */}
-          <div className="absolute top-10 left-10 w-32 h-40 rounded-lg shadow-lg transform rotate-6 bg-gradient-to-br from-[hsl(var(--manatee))] to-[hsl(var(--pale-sky))]"></div>
-          <div className="absolute top-20 right-20 w-28 h-36 rounded-lg shadow-lg transform -rotate-3 bg-gradient-to-br from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))]"></div>
-          <div className="absolute top-40 left-20 w-24 h-32 rounded-lg shadow-lg transform rotate-12 bg-gradient-to-br from-[hsl(var(--plantation))] to-[hsl(var(--charade))]"></div>
-          <div className="absolute top-60 right-10 w-36 h-44 rounded-lg shadow-lg transform -rotate-6 bg-gradient-to-br from-[hsl(var(--pale-sky))] to-[hsl(var(--manatee))]"></div>
-          <div className="absolute bottom-20 left-10 w-30 h-38 rounded-lg shadow-lg transform rotate-3 bg-gradient-to-br from-[hsl(var(--charade))] to-[hsl(var(--baltic-sea))]"></div>
-          <div className="absolute bottom-40 right-20 w-26 h-34 rounded-lg shadow-lg transform -rotate-12 bg-gradient-to-br from-[hsl(var(--manatee))] to-[hsl(var(--pale-sky))]"></div>
-          
-          {/* Presentation slides */}
-          <div className="absolute top-32 left-40 w-40 h-24 bg-white rounded-lg shadow-lg transform rotate-2">
-            <div className="p-3">
-              <div className="h-2 bg-gray-300 rounded mb-2"></div>
-              <div className="h-2 bg-gray-300 rounded w-3/4"></div>
-            </div>
-          </div>
-          <div className="absolute top-48 right-32 w-36 h-20 bg-white rounded-lg shadow-lg transform -rotate-4">
-            <div className="p-3">
-              <div className="h-2 bg-gray-300 rounded mb-2"></div>
-              <div className="h-2 bg-gray-300 rounded w-2/3"></div>
-            </div>
-          </div>
-          
-          {/* Website mockups */}
-          <div className="absolute bottom-32 left-32 w-44 h-28 bg-white rounded-lg shadow-lg transform rotate-8">
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-2 bg-blue-500 rounded w-8"></div>
-                <div className="h-2 bg-gray-300 rounded w-4"></div>
-              </div>
-              <div className="h-2 bg-gray-300 rounded mb-1"></div>
-              <div className="h-2 bg-gray-300 rounded w-3/4"></div>
+        {/* subtle vignette */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.06),transparent_60%)]" />
+
+        {/* slide A */}
+        <div className="absolute top-24 left-16 rotate-[-6deg] float-slow">
+          <div className="relative">
+            <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-3xl opacity-20" aria-hidden />
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+              <Image
+                src="/samples/slides/product-infographic.png"
+                alt="Product Infographic slide"
+                width={640}
+                height={360}
+                priority
+                className="object-cover"
+              />
             </div>
           </div>
         </div>
-        
-        {/* Floating elements */}
-        <div className="absolute top-1/4 left-1/4 w-4 h-4 bg-white rounded-full opacity-30 animate-pulse"></div>
-        <div className="absolute top-1/3 right-1/3 w-6 h-6 bg-white rounded-full opacity-20 animate-pulse delay-1000"></div>
-        <div className="absolute bottom-1/3 left-1/3 w-3 h-3 bg-white rounded-full opacity-40 animate-pulse delay-500"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-5 h-5 bg-white rounded-full opacity-25 animate-pulse delay-1500"></div>
+
+        {/* slide B */}
+        <div className="absolute top-44 right-16 rotate-[5deg] float-medium">
+          <div className="relative">
+            <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-3xl opacity-15" aria-hidden />
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[520px]">
+              <Image
+                src="/samples/slides/mckinsey-example-1.png"
+                alt="Consulting slide example"
+                width={520}
+                height={320}
+                className="object-cover"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* slide C */}
+        <div className="absolute bottom-24 left-1/3 -translate-x-1/2 rotate-[2deg] float-delayed">
+          <div className="relative">
+            <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-3xl opacity-15" aria-hidden />
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[560px]">
+              <Image
+                src="/samples/slides/jpm_slide_1.png"
+                alt="Financial highlights slide"
+                width={560}
+                height={330}
+                className="object-cover"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* small floating dots for depth */}
+        <div className="absolute top-1/4 left-1/4 w-3 h-3 bg-white/30 rounded-full animate-pulse" />
+        <div className="absolute top-1/3 right-1/3 w-5 h-5 bg-white/20 rounded-full animate-pulse delay-1000" />
+        <div className="absolute bottom-1/3 left-1/3 w-2 h-2 bg-white/40 rounded-full animate-pulse delay-500" />
+        <div className="absolute bottom-1/4 right-1/4 w-4 h-4 bg-white/25 rounded-full animate-pulse delay-1500" />
+
+        {/* floating animations */}
+        <style jsx>{`
+          @keyframes floatY {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+          }
+          .float-slow { animation: floatY 10s ease-in-out infinite; }
+          .float-medium { animation: floatY 8s ease-in-out infinite; }
+          .float-delayed { animation: floatY 12s ease-in-out infinite; animation-delay: 1.5s; }
+        `}</style>
       </div>
     </div>
   );

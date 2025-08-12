@@ -30,10 +30,33 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     const load = async () => {
       try {
         setLoadingExamples(true);
+        // Try Supabase-powered curated examples first
         const exRes = await fetch('/api/examples/list');
         const exData = await exRes.json();
         const curated: Array<{id:string;name:string;theme:string;description:string;aspect_ratio:string;html:string}> = (exData.examples || []);
-        const onlyOne = curated.find((e) => e.id === 'imported-02') || curated[0];
+        let onlyOne = curated.find((e) => e.id === 'imported-02') || curated[0];
+
+        // Fallback: if we have no curated examples (e.g., Supabase not configured),
+        // load the local HTML template so the user always sees a live preview.
+        if (!onlyOne || !onlyOne.html) {
+          try {
+            const fbRes = await fetch('/api/fallback-slide');
+            const fbData = await fbRes.json();
+            if (fbData?.slideHtml) {
+              onlyOne = {
+                id: 'imported-02',
+                name: 'Imported 02 (Local)',
+                theme: 'Curated',
+                description: 'Local fallback curated example',
+                aspect_ratio: '16:9',
+                html: fbData.slideHtml as string,
+              } as any;
+            }
+          } catch {
+            // ignore; we'll show no examples
+          }
+        }
+
         setExamples(onlyOne ? [onlyOne] : []);
       } catch {
         setExamples([]);

@@ -40,18 +40,79 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     return () => resizeObserver.disconnect();
   }, [slideData.slideHtml]);
 
+  // Build request body for slide generation API
+  const buildRequestPayload = (overrideFeedback?: string) => {
+    const hasParsedDocs = Array.isArray(slideData.parsedDocuments) && slideData.parsedDocuments.length > 0;
+    const simplifiedDocs = hasParsedDocs
+      ? slideData.parsedDocuments!.map((d) => ({
+          filename: d.filename,
+          success: d.success,
+          content: d.content,
+        }))
+      : slideData.documents && slideData.documents.length > 0
+      ? slideData.documents.map((f) => ({ filename: f.name }))
+      : undefined;
+
+    return {
+      description: slideData.description,
+      theme: slideData.selectedTheme || "Professional",
+      researchData: slideData.wantsResearch ? slideData.researchData : undefined,
+      contentPlan: slideData.contentPlan,
+      userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
+      documents: simplifiedDocs,
+    };
+  };
+
+  // Call API to generate slide HTML
+  const generateSlide = async (overrideFeedback?: string) => {
+    if (!slideData.description || isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/generate-slide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildRequestPayload(overrideFeedback)),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.success && data?.slideHtml) {
+          updateSlideData({ slideHtml: data.slideHtml });
+          return;
+        }
+      }
+      // If primary generation failed or returned no HTML, try fallback API
+      const fallbackRes = await fetch('/api/fallback-slide');
+      if (fallbackRes.ok) {
+        const fb = await fallbackRes.json();
+        if (fb?.slideHtml) {
+          updateSlideData({ slideHtml: fb.slideHtml });
+          return;
+        }
+      }
+      throw new Error('Slide generation failed and no fallback available');
+    } catch (err) {
+      console.error("Slide generation error:", err);
+      // Fallback to placeholder so user can continue the flow
+      updateSlideData({ slideHtml: "cat-slide-placeholder" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Auto-generate on first entry to this step if we don't have HTML yet
+  useEffect(() => {
+    if (!slideData.slideHtml && slideData.description) {
+      generateSlide();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slideData.slideHtml, slideData.description, slideData.selectedTheme, slideData.contentPlan, slideData.userFeedback, slideData.researchData, slideData.wantsResearch]);
+
   const regenerateWithFeedback = async () => {
     if (!feedback.trim()) return;
     setIsRegenerating(true);
     try {
-      // In this simplified version, just update content to reflect feedback
-      if (slideData.slideHtml) {
-        const updatedHtml = slideData.slideHtml.replace(
-          "Generated Content",
-          `Updated with feedback: "${feedback.slice(0, 50)}..."`
-        );
-        updateSlideData({ slideHtml: updatedHtml });
-      }
+      await generateSlide(feedback.trim());
     } finally {
       setIsRegenerating(false);
       setFeedback("");

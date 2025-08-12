@@ -11,7 +11,7 @@ from src.core.config import Settings
 logger = logging.getLogger(__name__)
 
 class LLMService:
-    """Service for LLM-based slide generation"""
+    """Service for LLM-based slide generation and knowledge graph extraction"""
     
     def __init__(self):
         self.settings = Settings()
@@ -340,6 +340,148 @@ Generate detailed, comprehensive content for each section."""
             logger.error(f"Error generating slide content: {e}")
             return self._generate_fallback_content(content, description, layout)
 
+    async def extract_knowledge_graph_from_chunk(
+        self, 
+        content: str, 
+        chunk_index: int,
+        filename: str,
+        file_path: str
+    ) -> Dict[str, Any]:
+        """
+        Extract entities, relationships, and facts from a content chunk using LLM
+        
+        Args:
+            content: Text content chunk to analyze
+            chunk_index: Index of the chunk in the file
+            filename: Name of the source file
+            file_path: Path to the source file
+            
+        Returns:
+            Dictionary containing extracted entities, relationships, and facts
+        """
+        if not self.client:
+            logger.warning("LLM client not available, returning empty knowledge graph data")
+            return self._generate_empty_knowledge_graph_data(chunk_index, filename, file_path)
+        
+        try:
+            system_prompt = """You are an expert knowledge graph extraction specialist. Your task is to analyze text content and extract ONLY three types of information:
+
+1. ENTITIES: Named entities, concepts, organizations, people, places, etc.
+2. RELATIONSHIPS: Connections between entities (subject-verb-object relationships)
+3. FACTS: Key factual information, statistics, claims, or assertions
+
+CRITICAL REQUIREMENTS:
+- Return ONLY a JSON object with the exact structure specified
+- Do not include any explanations, markdown, or additional text
+- Focus on factual, extractable information
+- Be precise and accurate
+- Do not generate or invent information not present in the text
+
+Return ONLY this JSON structure (no other text):
+{
+    "entities": [
+        {
+            "id": "unique_entity_id",
+            "name": "entity_name",
+            "type": "entity_type",
+            "description": "brief_description",
+            "confidence": 0.95
+        }
+    ],
+    "relationships": [
+        {
+            "id": "unique_relationship_id",
+            "source_entity": "source_entity_id",
+            "target_entity": "target_entity_id",
+            "relationship_type": "relationship_label",
+            "confidence": 0.9
+        }
+    ],
+    "facts": [
+        {
+            "id": "unique_fact_id",
+            "content": "factual_statement",
+            "source_entities": ["entity_id1", "entity_id2"],
+            "confidence": 0.85
+        }
+    ]
+}"""
+
+            user_prompt = f"""Analyze the following text content and extract entities, relationships, and facts:
+
+TEXT CONTENT:
+{content}
+
+EXTRACTION TASK:
+Extract ONLY:
+1. Named entities (people, organizations, places, concepts, etc.)
+2. Relationships between entities (who does what to whom, what connects what, etc.)
+3. Key facts, statistics, or assertions from the text
+
+Return the JSON structure as specified in the system prompt. Be thorough but accurate."""
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=2000,
+                temperature=0.1  # Low temperature for more consistent extraction
+            )
+            
+            extraction_text = response.choices[0].message.content.strip()
+            
+            # Clean up markdown code blocks if present
+            if extraction_text.startswith("```json"):
+                extraction_text = extraction_text[7:]
+            elif extraction_text.startswith("```"):
+                extraction_text = extraction_text[3:]
+            
+            if extraction_text.endswith("```"):
+                extraction_text = extraction_text[:-3]
+            
+            extraction_text = extraction_text.strip()
+            
+            try:
+                extraction_data = json.loads(extraction_text)
+                
+                # Validate the structure
+                required_fields = ["entities", "relationships", "facts"]
+                for field in required_fields:
+                    if field not in extraction_data:
+                        extraction_data[field] = []
+                    if not isinstance(extraction_data[field], list):
+                        extraction_data[field] = []
+                
+                # Add metadata
+                extraction_data["metadata"] = {
+                    "chunk_index": chunk_index,
+                    "filename": filename,
+                    "file_path": file_path,
+                    "chunk_content": content,
+                    "extraction_timestamp": self._get_current_timestamp()
+                }
+                
+                logger.info(f"Extraction data: {extraction_data}")
+                
+                logger.info(f"Successfully extracted knowledge graph data from chunk {chunk_index}")
+                logger.info(f"  Entities: {len(extraction_data['entities'])}")
+                logger.info(f"  Relationships: {len(extraction_data['relationships'])}")
+                logger.info(f"  Facts: {len(extraction_data['facts'])}")
+                
+                return extraction_data
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"Failed to parse knowledge graph extraction response: {e}")
+                logger.warning(f"Raw response: {extraction_text}")
+                logger.info("Using fallback knowledge graph extraction")
+                return self._generate_fallback_knowledge_graph_data(content, chunk_index, filename, file_path)
+                
+        except Exception as e:
+            logger.error(f"Error extracting knowledge graph from chunk: {e}")
+            return self._generate_fallback_knowledge_graph_data(content, chunk_index, filename, file_path)
+
     def _generate_fallback_layout(self, content: str, description: str, theme: str) -> Dict[str, Any]:
         """Generate a fallback layout when LLM is not available"""
         logger.info("Using fallback layout generation")
@@ -391,6 +533,62 @@ Generate detailed, comprehensive content for each section."""
                 }
         
         return content_data
+
+    def _generate_empty_knowledge_graph_data(self, chunk_index: int, filename: str, file_path: str) -> Dict[str, Any]:
+        """Generate empty knowledge graph data when LLM is not available"""
+        return {
+            "entities": [],
+            "relationships": [],
+            "facts": [],
+            "metadata": {
+                "chunk_index": chunk_index,
+                "filename": filename,
+                "file_path": file_path,
+                "chunk_content": "",
+                "extraction_timestamp": self._get_current_timestamp(),
+                "note": "LLM not available - empty data generated"
+            }
+        }
+
+    def _generate_fallback_knowledge_graph_data(self, content: str, chunk_index: int, filename: str, file_path: str) -> Dict[str, Any]:
+        """Generate fallback knowledge graph data when LLM extraction fails"""
+        # Simple fallback: extract basic entities from text
+        entities = []
+        relationships = []
+        facts = []
+        
+        # Extract basic entities (capitalized words that might be entities)
+        words = content.split()
+        for i, word in enumerate(words):
+            if word and word[0].isupper() and len(word) > 2:
+                # Simple heuristic for entity detection
+                entity_id = f"entity_{chunk_index}_{i}"
+                entities.append({
+                    "id": entity_id,
+                    "name": word,
+                    "type": "unknown",
+                    "description": f"Extracted from chunk {chunk_index}",
+                    "confidence": 0.5
+                })
+        
+        return {
+            "entities": entities,
+            "relationships": relationships,
+            "facts": facts,
+            "metadata": {
+                "chunk_index": chunk_index,
+                "filename": filename,
+                "file_path": file_path,
+                "chunk_content": content,
+                "extraction_timestamp": self._get_current_timestamp(),
+                "note": "Fallback extraction used due to LLM failure"
+            }
+        }
+
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp as string"""
+        from datetime import datetime
+        return datetime.now().isoformat()
     
     def is_available(self) -> bool:
         """Check if LLM service is available"""

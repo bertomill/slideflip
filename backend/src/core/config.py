@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     
     # File storage settings
     UPLOAD_DIR: str = "uploads"
+    KNOWLEDGE_GRAPH_BASE_DIR:str = "kg"
     TEMP_DIR: str = "temp"
     OUTPUT_DIR: str = "output"
     MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50MB
@@ -37,6 +38,7 @@ class Settings(BaseSettings):
     # Processing settings
     MAX_PROCESSING_TIME: int = 300  # 5 minutes
     CONCURRENT_PROCESSES: int = 4
+    MAX_THREADS: int = 4  # Maximum threads for parallel processing
     
     # Logging settings
     LOG_LEVEL: str = "INFO"

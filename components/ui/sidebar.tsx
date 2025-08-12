@@ -11,6 +11,7 @@ import {
   History, 
   Crown, 
   LogOut,
+  QrCode,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -82,7 +83,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                   <div className="h-3 w-3 bg-background rounded-sm"></div>
                 </div>
                 {!collapsed && (
-                  <span className="font-semibold text-foreground">SlideFlip</span>
+                  <span className="font-semibold text-foreground">Slideo</span>
                 )}
               </Link>
               
@@ -172,6 +173,20 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                 >
                   <FileText className={cn("h-4 w-4", !collapsed && "mr-3")} />
                   {!collapsed && "My Presentations"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full text-left",
+                    collapsed ? "justify-center px-2" : "justify-start"
+                  )}
+                  onClick={() => {
+                    router.push("/waitlist");
+                    onToggle?.();
+                  }}
+                >
+                  <QrCode className={cn("h-4 w-4", !collapsed && "mr-3")} />
+                  {!collapsed && "Waitlist QR Code"}
                 </Button>
                 <Button
                   variant="ghost"

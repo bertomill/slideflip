@@ -18,7 +18,7 @@ export default function DemoPage() {
             <div className="h-3 w-3 bg-background rounded-sm"></div>
           </div>
           <span className="font-semibold text-foreground">
-            SlideFlip
+            Slideo
           </span>
         </NavigationBrand>
         <div className="flex items-center gap-6">
@@ -46,9 +46,11 @@ export default function DemoPage() {
             Where practicality meets artistry. Clean, purposeful design that gets out of your way.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button variant="engineering" size="lg">
+            <Button asChild variant="engineering" size="lg">
+              <a href="/auth/login">
               <Rocket className="h-4 w-4 mr-2" />
               Get Started
+              </a>
             </Button>
             <Button variant="outline" size="lg">
               Learn More
@@ -165,9 +167,11 @@ export default function DemoPage() {
           <p className="text-muted-foreground max-w-md mx-auto">
             Start creating with our premium component library inspired by the best design systems.
           </p>
-          <Button variant="engineering" size="xl">
+          <Button asChild variant="engineering" size="xl">
+            <a href="/auth/login">
             <Rocket className="h-5 w-5 mr-2" />
             Start Building Now
+            </a>
           </Button>
         </section>
       </div>

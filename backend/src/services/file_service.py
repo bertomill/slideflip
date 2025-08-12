@@ -563,4 +563,103 @@ class FileService:
             return deleted_count
         except Exception as e:
             logger.error(f"Error cleaning up old client folders: {e}")
-            return 0 
+            return 0
+    
+    def get_downloadable_file(self, file_path: str) -> tuple[Path, str]:
+        """
+        Resolve file path and return the actual file path and filename for download.
+        
+        Args:
+            file_path: The requested file path (can be uploads/client_*, client_*, or output/*)
+            
+        Returns:
+            tuple: (resolved_file_path, filename)
+            
+        Raises:
+            ValueError: If file path is invalid or access is denied
+            FileNotFoundError: If file doesn't exist
+        """
+        try:
+            logger.info(f"Resolving download path for: {file_path}")
+            
+            # Handle different path formats
+            if file_path.startswith("uploads/"):
+                # Remove the uploads/ prefix and handle as client folder
+                relative_path = file_path[8:]  # Remove "uploads/"
+                if relative_path.startswith("client_"):
+                    upload_dir = Path(self.settings.UPLOAD_DIR)
+                    requested_file = upload_dir / relative_path
+                    
+                    # Prevent directory traversal attacks
+                    if not requested_file.resolve().is_relative_to(upload_dir.resolve()):
+                        raise ValueError("Access denied: Invalid file path")
+                else:
+                    raise ValueError("Invalid file path format")
+            elif file_path.startswith("client_"):
+                # Direct client folder path
+                upload_dir = Path(self.settings.UPLOAD_DIR)
+                requested_file = upload_dir / file_path
+                
+                # Prevent directory traversal attacks
+                if not requested_file.resolve().is_relative_to(upload_dir.resolve()):
+                    raise ValueError("Access denied: Invalid file path")
+            else:
+                # File is in the output directory (backward compatibility)
+                output_dir = Path("output")
+                requested_file = output_dir / file_path
+                
+                # Prevent directory traversal attacks
+                if not requested_file.resolve().is_relative_to(output_dir.resolve()):
+                    raise ValueError("Access denied: Invalid file path")
+            
+            # Check if file exists
+            if not requested_file.exists():
+                raise FileNotFoundError(f"File not found: {requested_file}")
+            
+            # Get filename
+            filename = requested_file.name
+            
+            logger.info(f"Resolved file path: {requested_file} -> {filename}")
+            return requested_file, filename
+            
+        except (ValueError, FileNotFoundError):
+            raise
+        except Exception as e:
+            logger.error(f"Error resolving file path {file_path}: {e}")
+            raise ValueError(f"Error resolving file path: {e}")
+    
+    def check_file_exists(self, file_path: str) -> dict:
+        """
+        Check if a file exists and return file information.
+        
+        Args:
+            file_path: The requested file path
+            
+        Returns:
+            dict: File existence and metadata information
+        """
+        try:
+            logger.info(f"Checking file existence for: {file_path}")
+            
+            # Try to resolve the file path
+            try:
+                resolved_file, filename = self.get_downloadable_file(file_path)
+                exists = True
+                size = resolved_file.stat().st_size
+                parent_exists = resolved_file.parent.exists() if resolved_file.parent else False
+            except (ValueError, FileNotFoundError):
+                exists = False
+                size = 0
+                parent_exists = False
+                resolved_file = None
+            
+            return {
+                "file_path": str(resolved_file) if resolved_file else None,
+                "exists": exists,
+                "size": size,
+                "parent_exists": parent_exists
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking file {file_path}: {e}")
+            return {"exists": False, "error": str(e)} 

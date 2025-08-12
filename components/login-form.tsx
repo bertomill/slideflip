@@ -8,8 +8,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Removed unused Tabs and Select imports
 
 export function LoginForm({
   className,
@@ -19,8 +18,7 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [ssoEmail, setSsoEmail] = useState("");
-  const [ssoError, setSsoError] = useState<string | null>(null);
+  // Removed unused SSO demo state
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,39 +42,7 @@ export function LoginForm({
     }
   };
 
-  const handleSsoLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setSsoError(null);
-
-    try {
-      // Extract domain from email
-      const domain = ssoEmail.split('@')[1];
-      
-      if (!domain) {
-        throw new Error('Please enter a valid email address');
-      }
-
-      // Mock SSO validation - in real implementation, this would check if SSO is enabled for the domain
-      const enabledDomains = ['company.com', 'bertomill.ca', 'corp.local', 'uwo.ca'];
-      
-      if (!enabledDomains.includes(domain)) {
-        throw new Error(`SSO is not enabled for ${domain}. Try using another method to access SlideFlip.`);
-      }
-
-      // In a real implementation, this would redirect to the SSO provider
-      // For now, we'll just simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-      
-      // Redirect to SSO provider (mock)
-      setSsoError('SSO redirect would happen here. For demo purposes, please use email login.');
-      
-    } catch (error: unknown) {
-      setSsoError(error instanceof Error ? error.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Removed unused SSO demo handler
 
   return (
       <div className={cn("flex flex-col gap-6 text-foreground", className)} {...props}>
@@ -96,7 +62,7 @@ export function LoginForm({
       {/* Google sign-in button */}
       <Button 
         variant="outline" 
-        className="w-full h-12 bg-background text-foreground border border-border hover:bg-muted font-medium"
+        className="w-full h-12 rounded-full bg-background text-foreground border border-border hover:bg-muted font-medium"
         disabled={isLoading}
         onClick={async () => {
           console.log('Google sign-in button clicked');
@@ -106,7 +72,7 @@ export function LoginForm({
           try {
             const supabase = createClient();
             console.log('Attempting Google OAuth...');
-            const { data, error } = await supabase.auth.signInWithOAuth({
+            const { error } = await supabase.auth.signInWithOAuth({
               provider: 'google',
               options: {
                 redirectTo: `${window.location.origin}/auth/callback`,
@@ -159,7 +125,7 @@ export function LoginForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-12 border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
+            className="h-12 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
           />
         </div>
         
@@ -173,7 +139,7 @@ export function LoginForm({
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-12 border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground pr-10"
+              className="h-12 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground pr-10"
             />
             <button
               type="button"
@@ -206,7 +172,7 @@ export function LoginForm({
         {/* Sign in button */}
         <Button 
           type="submit" 
-          className="w-full h-12 text-white bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 disabled:opacity-50"
+          className="w-full h-12 rounded-full text-white bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 disabled:opacity-50"
           disabled={isLoading || !email || !password}
         >
           {isLoading ? "Signing in..." : "Sign in"}

@@ -484,7 +484,7 @@ export default function Home() {
               Sign In
             </Button>
           </Link>
-          <Link href="/">
+          <Link href="/auth/login">
             <Button
               className="text-white shadow-lg transition-colors rounded-full px-6 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))]"
             >
@@ -521,7 +521,7 @@ export default function Home() {
 
             {/* CTA Section */}
             <div className="mb-8">
-              <Link href="/build">
+              <Link href="/auth/login">
                 <Button
                   size="lg"
                   className="shadow-xl text-lg px-8 py-6 rounded-full text-white transition-all duration-300 hover:shadow-2xl hover:scale-105 bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 font-medium"
@@ -539,11 +539,11 @@ export default function Home() {
                   placeholder="Try a prompt to create your own slide..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  className="flex-1 py-4 text-lg rounded-xl border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
+                  className="flex-1 h-14 py-4 text-lg rounded-full border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm"
                   style={{ fontStyle: promptText ? 'normal' : 'italic' }}
                 />
                 <Button
-                  className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-xl px-6 h-[60px] text-lg"
+                  className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 rounded-full px-6 h-14 text-lg"
                   onClick={() => window.location.href = '/auth/sign-up'}
                 >
                   <ArrowRight className="h-4 w-4 mr-1" />
@@ -681,7 +681,7 @@ export default function Home() {
                 </Button>
               </Link>
               <Link href="/auth/login">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-4 rounded-full border-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-6 rounded-full border-2 hover:bg-slate-50 dark:hover:bg-slate-800">
                   <FileText className="h-5 w-5 mr-2" />
                   View Examples
                 </Button>

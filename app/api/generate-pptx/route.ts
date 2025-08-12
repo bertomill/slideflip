@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
 
     // PRESENTATION METADATA: Set document properties for professional appearance
     // These properties appear in PowerPoint's file properties and help with organization
-    pptx.author = 'SlideFlip AI';
-    pptx.company = 'SlideFlip';
+    pptx.author = 'Slideo AI';
+    pptx.company = 'Slideo';
     pptx.subject = 'AI Generated Presentation';
     pptx.title = title || description?.substring(0, 50) || 'AI Generated Slide';
 
