@@ -141,7 +141,9 @@ export default function TestFabricTemplates() {
             )}
 
             {current?.slide_json && (
-              <pre className="bg-gray-100 rounded p-3 text-xs overflow-auto max-h-80">{JSON.stringify(current.slide_json, null, 2)}</pre>
+              <pre className="rounded p-3 text-xs overflow-auto max-h-80 bg-black/70 text-white border border-white/10">
+                {JSON.stringify(current.slide_json, null, 2)}
+              </pre>
             )}
           </CardContent>
         </Card>

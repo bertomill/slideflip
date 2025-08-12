@@ -7,23 +7,23 @@
     { "type": "shape", "shape": "rect", "options": { "x": 0.5, "y": 1.4, "w": 9, "h": 0.05, "fill": { "color": "E5E7EB" } } },
 
     { "type": "shape", "shape": "roundRect", "options": { "x": 0.5, "y": 1.8, "w": 2.9, "h": 3.8, "fill": { "color": "F9FAFB" }, "rectRadius": 0.15 } },
-    { "type": "shape", "shape": "roundRect", "options": { "x": 3.25, "y": 1.8, "w": 2.9, "h": 3.8, "fill": { "color": "F9FAFB" }, "rectRadius": 0.15 } },
-    { "type": "shape", "shape": "roundRect", "options": { "x": 6.0, "y": 1.8, "w": 2.9, "h": 3.8, "fill": { "color": "F9FAFB" }, "rectRadius": 0.15 } },
+    { "type": "shape", "shape": "roundRect", "options": { "x": 3.55, "y": 1.8, "w": 2.9, "h": 3.8, "fill": { "color": "F9FAFB" }, "rectRadius": 0.15 } },
+    { "type": "shape", "shape": "roundRect", "options": { "x": 6.6, "y": 1.8, "w": 2.9, "h": 3.8, "fill": { "color": "F9FAFB" }, "rectRadius": 0.15 } },
 
     { "type": "text", "text": "Revenue", "options": { "x": 0.7, "y": 2.0, "w": 2.5, "h": 0.5, "fontSize": 16, "fontFace": "Segoe UI", "bold": true, "color": "374151" } },
     { "type": "text", "text": "$9.2B", "options": { "x": 0.7, "y": 2.4, "w": 2.5, "h": 0.9, "fontSize": 36, "fontFace": "Segoe UI", "bold": true, "color": "1F2937" } },
     { "type": "text", "text": "+12% YoY", "options": { "x": 0.7, "y": 3.2, "w": 2.5, "h": 0.5, "fontSize": 14, "fontFace": "Segoe UI", "color": "10B981" } },
     { "type": "text", "text": "Strong demand in cloud and AI services drives growth.", "options": { "x": 0.7, "y": 3.7, "w": 2.5, "h": 0.9, "fontSize": 12, "fontFace": "Segoe UI", "color": "6B7280" } },
 
-    { "type": "text", "text": "Users", "options": { "x": 3.45, "y": 2.0, "w": 2.5, "h": 0.5, "fontSize": 16, "fontFace": "Segoe UI", "bold": true, "color": "374151" } },
-    { "type": "text", "text": "15.3M", "options": { "x": 3.45, "y": 2.4, "w": 2.5, "h": 0.9, "fontSize": 36, "fontFace": "Segoe UI", "bold": true, "color": "1F2937" } },
-    { "type": "text", "text": "+8% QoQ", "options": { "x": 3.45, "y": 3.2, "w": 2.5, "h": 0.5, "fontSize": 14, "fontFace": "Segoe UI", "color": "3B82F6" } },
-    { "type": "text", "text": "New onboarding flows improved conversion by 14%.", "options": { "x": 3.45, "y": 3.7, "w": 2.5, "h": 0.9, "fontSize": 12, "fontFace": "Segoe UI", "color": "6B7280" } },
+    { "type": "text", "text": "Users", "options": { "x": 3.75, "y": 2.0, "w": 2.5, "h": 0.5, "fontSize": 16, "fontFace": "Segoe UI", "bold": true, "color": "374151" } },
+    { "type": "text", "text": "15.3M", "options": { "x": 3.75, "y": 2.4, "w": 2.5, "h": 0.9, "fontSize": 36, "fontFace": "Segoe UI", "bold": true, "color": "1F2937" } },
+    { "type": "text", "text": "+8% QoQ", "options": { "x": 3.75, "y": 3.2, "w": 2.5, "h": 0.5, "fontSize": 14, "fontFace": "Segoe UI", "color": "3B82F6" } },
+    { "type": "text", "text": "New onboarding flows improved conversion by 14%.", "options": { "x": 3.75, "y": 3.7, "w": 2.5, "h": 0.9, "fontSize": 12, "fontFace": "Segoe UI", "color": "6B7280" } },
 
-    { "type": "text", "text": "NPS", "options": { "x": 6.2, "y": 2.0, "w": 2.5, "h": 0.5, "fontSize": 16, "fontFace": "Segoe UI", "bold": true, "color": "374151" } },
-    { "type": "text", "text": "72", "options": { "x": 6.2, "y": 2.4, "w": 2.5, "h": 0.9, "fontSize": 36, "fontFace": "Segoe UI", "bold": true, "color": "1F2937" } },
-    { "type": "text", "text": "+4 pts", "options": { "x": 6.2, "y": 3.2, "w": 2.5, "h": 0.5, "fontSize": 14, "fontFace": "Segoe UI", "color": "F59E0B" } },
-    { "type": "text", "text": "Satisfaction improved after reliability initiatives.", "options": { "x": 6.2, "y": 3.7, "w": 2.5, "h": 0.9, "fontSize": 12, "fontFace": "Segoe UI", "color": "6B7280" } }
+    { "type": "text", "text": "NPS", "options": { "x": 6.8, "y": 2.0, "w": 2.5, "h": 0.5, "fontSize": 16, "fontFace": "Segoe UI", "bold": true, "color": "374151" } },
+    { "type": "text", "text": "72", "options": { "x": 6.8, "y": 2.4, "w": 2.5, "h": 0.9, "fontSize": 36, "fontFace": "Segoe UI", "bold": true, "color": "1F2937" } },
+    { "type": "text", "text": "+4 pts", "options": { "x": 6.8, "y": 3.2, "w": 2.5, "h": 0.5, "fontSize": 14, "fontFace": "Segoe UI", "color": "F59E0B" } },
+    { "type": "text", "text": "Satisfaction improved after reliability initiatives.", "options": { "x": 6.8, "y": 3.7, "w": 2.5, "h": 0.9, "fontSize": 12, "fontFace": "Segoe UI", "color": "6B7280" } }
   ],
   "notes": "Three-column KPI layout with header, divider and descriptive cards"
 }
