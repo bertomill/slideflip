@@ -7,7 +7,7 @@ import type { ClipboardEvent as ReactClipboardEvent } from 'react';
 
 // Import UI components
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Sparkles, Image as ImageIcon } from "lucide-react";
 import { SlideData } from "@/app/build/page";
@@ -60,16 +60,15 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         const exRes = await fetch('/api/examples/list');
         const exData = await exRes.json();
         const curated: CuratedExample[] = (exData.examples || []);
-        let onlyOne: CuratedExample | undefined = curated.find((e) => e.id === 'imported-02') || curated[0];
 
         // Fallback: if we have no curated examples (e.g., Supabase not configured),
         // load the local HTML template so the user always sees a live preview.
-        if (!onlyOne || (!onlyOne.html && !onlyOne.slide_json)) {
+        if (curated.length === 0) {
           try {
             const fbRes = await fetch('/api/fallback-slide');
             const fbData = await fbRes.json();
             if (fbData?.slideHtml) {
-              onlyOne = {
+              const fallbackOne: CuratedExample = {
                 id: 'imported-02',
                 name: 'Imported 02 (Local)',
                 theme: 'Curated',
@@ -77,13 +76,15 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                 aspect_ratio: '16:9',
                 html: fbData.slideHtml as string,
               };
+              setExamples([fallbackOne]);
+              return;
             }
           } catch {
             // ignore; we'll show no examples
           }
         }
 
-        setExamples(onlyOne ? [onlyOne] : []);
+        setExamples(curated);
       } catch {
         setExamples([]);
       } finally {
@@ -262,18 +263,16 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
 
   return (
     <div className="space-y-6">
-      {/* Header card */}
-      <Card variant="elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ImageIcon className="h-5 w-5 text-primary" />
-            Choose Your Slide Template
-          </CardTitle>
-          <CardDescription>
-            Select a slide template that matches your presentation style and industry
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      {/* Header (no card) */}
+      <div className="px-1">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <ImageIcon className="h-5 w-5 text-primary" />
+          Choose Your Slide Template
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Select a slide template that matches your presentation style and industry
+        </p>
+      </div>
 
       {/* Collapsible content sections using Accordion */}
       <Accordion type="multiple" className="w-full" defaultValue={["templates", "palette"]}>
@@ -281,8 +280,8 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         <AccordionItem value="templates">
           <AccordionTrigger>
             <div className="flex flex-col items-start">
-              <h3 className="text-lg font-semibold text-foreground">Curated Examples</h3>
-              <p className="text-sm text-muted-foreground">Verified 1:1 PPTX/HTML pairs stored in Supabase.</p>
+              <h3 className="text-lg font-semibold text-foreground">Curated Templates</h3>
+              <p className="text-sm text-muted-foreground">Templates stored in Supabase (Fabric JSON preferred; HTML fallback).</p>
             </div>
           </AccordionTrigger>
           <AccordionContent>

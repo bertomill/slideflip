@@ -317,6 +317,11 @@ curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
 # Note: `id` refers to the JSON filename under templates/fabric; the DB row id remains a UUID.
 ```
 
+### Debugging preview rendering
+
+- Visit `/test-fabric` to load all templates from `/api/examples/list` and preview them.
+- The page renders Fabric JSON on a canvas and shows the raw JSON for quick inspection.
+
 ### Assets
 - `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).
 - Landing page CTAs updated: all "Get Started" buttons now navigate to `'/auth/login'` so users are prompted to sign in before creating content.
