@@ -49,33 +49,41 @@ export default function PresentationsPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // TODO: Replace with actual project data from database
-  const mockProjects = [
-    {
-      id: 1,
-      title: "Marketing Presentation Q4",
-      description: "Quarterly marketing review and strategy presentation",
-      createdAt: "2024-01-15",
-      status: "completed",
-      slideCount: 24
-    },
-    {
-      id: 2,
-      title: "Product Launch Deck",
-      description: "New product launch presentation for stakeholders",
-      createdAt: "2024-01-10",
-      status: "draft",
-      slideCount: 18
-    },
-    {
-      id: 3,
-      title: "Team Training Materials",
-      description: "Onboarding and training slides for new team members",
-      createdAt: "2024-01-05",
-      status: "completed",
-      slideCount: 32
-    }
-  ];
+  const [items, setItems] = useState<Array<{ id: string; title: string; description: string; createdAt: string; status: string; slideHtml?: string | null }>>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient();
+      const { data: flows } = await supabase
+        .from('flows')
+        .select('id, description, created_at, status')
+        .order('created_at', { ascending: false })
+        .limit(12);
+
+      if (!flows || flows.length === 0) { setItems([]); return; }
+
+      // For each flow, pull the latest preview (may contain slide_html from AI or be null in seeds)
+      const ids = flows.map(f => f.id);
+      const { data: previews } = await supabase
+        .from('flow_previews')
+        .select('flow_id, slide_html, created_at')
+        .in('flow_id', ids)
+        .order('created_at', { ascending: false });
+
+      const latestHtml: Record<string, string | null> = {};
+      previews?.forEach(p => { if (!(p.flow_id in latestHtml)) latestHtml[p.flow_id] = p.slide_html || null; });
+
+      setItems(flows.map(f => ({
+        id: f.id,
+        title: f.description || 'Untitled',
+        description: f.status === 'completed' ? 'Completed flow' : 'In progress',
+        createdAt: f.created_at,
+        status: f.status,
+        slideHtml: latestHtml[f.id] ?? null,
+      })));
+    };
+    load();
+  }, []);
 
   return (
     <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
@@ -144,7 +152,7 @@ export default function PresentationsPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockProjects.map((project) => (
+              {items.map((project) => (
                 <Card key={project.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -162,12 +170,27 @@ export default function PresentationsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
+                    {/* Visual preview: if slideHtml exists, render a safe scaled iframe-like div */}
+                    {project.slideHtml ? (
+                      <div className="border rounded-lg overflow-hidden shadow-sm mb-3">
+                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                          <div
+                            className="absolute inset-0 bg-white"
+                            dangerouslySetInnerHTML={{ __html: project.slideHtml }}
+                            style={{
+                              transform: 'scale(0.8)',
+                              transformOrigin: 'top left',
+                              width: '125%',
+                              height: '125%'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground mb-3">No HTML preview stored. Generate to view.</div>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <FileText className="h-4 w-4" />
-                          <span>{project.slideCount} slides</span>
-                        </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
                           <span>{new Date(project.createdAt).toLocaleDateString()}</span>
@@ -185,7 +208,7 @@ export default function PresentationsPage() {
               ))}
             </div>
 
-            {mockProjects.length === 0 && (
+            {items.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">No projects yet</h3>
