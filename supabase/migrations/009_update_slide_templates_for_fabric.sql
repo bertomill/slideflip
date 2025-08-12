@@ -12,13 +12,18 @@ ALTER TABLE IF EXISTS slide_templates
 ALTER COLUMN is_active SET DEFAULT true;
 
 -- 3b) Make name unique to support idempotent upserts by name
-DO $$ BEGIN
+-- Use a partial unique index or constraint; attempt to add unique constraint on name if not present
+DO $$
+BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_slide_templates_name_unique'
+    SELECT 1 
+    FROM information_schema.table_constraints 
+    WHERE table_name = 'slide_templates' AND constraint_name = 'slide_templates_name_key'
   ) THEN
-    CREATE UNIQUE INDEX idx_slide_templates_name_unique ON slide_templates (name);
+    ALTER TABLE slide_templates ADD CONSTRAINT slide_templates_name_key UNIQUE (name);
   END IF;
-END $$;
+END
+$$;
 
 -- 4) Touch updated_at on modification
 CREATE OR REPLACE FUNCTION set_updated_at()
