@@ -463,6 +463,8 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
                     "extraction_timestamp": self._get_current_timestamp()
                 }
                 
+                logger.info(f"Extraction data: {extraction_data}")
+                
                 logger.info(f"Successfully extracted knowledge graph data from chunk {chunk_index}")
                 logger.info(f"  Entities: {len(extraction_data['entities'])}")
                 logger.info(f"  Relationships: {len(extraction_data['relationships'])}")

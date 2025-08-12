@@ -26,6 +26,7 @@ export function useWebSocket({
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const isInitialized = useRef(false);
   const lastClientId = useRef<string | null>(null);
+  const pingInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Update connection status from service
   const updateConnectionStatus = useCallback(() => {
@@ -81,6 +82,30 @@ export function useWebSocket({
       // Don't disconnect here as other components might be using the service
     };
   }, [clientId, onMessage, onError, onClose, onOpen, updateConnectionStatus]);
+
+  const ping = useCallback(() => {
+    return websocketService.ping();
+  }, []);
+
+  // Add ping interval to keep connection alive
+  useEffect(() => {
+    if (isConnected) {
+      // Send initial ping immediately
+      ping();
+      
+      // Then set up recurring ping
+      pingInterval.current = setInterval(() => {
+        ping();
+      }, 45000);
+      
+      return () => {
+        if (pingInterval.current) {
+          clearInterval(pingInterval.current);
+          pingInterval.current = null;
+        }
+      };
+    }
+  }, [isConnected, ping]);
 
   const connect = useCallback(async () => {
     if (clientId.startsWith('temp_')) {
@@ -140,9 +165,7 @@ export function useWebSocket({
     return websocketService.sendProcessSlide(options);
   }, []);
 
-  const ping = useCallback(() => {
-    return websocketService.ping();
-  }, []);
+
 
   return {
     isConnected,
