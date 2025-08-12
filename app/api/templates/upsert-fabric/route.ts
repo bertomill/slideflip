@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'id and name are required' }, { status: 400 });
     }
 
+    // Treat `id` as the local file key/slug. DB row id remains UUID auto-generated.
     const jsonPath = path.join(process.cwd(), 'templates', 'fabric', `${id}.json`);
     if (!fs.existsSync(jsonPath)) {
       return NextResponse.json({ error: 'Template JSON not found' }, { status: 404 });
@@ -22,20 +23,24 @@ export async function POST(req: NextRequest) {
     const slideJson = JSON.parse(jsonRaw);
 
     const supabase = await createClient();
+    // Use name as unique key for idempotent upserts (see migration adding unique index on name)
     const { data, error } = await supabase
       .from('slide_templates')
-      .upsert({
-        id,
-        name,
-        description: description ?? 'Fabric template',
-        theme,
-        html_content: '',
-        css_scoped: true,
-        aspect_ratio,
-        tags,
-        is_active: true,
-        slide_json: slideJson,
-      }, { onConflict: 'id' })
+      .upsert(
+        {
+          // do not send UUID id, let DB generate/keep existing
+          name,
+          description: description ?? 'Fabric template',
+          theme,
+          html_content: '',
+          css_scoped: true,
+          aspect_ratio,
+          tags,
+          is_active: true,
+          slide_json: slideJson,
+        },
+        { onConflict: 'name' },
+      )
       .select()
       .single();
 

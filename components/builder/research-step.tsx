@@ -9,6 +9,7 @@ import { SlideData, ResearchOptions } from "@/app/builder/page";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 /**
  * Props interface for the ResearchStep component
@@ -212,7 +213,7 @@ Your slide will be created using the uploaded documents and description provided
       {/* Research Choice Cards: Two-option selection interface */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Option 1: Enable AI Research Enhancement */}
-        <Card 
+        <Card
           variant={slideData.wantsResearch === true ? "premium" : "glass"}
           className={`cursor-pointer transition-premium hover:scale-[1.02] ${
             slideData.wantsResearch === true ? "ring-2 ring-primary" : ""
@@ -221,8 +222,8 @@ Your slide will be created using the uploaded documents and description provided
         >
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-accent">
+                <CheckCircle className="h-6 w-6 text-accent-foreground" />
               </div>
               <div>
                 <CardTitle className="text-lg">Yes, enhance with research</CardTitle>
@@ -239,25 +240,34 @@ Your slide will be created using the uploaded documents and description provided
             <CardDescription className="mb-4">
               AI will research relevant industry data, trends, and best practices to make your slide more compelling and data-driven.
             </CardDescription>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Industry insights & trends
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Supporting statistics
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Best practice recommendations
-              </div>
-            </div>
+            <Accordion type="single" collapsible>
+              <AccordionItem value="details-yes">
+                <AccordionTrigger className="text-sm font-medium text-foreground/90 hover:underline">
+                  Learn more
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Industry insights & trends
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Supporting statistics
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Best practice recommendations
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
 
         {/* Option 2: Skip Research, Use Existing Content Only */}
-        <Card 
+        <Card
           variant={slideData.wantsResearch === false ? "premium" : "glass"}
           className={`cursor-pointer transition-premium hover:scale-[1.02] ${
             slideData.wantsResearch === false ? "ring-2 ring-primary" : ""
@@ -266,8 +276,8 @@ Your slide will be created using the uploaded documents and description provided
         >
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
-                <XCircle className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-secondary">
+                <XCircle className="h-6 w-6 text-secondary-foreground" />
               </div>
               <div>
                 <CardTitle className="text-lg">No, use existing content</CardTitle>
@@ -284,20 +294,29 @@ Your slide will be created using the uploaded documents and description provided
             <CardDescription className="mb-4">
               Proceed with just the content from your uploaded documents. This is faster and works well when you have comprehensive source material.
             </CardDescription>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Faster processing time
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Focus on your specific content
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Maintain original context
-              </div>
-            </div>
+            <Accordion type="single" collapsible>
+              <AccordionItem value="details-no">
+                <AccordionTrigger className="text-sm font-medium text-foreground/90 hover:underline">
+                  Learn more
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Faster processing time
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Focus on your specific content
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Maintain original context
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
       </div>

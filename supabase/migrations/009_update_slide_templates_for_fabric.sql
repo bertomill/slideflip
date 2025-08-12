@@ -11,6 +11,15 @@ CREATE INDEX IF NOT EXISTS idx_slide_templates_slide_json ON slide_templates USI
 ALTER TABLE IF EXISTS slide_templates
 ALTER COLUMN is_active SET DEFAULT true;
 
+-- 3b) Make name unique to support idempotent upserts by name
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_slide_templates_name_unique'
+  ) THEN
+    CREATE UNIQUE INDEX idx_slide_templates_name_unique ON slide_templates (name);
+  END IF;
+END $$;
+
 -- 4) Touch updated_at on modification
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$

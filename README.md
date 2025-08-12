@@ -313,6 +313,8 @@ curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
 curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
   -H 'Content-Type: application/json' \
   -d '{"id":"three-column-kpis-01","name":"Three Column KPIs"}'
+
+# Note: `id` refers to the JSON filename under templates/fabric; the DB row id remains a UUID.
 ```
 
 ### Assets
