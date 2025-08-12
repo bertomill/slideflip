@@ -35,6 +35,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [canvasKey, setCanvasKey] = useState(0); // Add this line
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,17 +161,23 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     const containerHeight = containerRef.current.offsetHeight || 500;
     const scale = calculateOptimalScale(containerWidth, containerHeight);
 
-    if (!canvas) {
-      // Create new canvas
-      const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
-      setCanvas(newCanvas);
-    } else {
-      // Update existing canvas
-      import('@/lib/slide-to-fabric').then(module => {
-        module.renderSlideOnCanvas(canvas, extendedSlideData.slideJson!, scale);
-      });
+    // Always dispose of existing canvas first
+    if (canvas) {
+      canvas.dispose();
+      setCanvas(null);
     }
-  }, [extendedSlideData.slideJson, canvas]);
+
+    // Create new canvas for each update
+    const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
+    setCanvas(newCanvas);
+
+    // Cleanup function
+    return () => {
+      if (newCanvas) {
+        newCanvas.dispose();
+      }
+    };
+  }, [extendedSlideData.slideJson, canvasKey]); // Add canvasKey to dependencies
 
   // Auto-generate on first entry if we don't have JSON yet
   useEffect(() => {
@@ -179,16 +186,28 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
     }
   }, []);
 
+  // Add this useEffect for cleanup - PUT IT HERE
+  useEffect(() => {
+    return () => {
+      // Cleanup canvas on component unmount
+      if (canvas) {
+        canvas.dispose();
+      }
+    };
+  }, [canvas]);
+
   const regenerateWithFeedback = async () => {
-    if (!feedback.trim()) return;
-    setIsRegenerating(true);
-    try {
-      await generateSlide(feedback.trim());
-    } finally {
-      setIsRegenerating(false);
-      setFeedback("");
-    }
-  };
+  if (!feedback.trim()) return;
+  setIsRegenerating(true);
+  try {
+    // Force canvas recreation by updating key
+    setCanvasKey(prev => prev + 1);
+    await generateSlide(feedback.trim());
+  } finally {
+    setIsRegenerating(false);
+    setFeedback("");
+  }
+};
 
   // Open in Google Slides
   const openInGoogleSlides = async () => {
@@ -356,12 +375,17 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
           ) : (
             <div 
               ref={containerRef}
+              key={`canvas-container-${canvasKey}`} // Add this line
               className="border rounded-lg overflow-hidden shadow-lg bg-gray-100"
               style={{ minHeight: '400px' }}
             >
               <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <canvas ref={canvasRef} className="shadow-lg" />
+                  <canvas 
+                    ref={canvasRef} 
+                    key={`canvas-${canvasKey}`} // Add this line
+                    className="shadow-lg" 
+                  />
                 </div>
               </div>
             </div>
