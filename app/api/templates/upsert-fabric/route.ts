@@ -23,12 +23,36 @@ export async function POST(req: NextRequest) {
     const slideJson = JSON.parse(jsonRaw);
 
     const supabase = await createClient();
-    // Use name as unique key for idempotent upserts (see migration adding unique index on name)
-    const { data, error } = await supabase
+    // Idempotent behavior without relying on DB constraint: find-or-insert
+    const { data: existing } = await supabase
       .from('slide_templates')
-      .upsert(
-        {
-          // do not send UUID id, let DB generate/keep existing
+      .select('id')
+      .eq('name', name)
+      .limit(1)
+      .maybeSingle();
+
+    let data;
+    let error;
+    if (existing?.id) {
+      ({ data, error } = await supabase
+        .from('slide_templates')
+        .update({
+          description: description ?? 'Fabric template',
+          theme,
+          html_content: '',
+          css_scoped: true,
+          aspect_ratio,
+          tags,
+          is_active: true,
+          slide_json: slideJson,
+        })
+        .eq('id', existing.id)
+        .select()
+        .single());
+    } else {
+      ({ data, error } = await supabase
+        .from('slide_templates')
+        .insert({
           name,
           description: description ?? 'Fabric template',
           theme,
@@ -38,11 +62,10 @@ export async function POST(req: NextRequest) {
           tags,
           is_active: true,
           slide_json: slideJson,
-        },
-        { onConflict: 'name' },
-      )
-      .select()
-      .single();
+        })
+        .select()
+        .single());
+    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true, template: data });
