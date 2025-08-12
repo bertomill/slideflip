@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PptxGenJS from 'pptxgenjs';
 import { loadSchemaById, renderPptxFromSchema } from '@/lib/pptx-templates/schema';
+import { logEvent, saveDownload } from '@/lib/flow-logging';
 
 // ============================================================================
 // POWERPOINT GENERATION API ENDPOINT
@@ -67,6 +68,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Flow logging to Supabase:
+    // - Record download request intent in `flow_events`
+    await logEvent({ flowId: requestData.flow_id, step: 'download', actor: 'user', eventType: 'download_pptx_requested', payload: { hasHtml: !!requestData.slideHtml } });
 
     // POWERPOINT INITIALIZATION: Create new presentation instance using PptxGenJS library
     // This library provides programmatic PowerPoint generation with full formatting control
@@ -147,6 +152,9 @@ export async function POST(request: NextRequest) {
         });
 
         const pptxBuffer = await pptx.write({ outputType: 'nodebuffer' });
+        // Save successful download to `flow_downloads` and log completion
+        await saveDownload({ flowId: requestData.flow_id, format: 'pptx', url: null, success: true });
+        await logEvent({ flowId: requestData.flow_id, step: 'download', actor: 'system', eventType: 'download_pptx_completed' });
         return new NextResponse(pptxBuffer as unknown as BodyInit, {
           status: 200,
           headers: {
@@ -361,6 +369,9 @@ export async function POST(request: NextRequest) {
     // FILE DOWNLOAD RESPONSE: Return the PPTX file as an immediate download
     // Sets appropriate headers for browser to recognize and download the file
     // Filename includes timestamp to prevent conflicts with multiple downloads
+    // Save successful download to `flow_downloads` and log completion
+    await saveDownload({ flowId: requestData.flow_id, format: 'pptx', url: null, success: true });
+    await logEvent({ flowId: requestData.flow_id, step: 'download', actor: 'system', eventType: 'download_pptx_completed' });
     return new NextResponse(pptxBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
@@ -375,6 +386,10 @@ export async function POST(request: NextRequest) {
     console.error('PPTX generation error:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
 
+    // Persist failure and log event
+    const parsed = await request.json().catch(() => ({} as any));
+    await saveDownload({ flowId: parsed.flow_id, format: 'pptx', url: null, success: false });
+    await logEvent({ flowId: parsed.flow_id, step: 'download', actor: 'system', eventType: 'download_pptx_failed', payload: { message: error instanceof Error ? error.message : 'unknown' } });
     return NextResponse.json({
       error: 'Failed to generate PowerPoint file',
       details: error instanceof Error ? error.message : 'Unknown error',

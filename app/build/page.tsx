@@ -23,8 +23,8 @@ import { UploadStep } from "@/components/builder/upload-step";      // Step 1: D
 import { ThemeStep } from "@/components/builder/theme-step";        // Step 2: Visual theme selection
 import { ResearchStep } from "@/components/builder/research-step";  // Step 3: Research options and data gathering
 import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback
-import { PreviewStep } from "@/components/builder/preview-step";    // Step 5: AI slide generation and preview
-import { DownloadStep } from "@/components/builder/download-step";  // Step 6: Final export and download
+import { PreviewStep } from "@/components/builder/preview-step-fabric"; // Step 5: AI slide generation and preview with Fabric.js
+// import { DownloadStep } from "@/components/builder/download-step";  // Step 6: Removed - export now happens in Preview step
 
 // Supabase client for user authentication and session management
 import { createClient } from "@/lib/supabase/client";
@@ -72,7 +72,8 @@ export type SlideData = {
   researchData?: string;    // Optional research results from external sources
   contentPlan?: string;     // AI-generated content plan for user review
   userFeedback?: string;    // User's feedback and additional requirements
-  slideHtml?: string;       // Generated HTML content for the slide
+  slideHtml?: string;       // Generated HTML content for the slide (legacy)
+  slideJson?: any;          // Generated JSON slide definition for Fabric.js/PptxGenJS
 };
 
 // Configuration for the multi-step slide builder process
@@ -81,8 +82,7 @@ const steps = [
   { id: 2, name: "Theme", description: "Choose theme" },
   { id: 3, name: "Research", description: "Research options" },
   { id: 4, name: "Content", description: "Plan content" },
-  { id: 5, name: "Preview", description: "Review & refine" },
-  { id: 6, name: "Download", description: "Export slide" },
+  { id: 5, name: "Preview", description: "Review & export" },
 ];
 
 /**
@@ -294,14 +294,7 @@ export default function Build() {
             sendGenerateSlide={sendGenerateSlide}
           />
         );
-      case 6:
-        return (
-          <DownloadStep 
-            slideData={slideData} 
-            onPrev={prevStep} 
-            onComplete={() => setCurrentStep(1)} 
-          />
-        );
+      // case 6: Download step removed - export functionality moved to Preview step
       default:
         return null;
     }

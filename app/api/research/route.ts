@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { tavily } from '@tavily/core';
+import { logEvent, saveResearchRun } from '@/lib/flow-logging';
 
 /**
  * API endpoint for conducting research using Tavily search API
@@ -7,15 +8,35 @@ import { tavily } from '@tavily/core';
  * Returns formatted research results suitable for slide presentation content
  */
 export async function POST(request: NextRequest) {
+  // Hoisted variables for catch scope
+  let flow_id: string | undefined;
+  let reqQuery: string | undefined;
+  let reqDescription: string | undefined;
+  let reqOptions: any | undefined;
+
   try {
     // REQUEST VALIDATION: Extract search parameters from request body
     // - query: The main search term or question
     // - description: Additional context about what the user is looking for
     // - options: Optional search configuration (maxResults, timeRange, etc.)
-    const { query, description, options } = await request.json();
+    const parsed = await request.json();
+    flow_id = parsed.flow_id as string | undefined;
+    reqQuery = parsed.query as string | undefined;
+    reqDescription = parsed.description as string | undefined;
+    reqOptions = parsed.options as any | undefined;
+
+    // Flow logging to Supabase:
+    // - Inserts an event row into `flow_events` for the research request
+    await logEvent({
+      flowId: flow_id,
+      step: 'research',
+      actor: 'user',
+      eventType: 'research_requested',
+      payload: { query: reqQuery, options: reqOptions }
+    });
 
     // Validate required parameters - both query and description are needed for effective research
-    if (!query || !description) {
+    if (!reqQuery || !reqDescription) {
       return NextResponse.json(
         { error: 'Query and description are required' },
         { status: 400 }
@@ -36,12 +57,12 @@ export async function POST(request: NextRequest) {
 
     // QUERY OPTIMIZATION: Build optimized search query respecting Tavily's 400 character API limit
     // Strategy: prioritize user query, then add description and keywords as space allows
-    let searchQuery = query.substring(0, 200); // Reserve half the limit for the primary query
+    let searchQuery = (reqQuery as string).substring(0, 200); // Reserve half the limit for the primary query
 
     // Append user description if it fits, truncating to preserve space for keywords
-    if (description && searchQuery.length < 300) {
+    if (reqDescription && searchQuery.length < 300) {
       const remainingSpace = 350 - searchQuery.length; // Reserve 50 chars for final keywords
-      const truncatedDescription = description.substring(0, remainingSpace);
+      const truncatedDescription = (reqDescription as string).substring(0, remainingSpace);
       searchQuery += ` ${truncatedDescription}`;
     }
 
@@ -56,15 +77,15 @@ export async function POST(request: NextRequest) {
     // Configure search parameters with user options or sensible defaults
     const searchOptions: Record<string, any> = {
       searchDepth: 'advanced' as const, // Use advanced search for comprehensive results
-      maxResults: options?.maxResults || 5, // Default to 5 results for performance
-      includeAnswer: options?.includeAnswer !== false, // Include AI-generated answer summaries by default
-      includeImages: options?.includeImages || false, // Only include images if explicitly requested
-      includeImageDescriptions: options?.includeImages || false, // Include image descriptions with images
+      maxResults: (reqOptions as any)?.maxResults || 5, // Default to 5 results for performance
+      includeAnswer: (reqOptions as any)?.includeAnswer !== false, // Include AI-generated answer summaries by default
+      includeImages: (reqOptions as any)?.includeImages || false, // Only include images if explicitly requested
+      includeImageDescriptions: (reqOptions as any)?.includeImages || false, // Include image descriptions with images
     };
 
     // Add domain exclusions based on user preferences
     const excludeDomains: string[] = [];
-    if (options?.excludeSocial !== false) {
+    if ((reqOptions as any)?.excludeSocial !== false) {
       // By default, exclude social media sites for higher quality research
       excludeDomains.push('reddit.com', 'quora.com', 'twitter.com', 'facebook.com', 'instagram.com');
     }
@@ -73,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add time range filtering if specified by user
-    if (options?.timeRange && options.timeRange !== 'all') {
+    if ((reqOptions as any)?.timeRange && (reqOptions as any).timeRange !== 'all') {
       // Note: Tavily doesn't directly support time ranges, but we can add temporal keywords
       const timeKeywords = {
         'day': 'today recent',
@@ -81,20 +102,26 @@ export async function POST(request: NextRequest) {
         'month': 'this month recent',
         'year': 'this year 2024 2025'
       };
-      const timeKeyword = timeKeywords[options.timeRange as keyof typeof timeKeywords];
+      const timeKeyword = timeKeywords[(reqOptions as any).timeRange as keyof typeof timeKeywords];
       if (timeKeyword && searchQuery.length < 380) {
         searchQuery += ` ${timeKeyword}`;
       }
     }
 
     // Execute search using Tavily SDK with user-customized parameters
+    const startTs = Date.now();
     const data = await client.search(searchQuery, searchOptions);
+    const durationMs = Date.now() - startTs;
 
     // SEARCH RESULT PROCESSING: Handle empty or insufficient search results gracefully
     if (!data.results || data.results.length === 0) {
+      // Persist no-result research run to `flow_research_runs`
+      await saveResearchRun({ flowId: flow_id, query: reqQuery as string, options: searchOptions, result: null, sources: [], answer: data.answer || null, status: 'no_results', durationMs });
+      // Log completion event to `flow_events`
+      await logEvent({ flowId: flow_id, step: 'research', actor: 'ai', eventType: 'research_completed', payload: { status: 'no_results' } });
       return NextResponse.json({
         success: true,
-        researchData: `No specific research results found for "${query}". 
+        researchData: `No specific research results found for "${reqQuery}". 
 
 Your slide will be created using the uploaded documents and description provided. Consider refining your description with more specific keywords for better research results.`,
         sources: [],
@@ -117,7 +144,7 @@ Your slide will be created using the uploaded documents and description provided
     if (researchInsights.length === 0) {
       return NextResponse.json({
         success: true,
-        researchData: `Limited research results found for "${query}". 
+        researchData: `Limited research results found for "${reqQuery}". 
 
 Your slide will be created using the uploaded documents and description provided. The search may have been too specific - consider using broader terms for better research results.`,
         sources: [],
@@ -126,7 +153,7 @@ Your slide will be created using the uploaded documents and description provided
     }
 
     // RESEARCH FORMATTING: Create formatted research summary optimized for slide presentation
-    let formattedResearch = `Research Insights for "${query}":
+    let formattedResearch = `Research Insights for "${reqQuery}":
 
 `;
 
@@ -151,6 +178,10 @@ Key Takeaways:
 • Focus areas: industry trends, best practices, supporting data
 • Research confidence: ${Math.round(researchInsights.reduce((acc: number, r: { score: number }) => acc + r.score, 0) / researchInsights.length * 100)}%`;
 
+    // Persist successful research run to `flow_research_runs`, then log completion event
+    await saveResearchRun({ flowId: flow_id, query: reqQuery as string, options: searchOptions, result: formattedResearch, sources: researchInsights, answer: data.answer || null, status: 'success', durationMs });
+    await logEvent({ flowId: flow_id, step: 'research', actor: 'ai', eventType: 'research_completed', payload: { status: 'success', sources: researchInsights.length } });
+
     // Return successful response with formatted research data and source metadata
     return NextResponse.json({
       success: true,
@@ -159,9 +190,15 @@ Key Takeaways:
       answer: data.answer || null,
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     // Log error details for debugging while returning generic error to client
     console.error('Research API error:', error);
+    const fallbackFlowId = flow_id;
+    const fallbackQuery = typeof reqQuery === 'string' ? (reqQuery as string) : '';
+    const fallbackOptions = reqOptions as any;
+    // Persist error outcome to `flow_research_runs`, then log failure event
+    await saveResearchRun({ flowId: fallbackFlowId, query: fallbackQuery, options: fallbackOptions, result: null, sources: null, answer: null, status: 'error' });
+    await logEvent({ flowId: fallbackFlowId, step: 'research', actor: 'system', eventType: 'research_failed', payload: { message: (error as Error)?.message ?? 'unknown' } });
     return NextResponse.json(
       { error: 'Failed to conduct research', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

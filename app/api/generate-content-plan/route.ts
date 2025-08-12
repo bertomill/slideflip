@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { createClient } from '@/lib/supabase/server';
 
 // ============================================================================
 // CONTENT PLANNING API ENDPOINT
@@ -28,12 +29,15 @@ const openai = new OpenAI({
  * @returns JSON response with structured content plan or error details
  */
 export async function POST(request: NextRequest) {
+  const supabase = createClient();
+  
   try {
     // ========================================================================
     // REQUEST PARSING: Extract planning context from request body
     // ========================================================================
     
     const {
+      flowId,            // Flow ID for logging
       description,        // User's slide description
       selectedTheme,      // Visual theme choice
       hasResearch,        // Whether research was conducted
@@ -169,6 +173,25 @@ Make this plan detailed enough that the user can clearly see what their final sl
     }
 
     // ========================================================================
+    // LOG PLANNING EVENT TO SUPABASE
+    // ========================================================================
+    
+    if (flowId) {
+      await supabase.from('flow_events').insert({
+        flow_id: flowId,
+        step: 'content',
+        actor: 'ai',
+        event_type: 'content_plan_generated',
+        payload: {
+          contentPlan,
+          theme: selectedTheme,
+          hasResearch,
+          documentCount
+        }
+      });
+    }
+
+    // ========================================================================
     // SUCCESS RESPONSE: Return structured content plan
     // ========================================================================
     
@@ -187,10 +210,22 @@ Make this plan detailed enough that the user can clearly see what their final sl
 
   } catch (error) {
     // ========================================================================
-    // ERROR HANDLING: Log and return user-friendly error
+    // ERROR HANDLING: Log error to Supabase and return user-friendly response
     // ========================================================================
     
     console.error('Content planning error:', error);
+    
+    if (flowId) {
+      await supabase.from('flow_events').insert({
+        flow_id: flowId,
+        step: 'content',
+        actor: 'ai',
+        event_type: 'content_plan_error',
+        payload: {
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
     
     return NextResponse.json(
       {
