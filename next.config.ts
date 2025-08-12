@@ -18,6 +18,37 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Avoid bundling Node-only modules in client code paths
+  webpack: (config) => {
+    // Gracefully ignore node:* imports in the browser bundle
+    config.resolve = config.resolve || {} as any;
+    (config.resolve.alias as any) = {
+      ...(config.resolve.alias || {}),
+      'node:fs': false,
+      'node:https': false,
+      fs: false,
+      https: false,
+      http: false,
+      path: false,
+      stream: false,
+      crypto: false,
+      zlib: false,
+    } as any;
+
+    (config.resolve.fallback as any) = {
+      ...(config.resolve.fallback || {}),
+      fs: false,
+      https: false,
+      http: false,
+      path: false,
+      stream: false,
+      crypto: false,
+      zlib: false,
+    } as any;
+
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -11,7 +11,12 @@ import { SlideData } from "@/app/build/page";
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale, SLIDE_WIDTH_PX, SLIDE_HEIGHT_PX } from "@/lib/slide-to-fabric";
 import { SlideDefinition } from "@/lib/slide-types";
-import PptxGenJS from "pptxgenjs";
+// Import PPTX generator only in the browser to avoid bundling node:* deps on Vercel
+let PptxGenJS: any;
+if (typeof window !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  PptxGenJS = require('pptxgenjs');
+}
 
 interface PreviewStepProps {
   slideData: SlideData;
@@ -222,6 +227,7 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
   const exportToPowerPoint = () => {
     if (!extendedSlideData.slideJson) return;
     
+    if (!PptxGenJS) return;
     const pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_16x9';
     pptx.author = 'SlideFlip';
