@@ -46,10 +46,12 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     """WebSocket endpoint for real-time communication with frontend"""
     try:
         # Connect the client with better error handling
+        logger.info(f"Connecting client {client_id}")
         await websocket_manager.connect(websocket, client_id)
         
         # Check if this client has pending knowledge graph tasks that need clustering
         if await kg_task_manager.is_clustering_needed(client_id):
+            logger.info(f"Client {client_id} has pending knowledge graph tasks, performing clustering")
             # Wait for any pending tasks to complete
             await kg_task_manager.wait_for_client_tasks(client_id)
             
@@ -59,6 +61,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
                 await perform_final_clustering(client_id, kg_service, kg_task_manager)
                 await kg_task_manager.mark_clustering_completed(client_id)
+
+        else:
+            logger.info(f"Client {client_id} has no pending knowledge graph tasks")
         
         # Try to load existing graphs if available
         if await kg_task_manager.load_existing_graphs_if_available(client_id):
@@ -69,6 +74,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             
             # Send a status update to the client
             try:
+                logger.info("Existing knowledge graphs loaded succes")
                 status_message = ServerMessage(
                     type="kg_status_response",
                     data={
@@ -89,7 +95,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 )
             except Exception as e:
                 logger.warning(f"Could not send status update to client {client_id}: {e}")
-        
+        else:
+            logger.info(f"Client {client_id} has no existing knowledge graphs")
         # Main message loop
         while True:
             try:

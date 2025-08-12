@@ -16,9 +16,8 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from transformers import AutoTokenizer
-import hashlib
 import openai
+import tiktoken  # Add this import
 
 from src.models.message_models import FileInfo
 from src.core.config import Settings
@@ -37,20 +36,18 @@ class KnowledgeGraphService:
         self.client_id = client_id
         self.llm_service = LLMService()
         
-        # Initialize tokenizer for chunking
+        # Initialize tiktoken tokenizer for chunking
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
-            self.chunk_size = 512  # tokens
-            self.chunk_overlap = 50  # tokens
+            self.tokenizer = tiktoken.encoding_for_model("gpt-4o")
+            self.chunk_size = 200  # tokens
+            self.chunk_overlap = 20  # tokens (10% overlap)
         except Exception as e:
-            logger.warning(f"Failed to load tokenizer: {e}. Using fallback chunking.")
+            logger.warning(f"Failed to load tiktoken tokenizer: {e}. Using fallback chunking.")
             self.tokenizer = None
             self.chunk_size = 1000  # characters
             self.chunk_overlap = 100  # characters
-        
         # Create output directories
         self._create_output_directories()
-        
         # Embedding storage
         self.node_embeddings: Dict[str, np.ndarray] = {}
         self.edge_embeddings: Dict[Tuple[str, str], np.ndarray] = {}
@@ -138,7 +135,7 @@ class KnowledgeGraphService:
         logger.info(f"Generated knowledge graph for file {file_info.filename}")
     
     def _chunk_content_with_tokenizer(self, content: str) -> List[str]:
-        """Chunk content using tokenizer with overlap"""
+        """Chunk content using tiktoken tokenizer with overlap"""
         if self.tokenizer is None:
             # Fallback to character-based chunking
             return self._chunk_content_fallback(content)
@@ -159,7 +156,7 @@ class KnowledgeGraphService:
             chunk_tokens = tokens[start:end]
             
             # Decode tokens back to text
-            chunk_text = self.tokenizer.decode(chunk_tokens, skip_special_tokens=True)
+            chunk_text = self.tokenizer.decode(chunk_tokens)
             
             # Clean up chunk boundaries
             chunk_text = self._clean_chunk_boundaries(chunk_text)
