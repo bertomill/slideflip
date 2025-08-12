@@ -55,6 +55,36 @@ class SlideGenerationMessage(BaseModel):
     wants_research: Optional[bool] = Field(False, description="Whether to include research")
     client_id: Optional[str] = Field(None, description="Client identifier")
 
+class ResearchRequestMessage(BaseModel):
+    """Model for research request messages"""
+    description: str = Field(..., description="User's slide description")
+    research_options: Dict[str, Any] = Field(..., description="Complete ResearchOptions object")
+    wants_research: bool = Field(..., description="User's research preference")
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class ContentPlanningMessage(BaseModel):
+    """Model for content planning messages"""
+    description: str = Field(..., description="User's slide description")
+    research_data: Optional[str] = Field(None, description="Research results from Step 3")
+    theme: str = Field(..., description="Selected theme from Step 2")
+    parsed_documents: Optional[List[Dict[str, Any]]] = Field(None, description="Array of parsed document content")
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class ContentPlanResponseMessage(BaseModel):
+    """Model for content plan response messages"""
+    content_plan: str = Field(..., description="Generated content plan")
+    suggestions: List[str] = Field(default_factory=list, description="Content suggestions")
+    estimated_slide_count: int = Field(1, description="Estimated number of slides")
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class ProgressUpdateMessage(BaseModel):
+    """Model for progress update messages"""
+    step: str = Field(..., description="Current step name")
+    progress: int = Field(..., description="Progress percentage (0-100)")
+    message: str = Field(..., description="Progress message")
+    timestamp: str = Field(..., description="Timestamp of the update")
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
 class ProcessingRequestMessage(BaseModel):
     """Model for slide processing requests"""
     client_id: str = Field(..., description="Client identifier")
@@ -129,4 +159,38 @@ class StatusMessage(BaseModel):
     message: str
     progress: Optional[float] = None
     current_step: Optional[str] = None
-    total_steps: Optional[int] = None 
+    total_steps: Optional[int] = None
+
+# Phase 2: Enhanced session management message models
+class SessionInitializedMessage(BaseModel):
+    """Model for session initialization confirmation"""
+    session_id: str = Field(..., description="Client session identifier")
+    current_step: str = Field(..., description="Current step name")
+    overall_progress: int = Field(..., description="Overall progress percentage")
+    available_steps: List[str] = Field(..., description="List of available steps")
+    message: str = Field(..., description="Session initialization message")
+
+class SessionStatusMessage(BaseModel):
+    """Model for session status request"""
+    client_id: Optional[str] = Field(None, description="Client identifier")
+
+class SessionStatusResponseMessage(BaseModel):
+    """Model for session status response"""
+    session_id: str = Field(..., description="Client session identifier")
+    current_step: str = Field(..., description="Current step name")
+    overall_progress: int = Field(..., description="Overall progress percentage")
+    step_details: Dict[str, Any] = Field(..., description="Detailed step information")
+    session_start_time: Optional[str] = Field(None, description="Session start timestamp")
+    last_activity: Optional[str] = Field(None, description="Last activity timestamp")
+    message: str = Field(..., description="Status message")
+
+class EnhancedProgressUpdateMessage(BaseModel):
+    """Model for enhanced progress updates with step data"""
+    step: str = Field(..., description="Current step name")
+    progress: int = Field(..., description="Progress percentage (0-100)")
+    message: str = Field(..., description="Progress message")
+    timestamp: str = Field(..., description="Timestamp of the update")
+    overall_progress: int = Field(..., description="Overall progress percentage")
+    current_step: str = Field(..., description="Current step name")
+    step_data: Dict[str, Any] = Field(default_factory=dict, description="Step-specific data")
+    client_id: Optional[str] = Field(None, description="Client identifier") 
