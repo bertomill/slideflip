@@ -14,7 +14,9 @@ import { SlideDefinition } from "@/lib/slide-types";
 
 // Load PptxGenJS UMD bundle at runtime via CDN to avoid bundling Node-only imports
 // We'll access it via the global `window.PptxGenJS` exposed by the minified browser build
-type PptxWindow = Window & { PptxGenJS?: any };
+// PptxGenJS exposes a constructor on window at runtime
+// Using unknown here to avoid importing node-bound types; narrowed at call-site
+type PptxWindow = Window & { PptxGenJS?: unknown };
 async function ensurePptx() {
   if (typeof window === 'undefined') return null;
   const w = window as PptxWindow;
@@ -246,10 +248,16 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   // Export to PowerPoint
   const exportToPowerPoint = async () => {
     if (!extendedSlideData.slideJson) return;
-<<<<<<< HEAD
-    const PptxGenJS = await ensurePptx();
-    if (!PptxGenJS) return;
-    const pptx = new PptxGenJS();
+    const PptxGenJSImport = await ensurePptx();
+    if (!PptxGenJSImport) return;
+    const PptxCtor = PptxGenJSImport as unknown as new () => {
+      layout: string;
+      author: string;
+      title: string;
+      addSlide: () => unknown;
+      writeFile: (opts: { fileName: string }) => Promise<unknown>;
+    };
+    const pptx = new PptxCtor();
     pptx.layout = 'LAYOUT_16x9';
     pptx.author = 'SlideFlip';
     pptx.title = slideData.description || 'Presentation';
