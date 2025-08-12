@@ -289,10 +289,17 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
 
 - Added reusable card style `card-contrast` in `app/globals.css` for high-emphasis cards with thin white borders on dark backgrounds. Apply it via `className="card-contrast"` alongside `variant="glass"` on `Card` components.
+ - Updated `card-contrast` to use a hairline `0.5px` border for a more refined outline on high-DPI displays.
+ - Added `builder-background` utility (Supabase-like pointillism) with a slightly lighter dark base. Applied to the builder root container in `app/build/page.tsx`.
 
 - Theme step UX: the Template selection and Color Palette sections are now collapsible using shadcn/ui `Accordion`. This makes the page easier to scan while preserving all functionality.
   - New component: `components/ui/accordion.tsx`
   - Updated: `components/builder/theme-step.tsx`
+
+- Templates now support Fabric.js/PptxGenJS JSON in Supabase:
+  - Added migration `009_update_slide_templates_for_fabric.sql` to add `slide_json JSONB` to `slide_templates`.
+  - API `app/api/examples/list` now prefers `slide_templates` with `slide_json` and falls back to legacy HTML examples.
+  - Template cards in `ThemeStep` can preview either HTML or Fabric JSON.
 
 ### Assets
 - `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).

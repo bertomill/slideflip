@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { createClient } from './client';
+import type { SlideDefinition } from "../slide-types";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -41,6 +42,8 @@ export interface SlideTemplate {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // New: Fabric.js/PptxGenJS compatible JSON definition
+  slide_json?: SlideDefinition | null;
 }
 
 // ============================================================================

@@ -13,6 +13,10 @@ import { ArrowLeft, ArrowRight, Sparkles, Image as ImageIcon } from "lucide-reac
 import { SlideData } from "@/app/build/page";
 // Accordion primitives for collapsible sections
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+// Fabric.js preview for template cards
+import { Canvas } from "fabric";
+import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
+import type { SlideDefinition } from "@/lib/slide-types";
 
 // Props interface for ThemeStep component
 interface ThemeStepProps {
@@ -29,7 +33,8 @@ type CuratedExample = {
   theme: string;
   description: string;
   aspect_ratio: string;
-  html: string;
+  html?: string;
+  slide_json?: SlideDefinition | null;
 };
 
 export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeStepProps) {
@@ -59,7 +64,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
 
         // Fallback: if we have no curated examples (e.g., Supabase not configured),
         // load the local HTML template so the user always sees a live preview.
-        if (!onlyOne || !onlyOne.html) {
+        if (!onlyOne || (!onlyOne.html && !onlyOne.slide_json)) {
           try {
             const fbRes = await fetch('/api/fallback-slide');
             const fbData = await fbRes.json();
@@ -109,6 +114,32 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     return (
       <div ref={ref} className="relative w-full aspect-[16/9] overflow-hidden rounded-t-lg bg-white">
         <div className="absolute left-0 top-0 origin-top-left" style={{ width: '960px', height: '540px', transform: `scale(${scale})` }} dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    );
+  };
+
+  // Component to preview a Fabric/PptxGen-compatible slide JSON
+  const SlidePreviewJSON = ({ slide }: { slide: SlideDefinition }) => {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [canvas, setCanvas] = useState<Canvas | null>(null);
+    useEffect(() => {
+      if (!containerRef.current || !canvasRef.current) return;
+      const containerWidth = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight || 300;
+      const s = calculateOptimalScale(containerWidth, containerHeight);
+      if (!canvas) {
+        const c = createSlideCanvas(canvasRef.current, slide, s);
+        setCanvas(c);
+      } else {
+        import('@/lib/slide-to-fabric').then(mod => mod.renderSlideOnCanvas(canvas, slide, s));
+      }
+    }, [slide, canvas]);
+    return (
+      <div ref={containerRef} className="relative w-full aspect-[16/9] overflow-hidden rounded-t-lg bg-white">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <canvas ref={canvasRef} />
+        </div>
       </div>
     );
   };
@@ -268,7 +299,11 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                       className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}
                       onClick={() => updateSlideData({ selectedTheme: ex.id })}
                     >
-                      <SlidePreview html={ex.html} />
+                      {ex.slide_json ? (
+                        <SlidePreviewJSON slide={ex.slide_json} />
+                      ) : (
+                        <SlidePreview html={ex.html || ''} />
+                      )}
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="font-semibold text-sm">{ex.name}</h4>

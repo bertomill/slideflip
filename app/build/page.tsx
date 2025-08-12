@@ -412,7 +412,7 @@ export default function Build() {
   // Renders a full-screen layout with collapsible sidebars and dynamic step content
   // Layout adapts responsively between desktop (dual sidebars) and mobile (single column)
   return (
-    <div className="min-h-screen gradient-dark-blue flex">
+    <div className="min-h-screen builder-background flex">
       {/* ========================================================================
           LEFT SIDEBAR: User profile and main navigation
           ========================================================================
