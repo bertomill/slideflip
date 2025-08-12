@@ -11,18 +11,11 @@ import { SlideData } from "@/app/build/page";
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
 import { SlideDefinition } from "@/lib/slide-types";
+
 // Load PptxGenJS UMD bundle at runtime via CDN to avoid bundling Node-only imports
 // We'll access it via the global `window.PptxGenJS` exposed by the minified browser build
-type PptxWindow = Window & { PptxGenJS?: unknown };
-interface PptxPresentation {
-  layout: string;
-  author: string;
-  title: string;
-  addSlide: () => unknown;
-  writeFile: (opts: { fileName: string }) => Promise<unknown>;
-}
-type PptxGenConstructor = new () => PptxPresentation;
-async function loadPptxGenJsUMD() {
+type PptxWindow = Window & { PptxGenJS?: any };
+async function ensurePptx() {
   if (typeof window === 'undefined') return null;
   const w = window as PptxWindow;
   if (w.PptxGenJS) return w.PptxGenJS;
@@ -253,9 +246,9 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   // Export to PowerPoint
   const exportToPowerPoint = async () => {
     if (!extendedSlideData.slideJson) return;
-    const PptxGenJS = (await loadPptxGenJsUMD()) as unknown as PptxGenConstructor | null;
+<<<<<<< HEAD
+    const PptxGenJS = await ensurePptx();
     if (!PptxGenJS) return;
-
     const pptx = new PptxGenJS();
     pptx.layout = 'LAYOUT_16x9';
     pptx.author = 'SlideFlip';
