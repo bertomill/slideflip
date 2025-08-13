@@ -1,5 +1,19 @@
 """
 Slide service for handling slide generation and processing
+
+This service acts as the main orchestrator for slide creation, handling:
+- File content extraction and storage
+- Theme selection and application
+- AI-powered slide generation
+- Research data integration
+- Content planning and refinement
+- HTML and PowerPoint file generation
+
+Frontend Integration Points:
+- WebSocket status callbacks for real-time progress updates
+- Theme selection storage for consistent styling
+- Client-specific data management for session persistence
+- Error handling with user-friendly messages
 """
 
 import asyncio
@@ -21,28 +35,42 @@ logger = logging.getLogger(__name__)
 
 
 class SlideService:
-    """Service for handling slide generation and processing"""
+    """
+    Main service for slide generation and processing
+    
+    Frontend Integration Notes:
+    - All async methods support WebSocket status callbacks for real-time updates
+    - Client data is stored in memory dictionaries (consider Redis for production)
+    - Methods return structured data suitable for JSON serialization
+    - Error handling provides user-friendly messages for UI display
+    """
 
     def __init__(self):
+        # Initialize all service dependencies
         self.file_service = FileService()
         self.llm_service = LLMService()
         self.ppt_service = PPTService()
         self.ai_service = AIService()
         self.research_service = ResearchService()
         self.theme_service = ThemeService()
-        self.client_descriptions: Dict[str, str] = {}
-        # Store theme information for each client
-        self.client_themes: Dict[str, Dict] = {}
-        # Store extracted content for each client
-        self.client_content: Dict[str, List[Dict]] = {}
-        self.processing_results: Dict[str, ProcessingResult] = {}
-        # Store research data for each client
-        self.client_research_data: Dict[str, Dict] = {}
-        # Store content plans for each client
-        self.client_content_plans: Dict[str, Dict] = {}
+        
+        # In-memory storage for client data (Frontend: Consider implementing cleanup for memory management)
+        self.client_descriptions: Dict[str, str] = {}  # User-provided slide descriptions
+        self.client_themes: Dict[str, Dict] = {}  # Selected theme data with colors and styling
+        self.client_content: Dict[str, List[Dict]] = {}  # Extracted file content (text + images)
+        self.processing_results: Dict[str, ProcessingResult] = {}  # Generation results for download
+        self.client_research_data: Dict[str, Dict] = {}  # External research data
+        self.client_content_plans: Dict[str, Dict] = {}  # AI-generated content outlines
 
     async def store_slide_description(self, client_id: str, description: str) -> bool:
-        """Store slide description for a client"""
+        """
+        Store user's slide description for later use
+        
+        Frontend Usage:
+        - Call this when user submits description in step 1
+        - Returns boolean for success/error UI feedback
+        - Description is used throughout the generation process
+        """
         try:
             self.client_descriptions[client_id] = description
             logger.info(f"Stored slide description for client {client_id}")
@@ -53,15 +81,29 @@ class SlideService:
             return False
 
     async def get_slide_description(self, client_id: str) -> Optional[str]:
-        """Get stored slide description for a client"""
+        """
+        Retrieve stored slide description
+        
+        Frontend Usage:
+        - Use for displaying user's original description in UI
+        - Returns None if no description stored
+        """
         return self.client_descriptions.get(client_id)
 
     async def store_theme_selection(self, client_id: str, theme_data) -> bool:
-        """Store theme selection for a client"""
+        """
+        Store user's theme selection with full styling data
+        
+        Frontend Usage:
+        - Call when user selects theme in theme selection step
+        - Supports both ThemeMessage objects and plain dictionaries
+        - Theme data includes colors, fonts, and styling preferences
+        - Returns boolean for UI feedback
+        """
         try:
-            # Handle both ThemeMessage objects and dictionaries
+            # Handle both ThemeMessage objects and dictionaries for flexible frontend integration
             if hasattr(theme_data, 'theme_id'):
-                # ThemeMessage object
+                # ThemeMessage object from API
                 theme_info = {
                     "theme_id": theme_data.theme_id,
                     "theme_name": theme_data.theme_name,
@@ -70,7 +112,7 @@ class SlideService:
                     "preview_text": theme_data.preview_text
                 }
             elif isinstance(theme_data, dict):
-                # Dictionary
+                # Dictionary from frontend form data
                 theme_info = {
                     "theme_id": theme_data.get("theme_id"),
                     "theme_name": theme_data.get("theme_name"),
@@ -83,7 +125,7 @@ class SlideService:
                     f"Invalid theme_data type for client {client_id}: {type(theme_data)}")
                 return False
 
-            # Validate required fields
+            # Validate required fields for frontend error handling
             if not theme_info["theme_id"] or not theme_info["theme_name"]:
                 logger.error(
                     f"Missing required theme fields for client {client_id}")
@@ -99,11 +141,26 @@ class SlideService:
             return False
 
     async def get_theme_selection(self, client_id: str) -> Optional[Dict]:
-        """Get stored theme selection for a client"""
+        """
+        Retrieve stored theme selection
+        
+        Frontend Usage:
+        - Use for displaying selected theme in UI
+        - Contains full theme data including color palette
+        - Returns None if no theme selected
+        """
         return self.client_themes.get(client_id)
 
     async def store_extracted_content(self, client_id: str, content_data: Dict) -> bool:
-        """Store extracted content (text and images) for a client"""
+        """
+        Store extracted content from uploaded files
+        
+        Frontend Usage:
+        - Called automatically during file upload processing
+        - Stores both text content and image data
+        - Multiple files create multiple content entries
+        - Returns boolean for UI feedback
+        """
         try:
             if client_id not in self.client_content:
                 self.client_content[client_id] = []
@@ -118,11 +175,25 @@ class SlideService:
             return False
 
     async def get_extracted_content(self, client_id: str) -> List[Dict]:
-        """Get all stored extracted content for a client"""
+        """
+        Get all stored extracted content for a client
+        
+        Frontend Usage:
+        - Use for displaying uploaded content summary
+        - Returns list of content dictionaries with text and images
+        - Each entry includes filename and file type
+        """
         return self.client_content.get(client_id, [])
 
     async def get_client_files_content(self, client_id: str) -> List[Dict]:
-        """Get content from all files uploaded by a client"""
+        """
+        Get content from all files uploaded by a client
+        
+        Frontend Usage:
+        - Alternative to get_extracted_content that reads from file system
+        - Includes file metadata for UI display
+        - Used for content verification and preview
+        """
         try:
             # Get all files for the client
             files = await self.file_service.get_client_files(client_id)
@@ -141,7 +212,7 @@ class SlideService:
                 f"Error getting client files content for {client_id}: {e}")
             return []
 
-    # New AI Integration Methods for Phase 1
+    # AI Integration Methods - Core slide generation functionality
 
     async def generate_slide_with_ai(
         self,
@@ -154,8 +225,21 @@ class SlideService:
         status_callback=None
     ) -> Dict[str, Any]:
         """
-        Generate slide using OpenAI API with all collected data
-        Send real-time progress updates via WebSocket
+        Main AI-powered slide generation method with real-time progress updates
+        
+        Frontend Integration:
+        - Primary method for slide generation (step 5: generate)
+        - status_callback: WebSocket function for real-time progress (0-100%)
+        - Returns complete slide data including HTML and file paths
+        - Includes processing time for UI performance metrics
+        - Error handling returns structured error data
+        
+        Progress Stages for UI:
+        10% - Starting generation
+        20% - Loading theme and content
+        40% - AI processing
+        80% - Finalizing
+        100% - Complete
         """
         start_time = datetime.now()
 
@@ -163,24 +247,27 @@ class SlideService:
             logger.info(
                 f"Starting AI-powered slide generation for client {client_id}")
 
+            # Progress update: Starting generation
             if status_callback:
                 await status_callback("Starting AI-powered slide generation...", 10)
 
-            # Get stored theme information
+            # Get stored theme information for consistent styling
             theme_info = await self.theme_service.get_theme_selection(client_id)
             color_palette = theme_info.get(
                 "color_palette", []) if theme_info else []
 
+            # Progress update: Loading data
             if status_callback:
                 await status_callback("Retrieving theme and content data...", 20)
 
-            # Get stored content from previous steps
+            # Get stored content from previous upload steps
             parsed_documents = await self.get_extracted_content(client_id)
 
+            # Progress update: AI processing
             if status_callback:
                 await status_callback("Generating slide HTML with AI...", 40)
 
-            # Generate slide HTML using AI service
+            # Main AI generation call - creates HTML content
             slide_html = await self.ai_service.generate_slide_html(
                 description=description,
                 theme=theme,
@@ -190,29 +277,32 @@ class SlideService:
                 color_palette=color_palette
             )
 
+            # Progress update: Finalizing
             if status_callback:
                 await status_callback("Finalizing slide generation...", 80)
 
-            # Save HTML content to client folder
+            # Save HTML for download - creates file in client folder
             html_file_path = await self._save_html_to_client_folder(
                 slide_html, description, client_id
             )
 
             processing_time = (datetime.now() - start_time).total_seconds()
 
+            # Progress update: Complete
             if status_callback:
                 await status_callback("Slide generation completed!", 100)
 
+            # Return structured data for frontend consumption
             result = {
-                "slide_html": slide_html,
-                "html_file_path": html_file_path,
-                "processing_time": processing_time,
-                "theme": theme,
-                "research_data": research_data,
-                "content_plan": content_plan,
-                "user_feedback": user_feedback,
-                "color_palette": color_palette,
-                "status": "success"
+                "slide_html": slide_html,  # For preview display
+                "html_file_path": html_file_path,  # For download link
+                "processing_time": processing_time,  # For performance metrics
+                "theme": theme,  # For UI confirmation
+                "research_data": research_data,  # For user reference
+                "content_plan": content_plan,  # For user reference
+                "user_feedback": user_feedback,  # For user reference
+                "color_palette": color_palette,  # For theme preview
+                "status": "success"  # For UI state management
             }
 
             logger.info(
@@ -223,6 +313,7 @@ class SlideService:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error(f"Error in AI-powered slide generation: {e}")
 
+            # Return error data for frontend error handling
             return {
                 "error": str(e),
                 "processing_time": processing_time,
@@ -237,15 +328,21 @@ class SlideService:
         theme: str = "default"
     ) -> Dict[str, Any]:
         """
-        Generate content plan using AI
+        Generate AI-powered content plan (step 4: content planning)
+        
+        Frontend Usage:
+        - Called in content planning step before generation
+        - Returns structured outline for user review and editing
+        - Content plan is used in final slide generation
+        - Throw exceptions for frontend error handling
         """
         try:
             logger.info(f"Generating content plan for client {client_id}")
 
-            # Get parsed documents for context
+            # Get parsed documents for AI context
             parsed_documents = await self.get_extracted_content(client_id)
 
-            # Generate content plan using AI service
+            # AI service generates structured content outline
             content_plan_result = await self.ai_service.generate_content_plan(
                 description=description,
                 research_data=research_data,
@@ -253,7 +350,7 @@ class SlideService:
                 parsed_documents=parsed_documents
             )
 
-            # Store the content plan
+            # Store for use in slide generation
             self.client_content_plans[client_id] = content_plan_result
 
             logger.info(
@@ -263,7 +360,7 @@ class SlideService:
         except Exception as e:
             logger.error(
                 f"Error generating content plan for client {client_id}: {e}")
-            raise
+            raise  # Re-raise for frontend error handling
 
     async def refine_content_plan(
         self,
@@ -273,21 +370,27 @@ class SlideService:
     ) -> Dict[str, Any]:
         """
         Refine content plan based on user feedback
+        
+        Frontend Usage:
+        - Called when user provides feedback on content plan
+        - Allows iterative improvement before final generation
+        - Returns updated content plan for UI display
+        - Integrates user input for personalized results
         """
         try:
             logger.info(f"Refining content plan for client {client_id}")
 
-            # Get original description for context
+            # Get original context for AI refinement
             original_description = await self.get_slide_description(client_id)
 
-            # Refine content plan using AI service
+            # AI service refines plan based on feedback
             refined_plan = await self.ai_service.refine_content_plan(
                 content_plan=content_plan,
                 user_feedback=user_feedback,
                 original_description=original_description or ""
             )
 
-            # Update stored content plan
+            # Update stored plan for final generation
             self.client_content_plans[client_id] = refined_plan
 
             logger.info(
@@ -297,7 +400,7 @@ class SlideService:
         except Exception as e:
             logger.error(
                 f"Error refining content plan for client {client_id}: {e}")
-            raise
+            raise  # Re-raise for frontend error handling
 
     async def store_research_data(
         self,
@@ -305,7 +408,12 @@ class SlideService:
         research_data: Dict[str, Any]
     ) -> bool:
         """
-        Store research data for a client
+        Store research data from external sources (step 3: research)
+        
+        Frontend Usage:
+        - Called when research step completes
+        - Stores external data for content enhancement
+        - Returns boolean for UI feedback
         """
         try:
             self.client_research_data[client_id] = research_data
@@ -321,7 +429,11 @@ class SlideService:
         client_id: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Get stored research data for a client
+        Retrieve stored research data
+        
+        Frontend Usage:
+        - Use for displaying research results in UI
+        - Returns None if no research performed
         """
         return self.client_research_data.get(client_id)
 
@@ -330,21 +442,34 @@ class SlideService:
         client_id: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Get stored content plan for a client
+        Retrieve stored content plan
+        
+        Frontend Usage:
+        - Use for displaying content plan in UI
+        - Returns None if no plan generated
         """
         return self.client_content_plans.get(client_id)
 
     async def store_file_content(self, client_id: str, file_path: str, filename: str) -> bool:
-        """Extract and store content from a specific file"""
+        """
+        Extract and store content from a specific uploaded file
+        
+        Frontend Usage:
+        - Called during file upload processing (step 1: upload)
+        - Extracts text and images from various file formats
+        - Returns boolean for upload success feedback
+        - Content is used throughout the generation process
+        """
         try:
-            # Extract content from the file
+            # Extract content using file service
             content = await self.file_service.extract_content_from_file(file_path)
             logger.info(f"Content: {content['text'][:100]}")
             if content:
+                # Add client metadata for tracking
                 content['client_id'] = client_id
                 content['upload_time'] = datetime.now().isoformat()
 
-                # Store the content
+                # Store for later use in generation
                 await self.store_extracted_content(client_id, content)
                 logger.info(
                     f"Stored content from file {filename} for client {client_id}")
@@ -367,21 +492,40 @@ class SlideService:
         client_id: str = None,
         status_callback=None
     ) -> Dict:
-        """Generate slide content with specific parameters and return both HTML and PPT file"""
+        """
+        Legacy slide generation method with parameters (maintains backward compatibility)
+        
+        Frontend Usage:
+        - Alternative generation method for simple workflows
+        - Generates both HTML and PowerPoint files
+        - Includes detailed progress updates via status_callback
+        - Returns comprehensive result data for UI display
+        
+        Progress Stages:
+        5% - Starting process
+        10-40% - File processing (varies by file count)
+        50% - AI layout generation
+        60% - AI content generation
+        75% - PowerPoint creation
+        85% - HTML generation
+        90% - File saving
+        95% - Finalizing
+        """
         start_time = datetime.now()
 
         try:
             logger.info(
                 f"Starting slide generation with {len(files)} files, theme: {theme}, research: {wants_research}")
 
-            # Send initial status
+            # Progress: Starting
             if status_callback:
                 logger.info(
                     f"Calling status callback: Starting slide generation process... (5%)")
                 await status_callback("Starting slide generation process...", 5)
 
-            # Get stored content if client_id is provided, otherwise extract from files
+            # Get or extract content based on client_id availability
             if client_id:
+                # Use stored content for faster processing
                 if status_callback:
                     logger.info(
                         f"Calling status callback: Retrieving stored content... (10%)")
@@ -390,13 +534,14 @@ class SlideService:
                 logger.info(
                     f"Using stored content for client {client_id}: {len(file_contents)} items")
             else:
-                # Extract text content from all files (fallback for backward compatibility)
+                # Extract content from files (fallback for backward compatibility)
                 if status_callback:
                     logger.info(
                         f"Calling status callback: Extracting content from uploaded files... (15%)")
                     await status_callback("Extracting content from uploaded files...", 15)
                 file_contents = []
                 for i, file_info in enumerate(files):
+                    # Dynamic progress based on file count
                     if status_callback:
                         progress = 15 + (i * 5)
                         logger.info(
@@ -410,39 +555,43 @@ class SlideService:
                             "file_type": file_info.file_type
                         })
 
-            # Combine all content into a single string for LLM processing
+            # Content processing for AI consumption
             if status_callback:
                 logger.info(
                     f"Calling status callback: Combining content from all files... (40%)")
                 await status_callback("Combining content from all files...", 40)
+            
+            # Combine content for AI processing
             combined_content = ""
             has_images = False
 
             for content in file_contents:
                 if isinstance(content, dict):
+                    # Handle different content formats
                     if 'text' in content:
                         combined_content += f"--- {content.get('file_name', 'unknown')} ---\n{content['text']}\n\n"
                     elif 'content' in content:
                         combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
 
-                    # Check if images are available
+                    # Check for images for layout decisions
                     if 'images' in content and content['images']:
                         has_images = True
                 else:
                     combined_content += f"--- Content ---\n{str(content)}\n\n"
 
-            # Generate slide layout using LLM
+            # AI layout generation
             if status_callback:
                 logger.info(
                     f"Calling status callback: Generating slide layout with AI... (50%)")
                 await status_callback("Generating slide layout with AI...", 50)
             logger.info("Generating slide layout using LLM...")
 
-            # Get stored theme information if available
+            # Get theme information for consistent styling
             theme_info = None
             if client_id:
                 theme_info = await self.get_theme_selection(client_id)
 
+            # Generate structured layout using AI
             layout = await self.llm_service.generate_slide_layout(
                 combined_content,
                 description,
@@ -451,13 +600,14 @@ class SlideService:
                 theme_info
             )
 
-            # Generate slide content using LLM
+            # AI content generation
             if status_callback:
                 logger.info(
                     f"Calling status callback: Creating slide content with AI... (60%)")
                 await status_callback("Creating slide content with AI...", 60)
             logger.info("Generating slide content using LLM...")
             
+            # Generate detailed content for each layout section
             content = await self.llm_service.generate_slide_content(
                 combined_content,
                 description,
@@ -465,7 +615,7 @@ class SlideService:
                 theme_info
             )
 
-            # Generate PPT file using the layout and content
+            # PowerPoint file generation
             if status_callback:
                 logger.info(
                     f"Calling status callback: Creating PowerPoint presentation... (75%)")
@@ -479,7 +629,7 @@ class SlideService:
                 client_id
             )
 
-            # Generate HTML based on the same layout and content
+            # HTML generation for preview
             if status_callback:
                 logger.info(
                     f"Calling status callback: Generating HTML preview... (85%)")
@@ -493,7 +643,7 @@ class SlideService:
                 theme_info
             )
 
-            # Save HTML content to client folder if client_id is provided
+            # File saving
             if status_callback:
                 logger.info(f"Calling status callback: Saving files... (90%)")
                 await status_callback("Saving files...", 90)
@@ -503,6 +653,7 @@ class SlideService:
                     slide_html, description, client_id
                 )
 
+            # Finalizing
             if status_callback:
                 logger.info(
                     f"Calling status callback: Finalizing slide generation... (95%)")
@@ -510,15 +661,16 @@ class SlideService:
 
             processing_time = (datetime.now() - start_time).total_seconds()
 
+            # Return comprehensive result data for frontend
             result = {
-                "slide_html": slide_html,
-                "html_file_path": html_file_path,
-                "ppt_file_path": ppt_file_path,
-                "processing_time": processing_time,
-                "files_processed": len(files),
-                "content_extracted": len(file_contents),
-                "theme": theme,
-                "wants_research": wants_research
+                "slide_html": slide_html,  # For preview display
+                "html_file_path": html_file_path,  # For HTML download
+                "ppt_file_path": ppt_file_path,  # For PowerPoint download
+                "processing_time": processing_time,  # For performance metrics
+                "files_processed": len(files),  # For user feedback
+                "content_extracted": len(file_contents),  # For user feedback
+                "theme": theme,  # For UI confirmation
+                "wants_research": wants_research  # For UI state
             }
 
             logger.info(
@@ -529,6 +681,7 @@ class SlideService:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error(f"Error generating slide: {e}")
 
+            # Return error data for frontend error handling
             return {
                 "error": str(e),
                 "processing_time": processing_time,
@@ -540,9 +693,14 @@ class SlideService:
         file_contents: List[Dict],
         description: str
     ) -> SlideData:
-        """Analyze content and generate slide data"""
+        """
+        Legacy content analysis method (internal use)
+        
+        Note for Frontend: This is an internal method used by legacy workflows.
+        Modern workflows use the AI service directly for better results.
+        """
         try:
-            # Handle both old format (text only) and new format (text + images)
+            # Handle both old and new content formats
             combined_content = ""
             total_images = 0
 
@@ -555,23 +713,23 @@ class SlideService:
                         # Old format with just content
                         combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
 
-                    # Count images if available
+                    # Count images for UI feedback
                     if 'images' in content:
                         total_images += len(content['images'])
                 else:
                     # Fallback for string content
                     combined_content += f"--- Content ---\n{str(content)}\n\n"
 
-            # Extract key information from description
+            # Extract slide elements from description and content
             slide_title = self._extract_title_from_description(description)
             slide_theme = self._extract_theme_from_description(description)
             slide_layout = self._determine_layout(
                 description, combined_content)
 
-            # Generate slide elements based on content and description
+            # Generate slide elements for structured data
             elements = await self._generate_slide_elements(combined_content, description)
 
-            # Add image information to slide data if available
+            # Add image summary if images found
             if total_images > 0:
                 elements.append({
                     "type": "image_summary",
@@ -580,7 +738,7 @@ class SlideService:
                     "style": {"fontSize": "12px", "color": "#666", "fontStyle": "italic"}
                 })
 
-            # Create slide data
+            # Create structured slide data
             slide_data = SlideData(
                 title=slide_title,
                 content=combined_content[:1000] + "..." if len(
@@ -594,7 +752,7 @@ class SlideService:
 
         except Exception as e:
             logger.error(f"Error analyzing content: {e}")
-            # Return a basic slide structure
+            # Return basic slide structure for error recovery
             return SlideData(
                 title="Generated Slide",
                 content="Content analysis failed",
@@ -611,9 +769,17 @@ class SlideService:
         wants_research: bool = False,
         theme_info: Optional[Dict] = None
     ) -> str:
-        """Generate HTML content based on LLM-generated layout and content"""
+        """
+        Generate HTML content for preview display
+        
+        Frontend Integration:
+        - Creates responsive HTML for slide preview
+        - Applies theme styling and color palettes
+        - Supports both AI-generated and fallback HTML
+        - Returns ready-to-display HTML for iframe or div
+        """
         try:
-            # Use LLM to generate HTML based on the layout and content
+            # Use AI service for best results, fallback if unavailable
             if self.llm_service.is_available():
                 return await self._generate_html_with_llm(layout, content, theme, wants_research, theme_info)
             else:
@@ -631,9 +797,18 @@ class SlideService:
         wants_research: bool,
         theme_info: Optional[Dict] = None
     ) -> str:
-        """Generate HTML using LLM based on layout and content"""
+        """
+        Generate professional HTML using AI with advanced styling
+        
+        Frontend Notes:
+        - Creates production-ready HTML with embedded CSS
+        - Includes modern design elements (gradients, shadows, animations)
+        - Responsive design suitable for various screen sizes
+        - Incorporates theme colors and styling preferences
+        - Returns complete HTML document ready for display
+        """
         try:
-            # Build theme context for the prompt
+            # Build theme context for AI prompt
             theme_context = ""
             if theme_info:
                 theme_context = f"""
@@ -646,6 +821,7 @@ THEME INFORMATION:
 Please incorporate this theme's visual style, color palette, and design philosophy into the HTML design.
 """
 
+            # Comprehensive AI prompt for professional slide generation
             system_prompt = """You are a senior frontend developer and UI/UX expert specializing in creating stunning, professional slide presentations in HTML and CSS. You have 10+ years of experience creating presentations for Fortune 500 companies, TED talks, and high-profile events.
 
 Your task is to convert a slide layout and content into a beautiful, modern HTML slide that rivals the best presentation software.
@@ -713,6 +889,7 @@ CONTENT FORMATTING REQUIREMENTS:
 
 Generate a complete, production-ready HTML slide that transforms this layout and content into a beautiful, professional presentation."""
 
+            # Generate HTML using AI
             response = self.llm_service.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -725,19 +902,19 @@ Generate a complete, production-ready HTML slide that transforms this layout and
 
             html_content = response.choices[0].message.content.strip()
 
-            # Log the raw response for debugging
+            # Log response for debugging
             logger.info(
                 f"LLM HTML Response (first 500 chars): {html_content[:500]}...")
             logger.info(f"HTML content size: {len(html_content)} characters")
 
-            # Clean up the response to extract just the HTML
+            # Clean up AI response to extract pure HTML
             if html_content.startswith("```html"):
                 html_content = html_content[7:]
             if html_content.endswith("```"):
                 html_content = html_content[:-3]
 
-            # Validate HTML content
-            if len(html_content) > 50000:  # 50KB limit
+            # Validate and sanitize HTML for frontend security
+            if len(html_content) > 50000:  # 50KB limit for performance
                 logger.warning(
                     f"HTML content too large ({len(html_content)} chars), truncating")
                 html_content = html_content[:50000]
@@ -751,14 +928,11 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 logger.error("Invalid HTML content - missing tags")
                 return self._generate_error_html()
 
-            # Sanitize HTML content to prevent issues
-            # Remove any script tags that might cause issues
+            # Security: Remove potentially harmful content for frontend safety
             html_content = re.sub(
                 r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-            # Remove any on* attributes that might cause JavaScript errors
             html_content = re.sub(
                 r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html_content, flags=re.IGNORECASE)
-            # Remove any javascript: URLs
             html_content = re.sub(r'javascript:', '',
                                   html_content, flags=re.IGNORECASE)
 
@@ -777,17 +951,28 @@ Generate a complete, production-ready HTML slide that transforms this layout and
         wants_research: bool,
         theme_info: Optional[Dict] = None
     ) -> str:
-        """Generate HTML using fallback method when LLM is not available"""
+        """
+        Fallback HTML generation when AI is unavailable
+        
+        Frontend Notes:
+        - Creates basic but professional HTML slides
+        - Uses predefined theme styles and layouts
+        - Incorporates stored theme colors if available
+        - Ensures consistent visual presentation
+        - Reliable backup for AI service failures
+        """
         try:
-            # Extract title from layout
+            # Extract basic slide information
             title = layout.get("title", "Generated Slide")
 
-            # Get theme styles - use stored theme info if available
+            # Get base theme styles
             theme_styles = self._get_theme_styles(theme)
+            
+            # Override with stored theme information if available
             if theme_info:
-                # Override theme styles with stored theme information
                 color_palette = theme_info.get('color_palette', [])
                 if color_palette:
+                    # Apply custom color palette from theme selection
                     primary_color = color_palette[0]
                     secondary_color = color_palette[1] if len(
                         color_palette) > 1 else primary_color
@@ -802,7 +987,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                         'title_style': f'color: {primary_color};'
                     }
 
-            # Generate content sections from the layout
+            # Generate content sections from layout structure
             content_sections = ""
             sections = layout.get("sections", [])
 
@@ -811,8 +996,9 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 section_text = section_content.get(
                     "content", "Content not available")
 
+                # Format different content types
                 if section.get("type") == "bullet_list":
-                    # Convert to bullet points
+                    # Create styled bullet list
                     lines = section_text.split('\n')
                     bullet_points = ""
                     for line in lines:
@@ -831,14 +1017,14 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                     </div>
                     """
                 else:
-                    # Regular text content
+                    # Regular text content with styling
                     content_sections += f"""
                     <div style="margin-bottom: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
                         <p style="margin: 0; line-height: 1.6;">{section_text}</p>
                     </div>
                     """
 
-            # Add research indicator if enabled
+            # Add research indicator if research was requested
             if wants_research:
                 content_sections += """
                 <div style="margin-top: 20px; padding: 10px; background: rgba(245, 158, 11, 0.2); border-radius: 8px; border-left: 4px solid #f59e0b;">
@@ -848,7 +1034,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 </div>
                 """
 
-            # Create the HTML slide
+            # Create complete HTML slide with modern styling
             slide_html = f"""
             <div style="width: 800px; height: 600px; {theme_styles['background']}; padding: 60px; color: {theme_styles['text_color']}; font-family: 'Arial', sans-serif; position: relative; overflow: hidden; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
                 <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; {theme_styles['overlay']}; opacity: 0.3;"></div>
@@ -876,7 +1062,14 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             return self._generate_error_html()
 
     def _generate_error_html(self) -> str:
-        """Generate error HTML slide"""
+        """
+        Generate error slide for frontend display
+        
+        Frontend Usage:
+        - Displays when slide generation fails
+        - Provides user-friendly error message
+        - Maintains consistent visual design
+        """
         return """
         <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; display: flex; align-items: center; justify-content: center; border-radius: 15px;">
             <div style="text-align: center;">
@@ -887,17 +1080,15 @@ Generate a complete, production-ready HTML slide that transforms this layout and
         """
 
     def _extract_title_from_description(self, description: str) -> str:
-        """Extract slide title from description"""
-        # Simple title extraction - could be enhanced with NLP
+        """Extract slide title from user description (internal utility)"""
         words = description.split()
         if len(words) >= 3:
-            # Take first few words as title
             title = " ".join(words[:5])
             return title.title()
         return "Generated Slide"
 
     def _extract_theme_from_description(self, description: str) -> str:
-        """Extract theme preference from description"""
+        """Extract theme preference from description (internal utility)"""
         description_lower = description.lower()
 
         if any(word in description_lower for word in ["professional", "business", "corporate"]):
@@ -912,11 +1103,11 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             return "default"
 
     def _determine_layout(self, description: str, content: str) -> str:
-        """Determine slide layout based on content and description"""
+        """Determine slide layout from content analysis (internal utility)"""
         description_lower = description.lower()
         content_lower = content.lower()
 
-        # Check for specific layout indicators
+        # Analyze content for layout suggestions
         if any(word in description_lower for word in ["chart", "graph", "data", "statistics"]):
             return "data_visualization"
         elif any(word in description_lower for word in ["timeline", "process", "steps"]):
@@ -929,15 +1120,15 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             return "standard"
 
     async def _generate_slide_elements(self, content: str, description: str) -> List[Dict]:
-        """Generate slide elements based on content and description"""
+        """Generate structured slide elements for legacy support (internal utility)"""
         elements = []
 
         try:
-            # Split content into paragraphs
+            # Process content into structured elements
             paragraphs = [p.strip()
                           for p in content.split('\n\n') if p.strip()]
 
-            # Generate title element
+            # Title element
             title = self._extract_title_from_description(description)
             elements.append({
                 "type": "title",
@@ -946,10 +1137,9 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 "style": {"fontSize": "24px", "fontWeight": "bold"}
             })
 
-            # Generate content elements
+            # Content elements with positioning
             y_position = 80
-            # Limit to 5 paragraphs
-            for i, paragraph in enumerate(paragraphs[:5]):
+            for i, paragraph in enumerate(paragraphs[:5]):  # Limit to 5 paragraphs
                 if len(paragraph) > 200:
                     paragraph = paragraph[:200] + "..."
 
@@ -961,7 +1151,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 })
                 y_position += 60
 
-            # Add summary element if content is long
+            # Summary element for long content
             if len(content) > 500:
                 summary = f"Summary: {len(paragraphs)} key points extracted from uploaded documents"
                 elements.append({
@@ -973,7 +1163,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
 
         except Exception as e:
             logger.error(f"Error generating slide elements: {e}")
-            # Add a basic text element
+            # Basic fallback element
             elements.append({
                 "type": "text",
                 "content": "Content processing completed",
@@ -984,11 +1174,23 @@ Generate a complete, production-ready HTML slide that transforms this layout and
         return elements
 
     async def get_processing_result(self, client_id: str) -> Optional[ProcessingResult]:
-        """Get processing result for a client"""
+        """
+        Get processing result for download links
+        
+        Frontend Usage:
+        - Retrieve generation results for download page
+        - Contains file paths and metadata
+        """
         return self.processing_results.get(client_id)
 
     async def store_processing_result(self, client_id: str, result: ProcessingResult) -> bool:
-        """Store processing result for a client"""
+        """
+        Store processing result for later retrieval
+        
+        Frontend Usage:
+        - Called after successful generation
+        - Enables download functionality
+        """
         try:
             self.processing_results[client_id] = result
             return True
@@ -998,8 +1200,16 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             return False
 
     async def clear_client_data(self, client_id: str) -> bool:
-        """Clear all data for a client"""
+        """
+        Clear all client data for privacy and memory management
+        
+        Frontend Usage:
+        - Call when user session ends or starts new project
+        - Clears all stored data and uploaded files
+        - Returns boolean for UI feedback
+        """
         try:
+            # Clear all in-memory data
             if client_id in self.client_descriptions:
                 del self.client_descriptions[client_id]
 
@@ -1009,7 +1219,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             if client_id in self.processing_results:
                 del self.processing_results[client_id]
 
-            # Also clear files
+            # Clear uploaded files from file system
             await self.file_service.delete_client_files(client_id)
 
             logger.info(f"Cleared all data for client {client_id}")
@@ -1019,7 +1229,13 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             return False
 
     def get_service_stats(self) -> Dict:
-        """Get service statistics"""
+        """
+        Get service statistics for monitoring and analytics
+        
+        Frontend Usage:
+        - Display service health and usage statistics
+        - Monitor active sessions and performance
+        """
         return {
             "active_clients": len(self.client_descriptions),
             "processing_results": len(self.processing_results),
@@ -1028,17 +1244,25 @@ Generate a complete, production-ready HTML slide that transforms this layout and
         }
 
     async def get_client_content_stats(self, client_id: str) -> Dict:
-        """Get content statistics for a specific client"""
+        """
+        Get detailed content statistics for a client
+        
+        Frontend Usage:
+        - Display upload summary and content analysis
+        - Show file counts, types, and processing status
+        - Provide user feedback on uploaded content
+        """
         try:
             content_list = await self.get_extracted_content(client_id)
 
+            # Calculate statistics
             total_files = len(content_list)
             total_text_length = sum(len(content.get('text', ''))
                                     for content in content_list)
             total_images = sum(len(content.get('images', []))
                                for content in content_list)
 
-            # Count by file type
+            # Analyze file types for UI display
             file_types = {}
             for content in content_list:
                 file_name = content.get('file_name', 'unknown')
@@ -1064,7 +1288,14 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             }
 
     def _get_theme_styles(self, theme: str) -> Dict[str, str]:
-        """Get CSS styles for different themes"""
+        """
+        Get CSS styles for different theme presets
+        
+        Frontend Reference:
+        - Predefined theme styles for consistent design
+        - Each theme includes background, colors, and styling
+        - Used by fallback HTML generation
+        """
         themes = {
             "professional": {
                 "background": "background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%)",
@@ -1111,16 +1342,22 @@ Generate a complete, production-ready HTML slide that transforms this layout and
         return themes.get(theme, themes["default"])
 
     def _generate_content_sections(self, content: str, wants_research: bool) -> str:
-        """Generate HTML content sections based on the content"""
+        """
+        Generate HTML content sections with styling (internal utility)
+        
+        Frontend Notes:
+        - Creates styled bullet points and content sections
+        - Includes research indicators when applicable
+        - Returns HTML string for embedding in slides
+        """
         try:
-            # Split content into paragraphs
+            # Process content into bullet points
             paragraphs = [p.strip()
                           for p in content.split('\n\n') if p.strip()]
 
-            # Generate bullet points from content
             bullet_points = []
 
-            # Add document analysis point
+            # Document analysis bullet point
             bullet_points.append(
                 '<li style="margin-bottom: 15px; padding-left: 25px; position: relative;">'
                 '<span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #4ade80; border-radius: 50%;"></span>'
@@ -1128,7 +1365,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 '</li>'
             )
 
-            # Add theme point
+            # Theme application bullet point
             bullet_points.append(
                 '<li style="margin-bottom: 15px; padding-left: 25px; position: relative;">'
                 '<span style="position: absolute; left: 0; top: 5px; width: 8px; height: 8px; background: #60a5fa; border-radius: 50%;"></span>'
@@ -1136,7 +1373,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 '</li>'
             )
 
-            # Add research point if requested
+            # Research enhancement bullet point
             if wants_research:
                 bullet_points.append(
                     '<li style="margin-bottom: 15px; padding-left: 25px; position: relative;">'
@@ -1145,7 +1382,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                     '</li>'
                 )
 
-            # Add content summary point
+            # Content summary bullet point
             if len(content) > 500:
                 bullet_points.append(
                     '<li style="margin-bottom: 15px; padding-left: 25px; position: relative;">'
@@ -1174,13 +1411,19 @@ Generate a complete, production-ready HTML slide that transforms this layout and
         client_id: str = None
     ) -> str:
         """
-        Generate a PPT file from the content using LLM for layout and content generation
+        Generate PowerPoint file from processed content
+        
+        Frontend Integration:
+        - Creates downloadable PowerPoint presentations
+        - Uses AI-generated layout and content structure
+        - Saves files to client folder for organized downloads
+        - Returns file path for download link generation
         """
         try:
             logger.info(
                 f"Generating PPT file with theme: {theme}, research: {wants_research}, client: {client_id}")
 
-            # Combine all content into a single string
+            # Combine content for AI processing
             combined_content = ""
             has_images = False
 
@@ -1191,13 +1434,13 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                     elif 'content' in content:
                         combined_content += f"--- {content.get('filename', 'unknown')} ---\n{content['content']}\n\n"
 
-                    # Check if images are available
+                    # Detect images for layout decisions
                     if 'images' in content and content['images']:
                         has_images = True
                 else:
                     combined_content += f"--- Content ---\n{str(content)}\n\n"
 
-            # Generate slide layout using LLM
+            # Generate slide structure using AI
             logger.info("Generating slide layout using LLM...")
             layout = await self.llm_service.generate_slide_layout(
                 combined_content,
@@ -1206,7 +1449,6 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 has_images
             )
 
-            # Generate slide content using LLM
             logger.info("Generating slide content using LLM...")
             content = await self.llm_service.generate_slide_content(
                 combined_content,
@@ -1214,7 +1456,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
                 layout
             )
 
-            # Create output file path
+            # Create file path with timestamp and safe filename
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_description = "".join(
@@ -1222,19 +1464,21 @@ Generate a complete, production-ready HTML slide that transforms this layout and
             safe_description = safe_description.replace(' ', '_')
 
             if client_id:
+                # Save to client folder for organized file management
                 client_folder = self.file_service.get_client_folder_path(
                     client_id)
                 client_folder.mkdir(parents=True, exist_ok=True)
                 filename = f"slide_{timestamp}_{safe_description}.pptx"
                 file_path = client_folder / filename
             else:
+                # Fallback to output directory
                 import os
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
                 filename = f"slide_{timestamp}_{safe_description}.pptx"
                 file_path = os.path.join(output_dir, filename)
 
-            # Generate PPT file using the layout and content
+            # Generate PowerPoint file using structured data
             logger.info("Generating PPT file...")
             logger.info(f"Layout sections: {len(layout.get('sections', []))}")
             logger.info(f"Content sections: {list(content.keys())}")
@@ -1250,7 +1494,7 @@ Generate a complete, production-ready HTML slide that transforms this layout and
 
         except Exception as e:
             logger.error(f"Error generating PPT file: {e}")
-            # Return a default path in case of error
+            # Return error path for fallback handling
             if client_id:
                 client_folder = self.file_service.get_client_folder_path(
                     client_id)
@@ -1260,26 +1504,31 @@ Generate a complete, production-ready HTML slide that transforms this layout and
 
     async def _save_html_to_client_folder(self, html_content: str, description: str, client_id: str) -> str:
         """
-        Save HTML content to the client's folder
+        Save HTML content to client folder for download
+        
+        Frontend Integration:
+        - Creates downloadable HTML files
+        - Organizes files by client for easy access
+        - Returns file path for download link generation
+        - Handles file naming with timestamps and safe characters
         """
         try:
             from datetime import datetime
 
-            # Get client folder path
+            # Get client-specific folder
             client_folder = self.file_service.get_client_folder_path(client_id)
             client_folder.mkdir(parents=True, exist_ok=True)
 
-            # Create unique filename
+            # Create unique, safe filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_description = "".join(
                 c for c in description[:30] if c.isalnum() or c in (' ', '-', '_')).rstrip()
             safe_description = safe_description.replace(' ', '_')
 
-            # Generate filename
+            # Save HTML file
             filename = f"slide_{timestamp}_{safe_description}.html"
             file_path = client_folder / filename
 
-            # Save HTML content
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
 

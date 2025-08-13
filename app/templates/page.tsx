@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-import { Layers, Sun, Moon, Plus, Edit2 } from "lucide-react";
+import { Layers, Sun, Moon, Plus, Edit2, Upload, FileText } from "lucide-react";
 import Link from "next/link";
 import type { SlideDefinition } from "@/lib/slide-types";
 import { Canvas } from "fabric";
@@ -108,6 +108,9 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
 
   const [slideoTemplates, setSlideoTemplates] = useState<TemplateRow[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load both Slideo curated templates and user templates
   useEffect(() => {
@@ -144,6 +147,76 @@ export default function TemplatesPage() {
     };
     loadTemplates();
   }, []);
+
+  // Handle PPTX file upload
+  const handlePptxUpload = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.pptx')) {
+      setUploadError('Please select a PowerPoint (.pptx) file');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/convert-pptx', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.slideJson) {
+        // Create a new template from the uploaded PPTX
+        const templateName = file.name.replace('.pptx', '');
+        const supabase = createClient();
+        
+        const { data, error } = await supabase
+          .from('slide_templates')
+          .insert({
+            name: templateName,
+            description: `Imported from ${file.name}`,
+            theme: 'Imported',
+            html_content: '', // Required field, empty since we're using slide_json
+            slide_json: result.slideJson,
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Database error:', error);
+          throw new Error(`Failed to save template: ${error.message}`);
+        }
+
+        // Refresh templates list
+        const { data: userTemplates } = await supabase
+          .from("slide_templates")
+          .select("id,name,description,theme,created_at,slide_json,html_content")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(24);
+        setTemplates((userTemplates as any) || []);
+        
+        // Show success message
+        alert(`Successfully imported "${templateName}" as a template!`);
+      } else {
+        throw new Error(result.error || 'Failed to convert PPTX');
+      }
+    } catch (error) {
+      console.error('PPTX upload error:', error);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen builder-background flex overflow-x-hidden">
@@ -197,8 +270,60 @@ export default function TemplatesPage() {
                   Create Template
                 </Button>
               </Link>
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pptx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handlePptxUpload(file);
+                      // Reset input so same file can be selected again
+                      e.target.value = '';
+                    }
+                  }}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+                <Button 
+                  variant="outline" 
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploading ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import PPTX
+                    </>
+                  )}
+                </Button>
+              </>
             </div>
           </div>
+
+          {/* Upload Error Display */}
+          {uploadError && (
+            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-red-500" />
+                <span className="text-red-700 dark:text-red-400 text-sm">{uploadError}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setUploadError(null)}
+                  className="ml-auto text-red-500 hover:text-red-700"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Slideo Curated Templates Section */}
           {slideoTemplates.length > 0 && (

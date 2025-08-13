@@ -188,17 +188,23 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     const containerHeight = containerRef.current.offsetHeight || 500;
     const scale = calculateOptimalScale(containerWidth, containerHeight);
 
-    if (!canvas) {
-      // Create new canvas
-      const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
-      setCanvas(newCanvas);
-    } else {
-      // Update existing canvas
-      import('@/lib/slide-to-fabric').then(module => {
-        module.renderSlideOnCanvas(canvas, extendedSlideData.slideJson!, scale);
-      });
+    // Always dispose of existing canvas before creating/updating
+    if (canvas) {
+      canvas.dispose();
+      setCanvas(null);
     }
-  }, [extendedSlideData.slideJson, canvas]);
+    
+    // Create new canvas
+    const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
+    setCanvas(newCanvas);
+
+    // Cleanup function to dispose canvas when component unmounts or dependencies change
+    return () => {
+      if (newCanvas) {
+        newCanvas.dispose();
+      }
+    };
+  }, [extendedSlideData.slideJson]); // Remove canvas from dependencies to avoid circular updates
 
   // Auto-generate on first entry if we don't have JSON yet
   useEffect(() => {
@@ -388,12 +394,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                 Rendered on canvas for exact PowerPoint representation
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Badge variant="secondary">
-                <Sparkles className="h-3 w-3 mr-1" />
-                AI Generated
-              </Badge>
-              {extendedSlideData.slideJson && (
+            {extendedSlideData.slideJson && (
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
@@ -433,7 +434,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                     Copy Share Link
                   </Button>
                 </div>
-              )}
+            )}
             </div>
           </div>
         </CardHeader>
@@ -530,7 +531,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Content Planning
+          Back to Themes
         </Button>
         <div className="flex gap-2">
           <Button 

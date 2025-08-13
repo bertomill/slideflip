@@ -420,16 +420,10 @@ export function UploadStep({
       )}
       
       <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto px-4">
-      {/* Connection Status Indicator */}
-      {connectionStatus && (
+      {/* Upload Status - only show when actively uploading */}
+      {uploadStatus && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-sm text-muted-foreground">
-            Backend: {connectionStatus}
-          </span>
-          {uploadStatus && (
-            <span className="text-sm text-muted-foreground ml-auto">{uploadStatus}</span>
-          )}
+          <span className="text-sm text-muted-foreground">{uploadStatus}</span>
         </div>
       )}
 

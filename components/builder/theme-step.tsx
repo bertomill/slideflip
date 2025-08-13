@@ -9,7 +9,7 @@ import type { ClipboardEvent as ReactClipboardEvent } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, Sparkles, Image as ImageIcon, Palette, Layers } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, Image as ImageIcon, Palette, Layers, Maximize2 } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 // Accordion primitives for collapsible sections
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -18,6 +18,7 @@ import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
 import type { SlideDefinition } from "@/lib/slide-types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TemplateModal } from "@/components/template-modal";
 
 // Props interface for ThemeStep component
 interface ThemeStepProps {
@@ -135,7 +136,13 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
       
       // Deep clone the slide and apply the palette colors
       const slideClone = JSON.parse(JSON.stringify(slide));
-      const defaultColors = ['#980000', '#111111', '#333333', '#b3b3b3', '#ffffff'];
+      
+      // Extract the original template colors from this specific slide
+      const originalColorSystem = extractTemplateColorSystem(slide);
+      const originalColors = getColorSystemArray(originalColorSystem);
+      
+      console.log('Original template colors:', originalColors);
+      console.log('New palette colors:', palette);
       
       // Helper function to replace color in object
       const replaceColor = (color: unknown) => {
@@ -148,21 +155,33 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
             colorStr = `#${colorStr}`;
           }
           
-          // Check against default colors (also normalize them)
-          for (let i = 0; i < defaultColors.length && i < palette.length; i++) {
-            let defaultColor = defaultColors[i].toLowerCase();
-            if (colorStr === defaultColor) {
+          // Check against the original template colors first
+          for (let i = 0; i < originalColors.length && i < palette.length; i++) {
+            let originalColor = originalColors[i].toLowerCase();
+            if (colorStr === originalColor) {
+              console.log(`Replacing ${colorStr} with ${palette[i]}`);
+              return palette[i].replace('#', ''); // Remove # for JSON format
+            }
+          }
+          
+          // Fallback: Check against common hardcoded colors for backwards compatibility
+          const fallbackColors = ['#980000', '#111111', '#333333', '#b3b3b3', '#ffffff'];
+          for (let i = 0; i < fallbackColors.length && i < palette.length; i++) {
+            let fallbackColor = fallbackColors[i].toLowerCase();
+            if (colorStr === fallbackColor) {
+              console.log(`Fallback replacing ${colorStr} with ${palette[i]}`);
               return palette[i].replace('#', ''); // Remove # for JSON format
             }
           }
           
           // Also check common template colors we see in the logs
           const templateColors = ['111827', '764ba2', '1f2937', '3b82f6', 'ffffff'];
-          templateColors.forEach((templateColor, index) => {
-            if (colorStr === `#${templateColor}` && palette[index]) {
-              return palette[index].replace('#', ''); // Remove # for JSON format
+          for (let i = 0; i < templateColors.length && i < palette.length; i++) {
+            if (colorStr === `#${templateColors[i]}` && palette[i]) {
+              console.log(`Template color replacing ${colorStr} with ${palette[i]}`);
+              return palette[i].replace('#', ''); // Remove # for JSON format
             }
-          });
+          }
         }
         return color;
       };
@@ -476,24 +495,6 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         <p className="text-sm text-muted-foreground">
           Select a slide template that matches your presentation style and industry
         </p>
-        {/* AI Model selection dropdown - allows users to choose between different AI models */}
-        <div className="mt-3 flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">AI Model</span>
-          <Select
-            value={modelAwareSlideData.selectedModel || "gpt-4"}
-            onValueChange={(value) =>
-              updateSlideData({ ...( {} as Partial<SlideData>), ...( { selectedModel: value } as Partial<SlideData>) })
-            }
-          >
-            <SelectTrigger className="w-[220px] h-8 rounded-full">
-              <SelectValue placeholder="Select model" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="gpt-4">GPT-4 (current)</SelectItem>
-              <SelectItem value="gpt-5-2025-08-07">GPT-5 (2025-08-07)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {/* Template Selection Section */}
@@ -507,14 +508,29 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
             Select a slide template that matches your presentation style and industry
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+        <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 lg:p-6 lg:pt-0">
           <Accordion type="multiple" className="w-full" defaultValue={["templates"]}>
           {/* Template selection section */}
           <AccordionItem value="templates" className="border-0">
             <AccordionTrigger className="hover:no-underline pb-4">
-              <div className="flex flex-col items-start">
-                <h3 className="text-base font-semibold text-foreground">Available Templates</h3>
-                <p className="text-sm text-muted-foreground">Professional templates optimized for slide generation</p>
+              <div className="flex flex-col items-start w-full">
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">Available Templates</h3>
+                    <p className="text-sm text-muted-foreground">Professional templates optimized for slide generation</p>
+                  </div>
+                  {slideData.selectedTheme && (
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateSlideData({ selectedTheme: "" });
+                      }}
+                      className="ml-4 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-input bg-background px-3 py-1 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
+                    >
+                      Browse All Templates
+                    </div>
+                  )}
+                </div>
               </div>
             </AccordionTrigger>
           <AccordionContent>
@@ -523,7 +539,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
             ) : (
               <div className="space-y-8">
                 {/* Slideo Curated Templates */}
-                {examples.length > 0 && (
+                {examples.length > 0 && (!slideData.selectedTheme || examples.some(ex => ex.id === slideData.selectedTheme)) && (
                   <div>
                     <div className="flex items-center gap-2 mb-4">
                       <div className="h-5 w-5 bg-primary/10 rounded-sm flex items-center justify-center">
@@ -532,16 +548,84 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                       <h4 className="font-semibold text-foreground">Slideo Templates</h4>
                       <Badge variant="secondary" className="text-xs">Curated</Badge>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1">
+                    <div className={`transition-all duration-300 ${
+                      slideData.selectedTheme ? 'grid grid-cols-1 lg:grid-cols-[1fr_0.8fr] gap-6 px-1' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1'
+                    }`}>
                       {examples.map((ex) => {
                         const isSelected = slideData.selectedTheme === ex.id;
+                        // If a theme is selected, only show that specific template
+                        if (slideData.selectedTheme && !isSelected) return null;
+                        
+                        if (isSelected) {
+                          // Selected template - show in left column with compact size
+                          return (
+                            <div key={ex.id} className="space-y-4">
+                              <Card
+                                variant="premium"
+                                className="relative cursor-pointer ring-2 ring-primary shadow-lg"
+                                onClick={() => updateSlideData({ selectedTheme: ex.id })}
+                              >
+                                <div className="absolute top-2 right-2 z-10">
+                                  <TemplateModal
+                                    template={ex}
+                                    palette={slideData.selectedPalette}
+                                    onTemplateUpdate={(updated) => {
+                                      console.log('Template updated:', updated);
+                                    }}
+                                  >
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 bg-gray-100/90 hover:bg-gray-200 border-gray-300 shadow-sm backdrop-blur-sm transition-all duration-200 hover:scale-105"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Maximize2 className="h-4 w-4 text-gray-600" />
+                                    </Button>
+                                  </TemplateModal>
+                                </div>
+                                <SlidePreviewJSON slide={ex.slide_json} palette={slideData.selectedPalette} />
+                                <CardContent className="p-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-semibold text-sm">{ex.name}</h4>
+                                    <Badge variant="outline" className="text-xs border-primary/30 text-primary/80">Slideo</Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground line-clamp-2">{ex.description}</p>
+                                  <div className="mt-2 flex items-center gap-1 text-primary">
+                                    <Sparkles className="h-3 w-3" />
+                                    <span className="text-xs font-medium">Selected</span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          );
+                        }
+                        
+                        // Non-selected template - regular grid layout
                         return (
                           <Card
                             key={ex.id}
-                            variant={isSelected ? 'premium' : 'glass'}
-                            className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}
+                            variant="glass"
+                            className="relative cursor-pointer transition-all duration-200 hover:scale-[1.02]"
                             onClick={() => updateSlideData({ selectedTheme: ex.id })}
                           >
+                            <div className="absolute top-2 right-2 z-10">
+                              <TemplateModal
+                                template={ex}
+                                palette={slideData.selectedPalette}
+                                onTemplateUpdate={(updated) => {
+                                  console.log('Template updated:', updated);
+                                }}
+                              >
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 bg-white/70 hover:bg-white/90 border-gray-200/50 shadow-sm backdrop-blur-sm transition-all duration-200 opacity-60 hover:opacity-100"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Maximize2 className="h-3 w-3 text-gray-500" />
+                                </Button>
+                              </TemplateModal>
+                            </div>
                             <SlidePreviewJSON slide={ex.slide_json} palette={slideData.selectedPalette} />
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between mb-2">
@@ -591,27 +675,190 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                                   }}>
                                     Use colors
                                   </Button>
-                                  {slideData.selectedTheme === ex.id && (
-                                    <span className="text-xs text-primary ml-2">Applied</span>
-                                  )}
                                 </div>
                               </div>
-                              {isSelected && (
-                                <div className="mt-2 flex items-center gap-1 text-primary">
-                                  <Sparkles className="h-3 w-3" />
-                                  <span className="text-xs font-medium">Selected</span>
-                                </div>
-                              )}
                             </CardContent>
                           </Card>
                         );
                       })}
+                      
+                      {/* Color customization panel - right column when template is selected */}
+                      {slideData.selectedTheme && examples.some(ex => ex.id === slideData.selectedTheme) && (
+                        <div className="space-y-4">
+                          {/* Template Colors Section */}
+                          <Card variant="glass">
+                            <CardContent className="p-4">
+                              <h4 className="font-semibold mb-3">Template Colors</h4>
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {getColorSystemArray(extractTemplateColorSystem(examples.find(ex => ex.id === slideData.selectedTheme)!.slide_json)).map((colorHexVal, colorIdx) => {
+                                    const roleLabels = getColorRoleLabels();
+                                    return (
+                                      <div key={`${colorHexVal}-${colorIdx}`} className="relative group">
+                                        <input
+                                          type="color"
+                                          value={colorHexVal}
+                                          onChange={(e) => {
+                                            const newColor = e.target.value.toUpperCase();
+                                            const currentColors = getColorSystemArray(extractTemplateColorSystem(examples.find(ex => ex.id === slideData.selectedTheme)!.slide_json));
+                                            const updatedColors = [...currentColors];
+                                            updatedColors[colorIdx] = newColor;
+                                            setManualColors(updatedColors);
+                                            applyCustomPalette(updatedColors);
+                                          }}
+                                          className="absolute inset-0 opacity-0 cursor-pointer w-8 h-8"
+                                          title={`${roleLabels[colorIdx]}: ${colorHexVal}`}
+                                        />
+                                        <div 
+                                          className="w-8 h-8 rounded-full border-2 cursor-pointer shadow-sm"
+                                          style={{ backgroundColor: colorHexVal }}
+                                        />
+                                        {/* Tooltip showing color role */}
+                                        <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+                                          {roleLabels[colorIdx]}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="w-full rounded-full" 
+                                  onClick={() => { 
+                                    const templateColors = getColorSystemArray(extractTemplateColorSystem(examples.find(ex => ex.id === slideData.selectedTheme)!.slide_json));
+                                    setManualColors(templateColors);
+                                    applyCustomPalette(templateColors);
+                                  }}
+                                >
+                                  Reset to Original Colors
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          {/* Customize Colors Section */}
+                          <Card variant="glass">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-4">
+                                <Palette className="h-4 w-4 text-primary" />
+                                <h4 className="font-semibold text-foreground">Generate New Colors</h4>
+                              </div>
+
+                              {/* Mode selection tabs */}
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                <Button variant={paletteMode === 'logo' ? 'default' : 'outline'} size="sm" className="rounded-full text-xs" onClick={() => setPaletteMode('logo')}>From File</Button>
+                                <Button variant={paletteMode === 'ai' ? 'default' : 'outline'} size="sm" className="rounded-full text-xs" onClick={() => setPaletteMode('ai')}>AI Suggestion</Button>
+                              </div>
+
+                              {/* Logo-based palette extraction interface */}
+                              {paletteMode === 'logo' && (
+                                <div className="space-y-3">
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex items-center gap-3">
+                                      {/* File upload input for logo/image */}
+                                      <div className="relative">
+                                        <input 
+                                          type="file" 
+                                          accept="image/*" 
+                                          onChange={async (e) => {
+                                            const f = e.target.files && e.target.files[0];
+                                            if (!f) return;
+                                            const colors = await extractPaletteFromImage(f, 5);
+                                            setManualColors(colors);
+                                            applyCustomPalette(colors);
+                                          }}
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <Button variant="outline" size="sm" className="rounded-full text-xs">
+                                          Choose File
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Upload a logo or paste an image (Cmd/Ctrl+V) to extract colors.</p>
+                                  </div>
+                                  {/* Logo preview with remove option */}
+                                  {logoPreview && (
+                                    <div className="relative w-fit">
+                                      <img src={logoPreview} alt="logo preview" className="h-12 w-auto rounded border" />
+                                      <button type="button" aria-label="Remove image" className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-black/70 text-white text-xs flex items-center justify-center" onClick={() => setLogoPreview(null)}>×</button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* AI-powered palette generation interface */}
+                              {paletteMode === 'ai' && (
+                                <div className="space-y-3">
+                                  {/* Text input for style description */}
+                                  <input className="w-full rounded border px-3 py-2 text-sm bg-background" placeholder="Describe the style (e.g., modern tech with clean blue accents)" value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+                                  <div className="flex items-center gap-2">
+                                    {/* Preview of generated colors */}
+                                    {generatePaletteFromPrompt(aiPrompt).map((c, i) => (
+                                      <div key={i} className="w-5 h-5 rounded-full border" style={{ backgroundColor: c }} title={c} />
+                                    ))}
+                                    {/* Generate button with loading state */}
+                                    <Button size="sm" disabled={isPaletteLoading} onClick={async () => {
+                                      setIsPaletteLoading(true);
+                                      console.log('Generating AI palette for prompt:', aiPrompt);
+                                      try {
+                                        // Call API to generate palette from prompt
+                                        const res = await fetch('/api/color-palette/generate', { 
+                                          method: 'POST', 
+                                          headers: { 'Content-Type': 'application/json' }, 
+                                          body: JSON.stringify({ prompt: aiPrompt }) 
+                                        });
+                                        
+                                        console.log('API response status:', res.status);
+                                        
+                                        if (!res.ok) {
+                                          throw new Error(`API failed with status ${res.status}`);
+                                        }
+                                        
+                                        const data = await res.json();
+                                        console.log('API response data:', data);
+                                        
+                                        const colors: string[] = data.colors || [];
+                                        if (colors.length) { 
+                                          console.log('Applying AI-generated colors:', colors);
+                                          setManualColors(colors); 
+                                          applyCustomPalette(colors); 
+                                        } else {
+                                          console.warn('No colors returned from API, using fallback');
+                                          const fallbackColors = generatePaletteFromPrompt(aiPrompt);
+                                          setManualColors(fallbackColors);
+                                          applyCustomPalette(fallbackColors);
+                                        }
+                                      } catch (error) {
+                                        console.error('AI palette generation failed:', error);
+                                        // Show user-friendly error message for quota exceeded
+                                        if (error instanceof Error && error.message.includes('quota')) {
+                                          console.warn('OpenAI quota exceeded, using local fallback');
+                                        }
+                                        // Fallback to local generation if API fails
+                                        const fallbackColors = generatePaletteFromPrompt(aiPrompt);
+                                        console.log('Using local fallback colors:', fallbackColors);
+                                        setManualColors(fallbackColors);
+                                        applyCustomPalette(fallbackColors);
+                                      } finally {
+                                        setIsPaletteLoading(false);
+                                      }
+                                    }} className="rounded-full text-xs">
+                                      {isPaletteLoading ? 'Generating…' : 'Generate'}
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* User Templates */}
-                {userTemplates.length > 0 && (
+                {userTemplates.length > 0 && (!slideData.selectedTheme || userTemplates.some(t => t.id === slideData.selectedTheme)) && (
                   <div>
                     <div className="flex items-center gap-2 mb-4">
                       <div className="h-5 w-5 bg-secondary/10 rounded-sm flex items-center justify-center">
@@ -620,16 +867,39 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                       <h4 className="font-semibold text-foreground">My Templates</h4>
                       <Badge variant="outline" className="text-xs">{userTemplates.length}</Badge>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1">
+                    <div className={`grid gap-4 p-1 transition-all duration-300 ${
+                      slideData.selectedTheme ? 'grid-cols-1 md:grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                    }`}>
                       {userTemplates.map((template) => {
                         const isSelected = slideData.selectedTheme === template.id;
+                        // If a theme is selected, only show that specific template
+                        if (slideData.selectedTheme && !isSelected) return null;
                         return (
                           <Card
                             key={template.id}
                             variant={isSelected ? 'premium' : 'glass'}
-                            className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}
+                            className={`relative cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}
                             onClick={() => updateSlideData({ selectedTheme: template.id })}
                           >
+                            <div className="absolute top-2 right-2 z-10">
+                              <TemplateModal
+                                template={template}
+                                palette={slideData.selectedPalette}
+                                onTemplateUpdate={(updated) => {
+                                  // Handle template updates if needed
+                                  console.log('Template updated:', updated);
+                                }}
+                              >
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 bg-white/70 hover:bg-white/90 border-gray-200/50 shadow-sm backdrop-blur-sm transition-all duration-200 opacity-60 hover:opacity-100"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Maximize2 className="h-3 w-3 text-gray-500" />
+                                </Button>
+                              </TemplateModal>
+                            </div>
                             <SlidePreviewJSON slide={template.slide_json} palette={slideData.selectedPalette} />
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between mb-2">
@@ -679,9 +949,6 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                                   }}>
                                     Use colors
                                   </Button>
-                                  {slideData.selectedTheme === template.id && (
-                                    <span className="text-xs text-primary ml-2">Applied</span>
-                                  )}
                                 </div>
                               </div>
                               {isSelected && (
@@ -705,8 +972,8 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         </CardContent>
       </Card>
 
-      {/* Color palette customization section - only show when template is selected */}
-      {slideData.selectedTheme && (
+      {/* Color palette customization section - hide when we have the side-by-side view */}
+      {slideData.selectedTheme && !examples.some(ex => ex.id === slideData.selectedTheme) && !userTemplates.some(t => t.id === slideData.selectedTheme) && (
         <Card variant="glass" className="mt-6">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -730,13 +997,23 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-3">
                       {/* File upload input for logo/image */}
-                      <input type="file" accept="image/*" onChange={async (e) => {
-                        const f = e.target.files && e.target.files[0];
-                        if (!f) return;
-                        const colors = await extractPaletteFromImage(f, 5);
-                        setManualColors(colors);
-                        applyCustomPalette(colors);
-                      }} />
+                      <div className="relative">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={async (e) => {
+                            const f = e.target.files && e.target.files[0];
+                            if (!f) return;
+                            const colors = await extractPaletteFromImage(f, 5);
+                            setManualColors(colors);
+                            applyCustomPalette(colors);
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <Button variant="outline" className="rounded-full">
+                          Choose File
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">Upload a logo or paste an image (Cmd/Ctrl+V) to extract a 5‑color palette.</p>
                   </div>
@@ -803,15 +1080,46 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                   {/* Generate button with loading state */}
                   <Button size="sm" disabled={isPaletteLoading} onClick={async () => {
                     setIsPaletteLoading(true);
+                    console.log('Generating AI palette for prompt:', aiPrompt);
                     try {
                       // Call API to generate palette from prompt
-                      const res = await fetch('/api/color-palette/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: aiPrompt }) });
+                      const res = await fetch('/api/color-palette/generate', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ prompt: aiPrompt }) 
+                      });
+                      
+                      console.log('API response status:', res.status);
+                      
+                      if (!res.ok) {
+                        throw new Error(`API failed with status ${res.status}`);
+                      }
+                      
                       const data = await res.json();
+                      console.log('API response data:', data);
+                      
                       const colors: string[] = data.colors || [];
-                      if (colors.length) { setManualColors(colors); applyCustomPalette(colors); }
-                    } catch {
+                      if (colors.length) { 
+                        console.log('Applying AI-generated colors:', colors);
+                        setManualColors(colors); 
+                        applyCustomPalette(colors); 
+                      } else {
+                        console.warn('No colors returned from API, using fallback');
+                        const fallbackColors = generatePaletteFromPrompt(aiPrompt);
+                        setManualColors(fallbackColors);
+                        applyCustomPalette(fallbackColors);
+                      }
+                    } catch (error) {
+                      console.error('AI palette generation failed:', error);
+                      // Show user-friendly error message for quota exceeded
+                      if (error instanceof Error && error.message.includes('quota')) {
+                        console.warn('OpenAI quota exceeded, using local fallback');
+                      }
                       // Fallback to local generation if API fails
-                      applyCustomPalette(generatePaletteFromPrompt(aiPrompt));
+                      const fallbackColors = generatePaletteFromPrompt(aiPrompt);
+                      console.log('Using local fallback colors:', fallbackColors);
+                      setManualColors(fallbackColors);
+                      applyCustomPalette(fallbackColors);
                     } finally {
                       setIsPaletteLoading(false);
                     }
@@ -831,10 +1139,10 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Upload
+          Back to Research
         </Button>
         <Button variant="default" size="lg" onClick={onNext} disabled={!canProceed}>
-          Continue to Research
+          Continue to Preview
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>

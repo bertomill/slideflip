@@ -22,7 +22,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { UploadStep } from "@/components/builder/upload-step";      // Step 1: Document upload and description
 import { ThemeStep } from "@/components/builder/theme-step";        // Step 2: Visual theme selection
 import { ResearchStep } from "@/components/builder/research-step";  // Step 3: Research options and data gathering
-import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback
+// import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback (removed)
 import { PreviewStep } from "@/components/builder/preview-step-fabric"; // Step 5: AI slide generation and preview with Fabric.js
 // import { DownloadStep } from "@/components/builder/download-step";  // Step 6: Removed - export now happens in Preview step
 
@@ -61,6 +61,7 @@ export type ParsedDocument = {
  * Accumulates user inputs and AI-generated content as user progresses
  */
 export type SlideData = {
+  title: string;            // Presentation title
   documents: File[];        // User-uploaded files for slide content
   parsedDocuments?: ParsedDocument[]; // Extracted text content from uploaded documents
   sessionId?: string;       // Session ID for tracking document uploads
@@ -79,10 +80,9 @@ export type SlideData = {
 // Configuration for the multi-step slide builder process
 const steps = [
   { id: 1, name: "Upload", description: "Upload & describe" },
-  { id: 2, name: "Theme", description: "Choose theme" },
-  { id: 3, name: "Research", description: "Research options" },
-  { id: 4, name: "Content", description: "Plan content" },
-  { id: 5, name: "Preview", description: "Review & export" },
+  { id: 2, name: "Research", description: "Research options" },
+  { id: 3, name: "Theme", description: "Choose theme" },
+  { id: 4, name: "Preview", description: "Review & export" },
 ];
 
 /**
@@ -128,6 +128,7 @@ export default function Build() {
   // 6. Download: Final PPTX export
 
   const [slideData, setSlideData] = useState<SlideData>({
+    title: "",               // Presentation title
     documents: [],           // User-uploaded files for slide content
     description: "",         // User's description of desired slide content
     selectedTheme: "",       // Visual theme choice (Professional, Modern, etc.)
@@ -257,16 +258,17 @@ export default function Build() {
         );
       case 2:
         return (
-          <ThemeStep 
+          <ResearchStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
              onPrev={prevStep}
+            sendGenerateSlide={sendGenerateSlide}
           />
         );
       case 3:
         return (
-          <ResearchStep 
+          <ThemeStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
@@ -275,15 +277,6 @@ export default function Build() {
         );
       case 4:
         return (
-          <ContentStep 
-            slideData={slideData} 
-            updateSlideData={updateSlideData} 
-            onNext={nextStep} 
-            onPrev={prevStep} 
-          />
-        );
-      case 5:
-        return (
           <PreviewStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
@@ -291,7 +284,7 @@ export default function Build() {
             onPrev={prevStep}
           />
         );
-      // case 6: Download step removed - export functionality moved to Preview step
+      // case 5: Content step removed - users go directly from Theme to Preview
       default:
         return null;
     }
@@ -300,7 +293,7 @@ export default function Build() {
   // Progress Sidebar Component - Collapsible right sidebar for step navigation
   const ProgressSidebar = () => (
     <div
-      className={`fixed right-0 top-0 z-30 h-screen transform bg-background border-l border-border transition-all duration-300 ease-in-out ${progressSidebarCollapsed ? "w-16" : "w-80"
+      className={`fixed right-0 top-0 z-30 h-screen transform bg-background border-l border-border transition-all duration-300 ease-in-out ${progressSidebarCollapsed ? "w-16" : "w-64"
         }`}
     >
       <div className="flex flex-col h-full">
@@ -447,7 +440,7 @@ export default function Build() {
           - Responsive design adapts to different screen sizes
           ======================================================================== */}
       <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'
-        } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-80'
+        } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-64'
         }`}>
         {/* ====================================================================
             MINIMAL HEADER: Just theme toggle and mobile menu
@@ -470,6 +463,27 @@ export default function Build() {
 
         {/* MAIN CONTAINER: Full-width container with responsive padding */}
         <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">
+          {/* ============================================================================
+              PRESENTATION TITLE INPUT: Notion-style title field
+              ============================================================================
+              - Appears at the top of the builder interface
+              - Allows users to name their presentation
+              - Transparent background with focus styling
+              ============================================================================ */}
+          <div className="w-full max-w-4xl mx-auto mb-6">
+            <input
+              type="text"
+              value={slideData.title}
+              onChange={(e) => updateSlideData({ title: e.target.value })}
+              placeholder="Untitled Presentation"
+              className="w-full px-4 py-4 text-3xl md:text-4xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground/50 focus:placeholder:text-muted-foreground/30 transition-colors leading-tight"
+              style={{
+                caretColor: 'currentColor',
+                lineHeight: '1.2',
+              }}
+            />
+          </div>
+
           {/* ============================================================================
               MAIN LAYOUT: Single column layout with fixed sidebars
               ============================================================================

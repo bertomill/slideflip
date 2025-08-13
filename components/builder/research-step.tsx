@@ -530,7 +530,7 @@ Your slide will be created using the uploaded documents and description provided
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Themes
+          Back to Upload
         </Button>
         {/* Forward Navigation: Proceed to preview step */}
         {/* Disabled during active research or if user hasn't made research choice */}
@@ -539,35 +539,11 @@ Your slide will be created using the uploaded documents and description provided
           size="lg" 
           onClick={onNext}
           disabled={!canProceed || isResearching}
+          className="bg-gradient-to-b from-[hsl(320,12%,62%)] to-[hsl(320,12%,52%)] hover:from-[hsl(320,12%,57%)] hover:to-[hsl(320,12%,47%)] text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 disabled:from-gray-400 disabled:to-gray-500"
         >
-          Continue to Content Planning
+          Continue to Themes
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
-        
-        {/* Show progress when generating slide */}
-        {slideData.isGenerating ? (
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-muted-foreground">
-              {slideData.generationStatus || "Generating slide..."}
-            </div>
-            <div className="w-32 bg-muted rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${slideData.generationProgress || 0}%` }}
-              />
-            </div>
-          </div>
-        ) : (
-          <Button 
-            variant="engineering" 
-            size="lg" 
-            onClick={handleContinueToPreview}
-            disabled={!canProceed || isResearching}
-          >
-            Continue to Preview
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        )}
       </div>
     </div>
   );
