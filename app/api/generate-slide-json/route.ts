@@ -97,7 +97,7 @@ const openai = new OpenAI({
  */
 export async function POST(request: NextRequest) {
   try {
-    const { description, theme, researchData, contentPlan, userFeedback, documents } = await request.json();
+    const { description, theme, researchData, contentPlan, userFeedback, documents, model: requestedModel } = await request.json();
 
     if (!description) {
       return NextResponse.json(
@@ -206,7 +206,7 @@ EXAMPLE JSON STRUCTURE:
 Return ONLY the JSON object, no markdown formatting or explanations.`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: requestedModel || "gpt-4",
       messages: [
         {
           role: "system",

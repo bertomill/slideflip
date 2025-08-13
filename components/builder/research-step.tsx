@@ -9,6 +9,7 @@ import { SlideData, ResearchOptions } from "@/app/builder/page";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 /**
  * Props interface for the ResearchStep component
@@ -28,10 +29,11 @@ interface ResearchStepProps {
  * Provides customizable research options and handles the research API integration
  */
 export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendGenerateSlide }: ResearchStepProps) {
+  type ModelAwareSlideData = SlideData & { selectedModel?: string };
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
   // UI State Management: Track research process status
   const [isResearching, setIsResearching] = useState(false);        // Loading state during API call
   const [researchComplete, setResearchComplete] = useState(false);  // Success state after research completion
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false); // Toggle for advanced configuration UI
 
   // Research Configuration: Default options that provide good balance of quality and performance
   const [researchOptions, setResearchOptions] = useState<ResearchOptions>({
@@ -61,12 +63,6 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendG
   const handleResearchChoice = (wantsResearch: boolean) => {
     // Store the user's research preference in the global slide data
     updateSlideData({ wantsResearch });
-    
-    if (wantsResearch) {
-      // Immediately reveal research customization options when user opts for research
-      // This provides instant feedback and allows configuration before starting research
-      setShowAdvancedOptions(true);
-    }
   };
 
   /**
@@ -206,13 +202,29 @@ Your slide will be created using the uploaded documents and description provided
           <CardDescription>
             Would you like AI to conduct additional research to enhance your slide content?
           </CardDescription>
+          {/* Inline AI model toggle for convenience */}
+          <div className="mt-3 flex items-center gap-3">
+            <Label className="text-xs">AI Model</Label>
+            <Select
+              value={modelAwareSlideData.selectedModel || "gpt-4"}
+              onValueChange={(value) => updateSlideData({ selectedModel: value } as Partial<SlideData>)}
+            >
+              <SelectTrigger className="w-[220px] h-8 rounded-full">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gpt-4">GPT-4 (current)</SelectItem>
+                <SelectItem value="gpt-5-2025-08-07">GPT-5 (2025-08-07)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
       </Card>
 
       {/* Research Choice Cards: Two-option selection interface */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Option 1: Enable AI Research Enhancement */}
-        <Card 
+        <Card
           variant={slideData.wantsResearch === true ? "premium" : "glass"}
           className={`cursor-pointer transition-premium hover:scale-[1.02] ${
             slideData.wantsResearch === true ? "ring-2 ring-primary" : ""
@@ -221,8 +233,8 @@ Your slide will be created using the uploaded documents and description provided
         >
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-accent">
+                <CheckCircle className="h-6 w-6 text-accent-foreground" />
               </div>
               <div>
                 <CardTitle className="text-lg">Yes, enhance with research</CardTitle>
@@ -239,25 +251,34 @@ Your slide will be created using the uploaded documents and description provided
             <CardDescription className="mb-4">
               AI will research relevant industry data, trends, and best practices to make your slide more compelling and data-driven.
             </CardDescription>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Industry insights & trends
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Supporting statistics
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Best practice recommendations
-              </div>
-            </div>
+            <Accordion type="single" collapsible>
+              <AccordionItem value="details-yes">
+                <AccordionTrigger className="text-sm font-medium text-foreground/90 hover:underline">
+                  Learn more
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Industry insights & trends
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Supporting statistics
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Best practice recommendations
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
 
         {/* Option 2: Skip Research, Use Existing Content Only */}
-        <Card 
+        <Card
           variant={slideData.wantsResearch === false ? "premium" : "glass"}
           className={`cursor-pointer transition-premium hover:scale-[1.02] ${
             slideData.wantsResearch === false ? "ring-2 ring-primary" : ""
@@ -266,8 +287,8 @@ Your slide will be created using the uploaded documents and description provided
         >
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
-                <XCircle className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-secondary">
+                <XCircle className="h-6 w-6 text-secondary-foreground" />
               </div>
               <div>
                 <CardTitle className="text-lg">No, use existing content</CardTitle>
@@ -284,20 +305,29 @@ Your slide will be created using the uploaded documents and description provided
             <CardDescription className="mb-4">
               Proceed with just the content from your uploaded documents. This is faster and works well when you have comprehensive source material.
             </CardDescription>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Faster processing time
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Focus on your specific content
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Lightbulb className="h-4 w-4" />
-                Maintain original context
-              </div>
-            </div>
+            <Accordion type="single" collapsible>
+              <AccordionItem value="details-no">
+                <AccordionTrigger className="text-sm font-medium text-foreground/90 hover:underline">
+                  Learn more
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Faster processing time
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Focus on your specific content
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                      Maintain original context
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
       </div>
@@ -306,153 +336,126 @@ Your slide will be created using the uploaded documents and description provided
       {slideData.wantsResearch === true && !isResearching && !researchComplete && (
         <Card variant="glass">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Settings className="h-5 w-5 text-primary" />
-                Configure Your Research
-              </CardTitle>
-              <CardDescription>
-                Customize the research parameters to get the most relevant results for your presentation
-              </CardDescription>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Settings className="h-5 w-5 text-primary" />
+              Configure Your Research
+            </CardTitle>
+            <CardDescription>
+              Keep it simple: you can start right away, or expand advanced options if you want to fine‑tune.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Quick Settings Summary */}
-            <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium">Current Settings:</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                >
-                  {showAdvancedOptions ? 'Hide Details' : 'Show Details'}
-                </Button>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {researchOptions.maxResults} results • {researchOptions.timeRange} timeframe • {researchOptions.includeAnswer} AI summary
-                {researchOptions.includeImages && ' • Images included'}
-                {researchOptions.excludeSocial && ' • Social media excluded'}
-              </div>
+            {/* Concise current settings summary */}
+            <div className="text-sm text-muted-foreground">
+              {researchOptions.maxResults} results • {researchOptions.timeRange} timeframe • {researchOptions.includeAnswer} AI summary
+              {researchOptions.includeImages && ' • Images included'}
+              {researchOptions.excludeSocial && ' • Social media excluded'}
             </div>
 
-            {/* Advanced Configuration Panel: Detailed research customization options */}
-            {/* Only visible when user expands the advanced settings section */}
-            {showAdvancedOptions && (
-              <div className="space-y-6">
-                {/* Research Parameter Grid: Two-column layout for desktop, single column on mobile */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Search Results Quantity Control: Allows users to balance comprehensiveness vs processing time */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Search className="h-4 w-4" />
-                    Number of Results
-                  </Label>
-                  <Select
-                    value={researchOptions.maxResults.toString()}
-                    onValueChange={(value) => updateResearchOptions({ maxResults: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="2">2 results</SelectItem>
-                      <SelectItem value="4">4 results</SelectItem>
-                      <SelectItem value="6">6 results</SelectItem>
-                      <SelectItem value="8">8 results</SelectItem>
-                      <SelectItem value="10">10 results</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Advanced options hidden by default to reduce cognitive load */}
+            <Accordion type="single" collapsible>
+              <AccordionItem value="advanced">
+                <AccordionTrigger className="text-sm">Advanced options</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          Number of Results
+                        </Label>
+                        <Select
+                          value={researchOptions.maxResults.toString()}
+                          onValueChange={(value) => updateResearchOptions({ maxResults: parseInt(value) })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">2 results</SelectItem>
+                            <SelectItem value="4">4 results</SelectItem>
+                            <SelectItem value="6">6 results</SelectItem>
+                            <SelectItem value="8">8 results</SelectItem>
+                            <SelectItem value="10">10 results</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                {/* Temporal Filtering: Control recency of search results for relevance */}
-                {/* Recent data is often more valuable for business presentations */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Time Range
-                  </Label>
-                  <Select
-                    value={researchOptions.timeRange}
-                    onValueChange={(value: 'day' | 'week' | 'month' | 'year' | 'all') => 
-                      updateResearchOptions({ timeRange: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="day">Past Day</SelectItem>
-                      <SelectItem value="week">Past Week</SelectItem>
-                      <SelectItem value="month">Past Month</SelectItem>
-                      <SelectItem value="year">Past Year</SelectItem>
-                      <SelectItem value="all">All Time</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Time Range
+                        </Label>
+                        <Select
+                          value={researchOptions.timeRange}
+                          onValueChange={(value: 'day' | 'week' | 'month' | 'year' | 'all') =>
+                            updateResearchOptions({ timeRange: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="day">Past Day</SelectItem>
+                            <SelectItem value="week">Past Week</SelectItem>
+                            <SelectItem value="month">Past Month</SelectItem>
+                            <SelectItem value="year">Past Year</SelectItem>
+                            <SelectItem value="all">All Time</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                {/* AI Processing Depth: Control level of analysis and summarization */}
-                {/* Advanced summaries provide more context but take longer to process */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Brain className="h-4 w-4" />
-                    AI Summary Level
-                  </Label>
-                  <Select
-                    value={researchOptions.includeAnswer}
-                    onValueChange={(value: 'basic' | 'advanced') => 
-                      updateResearchOptions({ includeAnswer: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="basic">Basic Summary</SelectItem>
-                      <SelectItem value="advanced">Advanced Summary</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="flex items-center gap-2">
+                          <Brain className="h-4 w-4" />
+                          AI Summary Level
+                        </Label>
+                        <Select
+                          value={researchOptions.includeAnswer}
+                          onValueChange={(value: 'basic' | 'advanced') =>
+                            updateResearchOptions({ includeAnswer: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="basic">Basic Summary</SelectItem>
+                            <SelectItem value="advanced">Advanced Summary</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
-              {/* Content Type and Source Quality Controls */}
-              {/* Toggle switches for additional content preferences and filtering */}
-              <div className="space-y-4">
-                {/* Visual Content Toggle: Include images and media in research results */}
-                {/* Images can enhance slide presentations but increase processing time */}
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <Image className="h-4 w-4" />
-                    Include Images
-                  </Label>
-                  <Switch
-                    checked={researchOptions.includeImages}
-                    onCheckedChange={(checked) => updateResearchOptions({ includeImages: checked })}
-                  />
-                </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <Image className="h-4 w-4" />
+                          Include Images
+                        </Label>
+                        <Switch
+                          checked={researchOptions.includeImages}
+                          onCheckedChange={(checked) => updateResearchOptions({ includeImages: checked })}
+                        />
+                      </div>
 
-                {/* Source Quality Filter: Exclude lower-quality social media sources */}
-                {/* Professional sources typically provide more credible data for business presentations */}
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Exclude Social Media
-                  </Label>
-                  <Switch
-                    checked={researchOptions.excludeSocial}
-                    onCheckedChange={(checked) => updateResearchOptions({ excludeSocial: checked })}
-                  />
-                </div>
-              </div>
-              </div>
-            )}
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Exclude Social Media
+                        </Label>
+                        <Switch
+                          checked={researchOptions.excludeSocial}
+                          onCheckedChange={(checked) => updateResearchOptions({ excludeSocial: checked })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
-            {/* Research Initiation: Primary action button to begin AI research process */}
-            {/* Centered button provides clear call-to-action after configuration */}
-            <div className="flex justify-center pt-4">
-              <Button 
-                onClick={startResearch}
-                size="lg"
-                className="px-8"
-              >
+            {/* Primary action */}
+            <div className="flex justify-center pt-2">
+              <Button onClick={startResearch} size="xl" className="px-8">
                 <Search className="h-4 w-4 mr-2" />
                 Start Research
               </Button>

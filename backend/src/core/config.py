@@ -1,28 +1,42 @@
 """
 Configuration settings for the SlideFlip Backend
+
+IMPORTANT FOR FRONTEND DEVELOPERS:
+- Server runs on HOST:PORT (default: 0.0.0.0:8000)
+- WebSocket connections use WEBSOCKET_PING_INTERVAL/TIMEOUT settings
+- File uploads are limited by MAX_FILE_SIZE (50MB) and ALLOWED_FILE_TYPES
+- Processing operations timeout after MAX_PROCESSING_TIME (5 minutes)
+- Environment variables are read from `.env.local` (if present) and then `.env`
 """
 
 import os
 from pathlib import Path
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings"""
-
-    # Server settings
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
-    DEBUG: bool = True
-
-    # File storage settings
-    UPLOAD_DIR: str = "uploads"
-    KNOWLEDGE_GRAPH_BASE_DIR: str = "kg"
-    TEMP_DIR: str = "temp"
-    OUTPUT_DIR: str = "output"
-    MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50MB
-    ALLOWED_FILE_TYPES: list = [
+    # Load from .env.local first (developer overrides), then .env
+    # Paths are relative to backend working directory
+    model_config = SettingsConfigDict(
+        env_file=(".env.local", ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
+    
+    # Server settings - Frontend should connect to these endpoints
+    HOST: str = "0.0.0.0"  # Backend server host
+    PORT: int = 8000       # Backend server port - use this for API calls
+    DEBUG: bool = True     # Development mode flag
+    
+    # File storage settings - Important for upload component integration
+    UPLOAD_DIR: str = "uploads"                    # Directory for uploaded files
+    KNOWLEDGE_GRAPH_BASE_DIR: str = "kg"          # Knowledge graph storage
+    TEMP_DIR: str = "temp"                        # Temporary processing files
+    OUTPUT_DIR: str = "output"                    # Generated slide outputs
+    MAX_FILE_SIZE: int = 50 * 1024 * 1024         # 50MB limit - enforce in frontend
+    ALLOWED_FILE_TYPES: list = [                  # Supported file types for upload validation
         "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/plain",
@@ -31,28 +45,28 @@ class Settings(BaseSettings):
         "text/html",
         "application/xhtml+xml"
     ]
-
-    # WebSocket settings
-    WEBSOCKET_PING_INTERVAL: int = 30
-    WEBSOCKET_PING_TIMEOUT: int = 10
-
-    # Processing settings
-    MAX_PROCESSING_TIME: int = 300  # 5 minutes
-    CONCURRENT_PROCESSES: int = 4
-    MAX_THREADS: int = 4  # Maximum threads for parallel processing
-
-    # Logging settings
+    
+    # WebSocket settings - Use these for real-time progress updates
+    WEBSOCKET_PING_INTERVAL: int = 30  # Ping every 30 seconds to keep connection alive
+    WEBSOCKET_PING_TIMEOUT: int = 10   # Timeout after 10 seconds if no pong response
+    
+    # Processing settings - Important for progress indicators and timeouts
+    MAX_PROCESSING_TIME: int = 300     # 5 minutes - show timeout warning to users
+    CONCURRENT_PROCESSES: int = 4      # Backend can handle 4 simultaneous requests
+    MAX_THREADS: int = 4               # Threading limit for parallel operations
+    
+    # Logging settings - For debugging integration issues
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
-    # Security settings
-    SECRET_KEY: str = "your-secret-key-here"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
-    # OpenAI settings
-    OPENAI_API_KEY: Optional[str] = None
-
+    
+    # Security settings - Required for authentication if implemented
+    SECRET_KEY: str = "your-secret-key-here"      # JWT secret - change in production
+    ALGORITHM: str = "HS256"                      # JWT algorithm
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30         # Token expiry time
+    
+    # OpenAI settings - Required for AI-powered slide generation
+    OPENAI_API_KEY: Optional[str] = None          # Set this in .env.local or .env
+    
     # Phase 1: Agentic research settings
     TAVILY_API_KEY: Optional[str] = None
     FIRECRAWL_API_KEY: Optional[str] = None
@@ -62,8 +76,3 @@ class Settings(BaseSettings):
     # Trigger Firecrawl for high-quality queries
     DEEP_RESEARCH_THRESHOLD: float = 0.8
     ENABLE_AGENTIC_RESEARCH: bool = False  # Feature flag for gradual rollout
-
-    class Config:
-        env_file = ".env.local"
-        env_file_encoding = "utf-8"
-        case_sensitive = True

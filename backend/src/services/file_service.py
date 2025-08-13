@@ -1,5 +1,10 @@
 """
 File service for handling file uploads and storage
+
+This service provides comprehensive file management capabilities for the backend,
+including upload handling, text extraction, image processing, and client-specific
+file organization. Frontend developers can use this service through API endpoints
+to manage user files.
 """
 
 import asyncio
@@ -32,16 +37,48 @@ except ImportError:
 from src.core.config import Settings
 from src.models.message_models import FileInfo
 
+# Optional PDF and DOCX parsing libraries
+try:
+    from pdfminer.high_level import extract_text as pdf_extract_text
+    PDFMINER_AVAILABLE = True
+except Exception:
+    PDFMINER_AVAILABLE = False
+    logging.warning("pdfminer.six not available. PDF text extraction will be disabled.")
+
+try:
+    import docx  # python-docx
+    DOCX_AVAILABLE = True
+except Exception:
+    DOCX_AVAILABLE = False
+    logging.warning("python-docx not available. DOCX text extraction will be disabled.")
+
 logger = logging.getLogger(__name__)
 
 class FileService:
-    """Service for handling file operations"""
+    """
+    Service for handling file operations
+    
+    This service manages all file-related operations including:
+    - File uploads and storage with client-specific organization
+    - Text extraction from various file formats (txt, md, html, pdf, docx)
+    - Image extraction and processing from HTML content
+    - URL content fetching and parsing
+    - File cleanup and storage management
+    
+    Frontend Integration Notes:
+    - Use client_id to associate files with specific users/sessions
+    - Files are automatically organized in client-specific folders
+    - Supports base64 file uploads from frontend
+    - Provides file download capabilities with secure path resolution
+    """
     
     def __init__(self):
         self.settings = Settings()
+        # In-memory storage for client file associations
+        # Key: client_id, Value: List of FileInfo objects
         self.client_files: Dict[str, List[FileInfo]] = {}
         
-        # Create necessary directories
+        # Create necessary directories for file storage
         os.makedirs(self.settings.UPLOAD_DIR, exist_ok=True)
         os.makedirs(self.settings.TEMP_DIR, exist_ok=True)
     
@@ -52,20 +89,40 @@ class FileService:
         file_type: str,
         client_id: Optional[str] = None
     ) -> Path:
-        """Save an uploaded file to disk"""
+        """
+        Save an uploaded file to disk with client-specific organization
+        
+        Frontend Usage:
+        - Send files as base64 encoded content
+        - Always include client_id to associate files with specific users
+        - Supported file types are defined in settings.ALLOWED_FILE_TYPES
+        - Maximum file size is defined in settings.MAX_FILE_SIZE
+        
+        Args:
+            filename: Original filename from frontend
+            content: Base64 encoded file content
+            file_type: MIME type of the file
+            client_id: Unique identifier for the client/user
+            
+        Returns:
+            Path: Path to the saved file
+            
+        Raises:
+            ValueError: If file size exceeds limit or file type not allowed
+        """
         try:
-            # Decode base64 content
+            # Decode base64 content from frontend
             file_content = base64.b64decode(content)
             
-            # Validate file size
+            # Validate file size against configured limits
             if len(file_content) > self.settings.MAX_FILE_SIZE:
                 raise ValueError(f"File size exceeds maximum allowed size of {self.settings.MAX_FILE_SIZE} bytes")
             
-            # Validate file type
+            # Validate file type against allowed types
             if file_type not in self.settings.ALLOWED_FILE_TYPES:
                 raise ValueError(f"File type {file_type} is not allowed")
             
-            # Create client-specific folder
+            # Create client-specific folder for file organization
             if client_id:
                 client_folder = Path(self.settings.UPLOAD_DIR) / f"client_{client_id}"
                 client_folder.mkdir(parents=True, exist_ok=True)
@@ -73,7 +130,7 @@ class FileService:
             else:
                 client_folder = Path(self.settings.UPLOAD_DIR)
             
-            # Generate unique filename
+            # Generate unique filename to prevent conflicts
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_hash = hashlib.md5(file_content).hexdigest()[:8]
             safe_filename = self._sanitize_filename(filename)
@@ -82,11 +139,11 @@ class FileService:
             # Create file path within client folder
             file_path = client_folder / unique_filename
             
-            # Save file
+            # Save file to disk asynchronously
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(file_content)
             
-            # Create file info
+            # Create file info object for tracking
             file_info = FileInfo(
                 filename=filename,
                 file_path=str(file_path),
@@ -95,7 +152,7 @@ class FileService:
                 upload_time=datetime.now().isoformat()
             )
             
-            # Store file info for client
+            # Store file info for client in memory
             if client_id:
                 if client_id not in self.client_files:
                     self.client_files[client_id] = []
@@ -110,14 +167,18 @@ class FileService:
             raise
     
     def _sanitize_filename(self, filename: str) -> str:
-        """Sanitize filename for safe storage"""
-        # Remove or replace unsafe characters
+        """
+        Sanitize filename for safe storage
+        
+        Removes unsafe characters and limits length to prevent filesystem issues
+        """
+        # Remove or replace unsafe characters that could cause issues
         unsafe_chars = ['<', '>', ':', '"', '|', '?', '*', '\\', '/']
         safe_filename = filename
         for char in unsafe_chars:
             safe_filename = safe_filename.replace(char, '_')
         
-        # Limit length
+        # Limit length to prevent filesystem issues
         if len(safe_filename) > 100:
             name, ext = os.path.splitext(safe_filename)
             safe_filename = name[:100-len(ext)] + ext
@@ -125,11 +186,26 @@ class FileService:
         return safe_filename
     
     async def get_client_files(self, client_id: str) -> List[FileInfo]:
-        """Get all files uploaded by a specific client"""
+        """
+        Get all files uploaded by a specific client
+        
+        Frontend Usage:
+        - Use this to display a list of uploaded files for a user
+        - Returns FileInfo objects with metadata about each file
+        """
         return self.client_files.get(client_id, [])
     
     async def delete_client_files(self, client_id: str) -> bool:
-        """Delete all files for a specific client"""
+        """
+        Delete all files for a specific client
+        
+        Frontend Usage:
+        - Call this when a user session ends or user requests file cleanup
+        - Removes both files from disk and memory
+        
+        Returns:
+            bool: True if deletion successful, False otherwise
+        """
         try:
             if client_id in self.client_files:
                 # Get the client folder path
@@ -161,7 +237,12 @@ class FileService:
             return False
     
     async def get_file_content(self, file_path: str) -> Optional[bytes]:
-        """Get file content as bytes"""
+        """
+        Get file content as bytes
+        
+        Frontend Usage:
+        - Use this to retrieve raw file content for processing or download
+        """
         try:
             path = Path(file_path)
             if not path.exists():
@@ -174,7 +255,16 @@ class FileService:
             return None
     
     async def extract_text_from_file(self, file_path: str) -> Optional[str]:
-        """Extract text content from various file types"""
+        """
+        Extract text content from various file types
+        
+        Frontend Usage:
+        - Use this to get readable text content from uploaded files
+        - Supports: .txt, .md, .html, .htm, .pdf, .docx files
+        
+        Returns:
+            str: Extracted text content or None if extraction fails
+        """
         try:
             file_content = await self.get_file_content(file_path)
             if not file_content:
@@ -190,13 +280,9 @@ class FileService:
             elif file_extension == '.html' or file_extension == '.htm':
                 return await self._extract_text_from_html(file_content)
             elif file_extension == '.pdf':
-                # For PDF files, we would need a PDF library
-                # For now, return a placeholder
-                return f"[PDF Content from {path.name}]"
+                return await self._extract_text_from_pdf(path)
             elif file_extension == '.docx':
-                # For DOCX files, we would need a DOCX library
-                # For now, return a placeholder
-                return f"[DOCX Content from {path.name}]"
+                return await self._extract_text_from_docx(path)
             else:
                 # Try to decode as text
                 return file_content.decode('utf-8', errors='ignore')
@@ -206,7 +292,22 @@ class FileService:
             return None
     
     async def extract_content_from_file(self, file_path: str) -> Optional[Dict]:
-        """Extract both text and image content from various file types"""
+        """
+        Extract both text and image content from various file types
+        
+        Frontend Usage:
+        - Use this for comprehensive content extraction
+        - Returns both text content and image metadata
+        - Useful for rich content processing and display
+        
+        Returns:
+            Dict: {
+                'text': str,           # Extracted text content
+                'images': List[Dict],  # List of image metadata
+                'file_path': str,      # Original file path
+                'file_name': str       # Original file name
+            }
+        """
         try:
             file_content = await self.get_file_content(file_path)
             if not file_content:
@@ -230,11 +331,9 @@ class FileService:
                 result['text'] = await self._extract_text_from_html(file_content)
                 result['images'] = await self._extract_images_from_html(file_content)
             elif file_extension == '.pdf':
-                # For PDF files, we would need a PDF library
-                result['text'] = f"[PDF Content from {path.name}]"
+                result['text'] = await self._extract_text_from_pdf(path)
             elif file_extension == '.docx':
-                # For DOCX files, we would need a DOCX library
-                result['text'] = f"[DOCX Content from {path.name}]"
+                result['text'] = await self._extract_text_from_docx(path)
             else:
                 # Try to decode as text
                 result['text'] = file_content.decode('utf-8', errors='ignore')
@@ -246,7 +345,12 @@ class FileService:
             return None
     
     async def _extract_text_from_html(self, html_content: bytes) -> str:
-        """Extract text content from HTML using BeautifulSoup"""
+        """
+        Extract text content from HTML using BeautifulSoup
+        
+        Internal method - removes HTML tags and extracts clean text
+        Requires BeautifulSoup library for full functionality
+        """
         try:
             if not BEAUTIFULSOUP_AVAILABLE:
                 # Fallback: try to decode as text and return raw content
@@ -287,7 +391,12 @@ class FileService:
             return html_content.decode('utf-8', errors='ignore')
     
     async def _extract_images_from_html(self, html_content: bytes, base_url: str = None) -> List[Dict]:
-        """Extract image information from HTML content"""
+        """
+        Extract image information from HTML content
+        
+        Internal method - finds all img tags and background images in CSS
+        Returns metadata about images found in the HTML
+        """
         try:
             if not BEAUTIFULSOUP_AVAILABLE:
                 logger.warning("BeautifulSoup not available for image extraction")
@@ -356,9 +465,87 @@ class FileService:
         except Exception as e:
             logger.error(f"Error extracting images from HTML: {e}")
             return []
+
+    async def _extract_text_from_pdf(self, path: Path) -> str:
+        """
+        Extract text from a PDF file using pdfminer.six.
+
+        This prefers library-based extraction over plain bytes decoding.
+        Returns a safe fallback message if the library is unavailable or fails.
+        """
+        try:
+            if not PDFMINER_AVAILABLE:
+                return f"[PDF parsing unavailable] Install pdfminer.six to enable parsing: {path.name}"
+
+            # pdfminer works on file paths; handle large files efficiently
+            text = pdf_extract_text(str(path)) or ""
+
+            # Normalize whitespace
+            normalized = "\n".join(
+                line.strip() for line in text.splitlines() if line.strip()
+            )
+
+            # Provide a minimal fallback if empty
+            return normalized if normalized else f"[No extractable text in PDF: {path.name}]"
+
+        except Exception as e:
+            logger.error(f"Error extracting PDF text from {path}: {e}")
+            return f"[Failed to parse PDF: {path.name}]"
+
+    async def _extract_text_from_docx(self, path: Path) -> str:
+        """
+        Extract text from a DOCX file using python-docx.
+
+        Concatenates paragraph text preserving basic paragraph breaks.
+        """
+        try:
+            if not DOCX_AVAILABLE:
+                return f"[DOCX parsing unavailable] Install python-docx to enable parsing: {path.name}"
+
+            document = docx.Document(str(path))
+            paragraphs: List[str] = []
+
+            for para in document.paragraphs:
+                text = (para.text or "").strip()
+                if text:
+                    paragraphs.append(text)
+
+            # Include table text if present
+            for table in getattr(document, 'tables', []):
+                for row in table.rows:
+                    row_cells = []
+                    for cell in row.cells:
+                        cell_text = "\n".join(
+                            (p.text or "").strip() for p in cell.paragraphs if (p.text or "").strip()
+                        )
+                        if cell_text:
+                            row_cells.append(cell_text)
+                    if row_cells:
+                        paragraphs.append(" | ".join(row_cells))
+
+            joined = "\n".join(paragraphs)
+            return joined if joined.strip() else f"[No extractable text in DOCX: {path.name}]"
+
+        except Exception as e:
+            logger.error(f"Error extracting DOCX text from {path}: {e}")
+            return f"[Failed to parse DOCX: {path.name}]"
     
     async def download_image(self, image_url: str, save_path: Path = None) -> Optional[Path]:
-        """Download an image from URL"""
+        """
+        Download an image from URL
+        
+        Frontend Usage:
+        - Use this to download images from external URLs
+        - Images are saved to temp directory if no path specified
+        - Requires aiohttp library for functionality
+        
+        Args:
+            image_url: URL of the image to download
+            save_path: Optional custom save path
+            
+        Returns:
+            Path: Path to downloaded image or None if failed
+        """
         try:
             if not AIOHTTP_AVAILABLE:
                 logger.error("aiohttp not available for image downloading")
@@ -394,7 +581,25 @@ class FileService:
             return None
     
     async def fetch_and_parse_html_from_url(self, url: str) -> Optional[Dict]:
-        """Fetch HTML content from a URL and extract text and images"""
+        """
+        Fetch HTML content from a URL and extract text and images
+        
+        Frontend Usage:
+        - Use this to extract content from web pages
+        - Returns both text content and image metadata from the URL
+        - Useful for web scraping and content analysis features
+        
+        Args:
+            url: Web URL to fetch and parse
+            
+        Returns:
+            Dict: {
+                'text': str,           # Extracted text content
+                'images': List[Dict],  # List of image metadata with resolved URLs
+                'url': str,            # Original URL
+                'content_length': int  # Size of HTML content
+            }
+        """
         try:
             if not AIOHTTP_AVAILABLE:
                 logger.error("aiohttp not available for URL fetching")
@@ -426,7 +631,13 @@ class FileService:
             return None
     
     async def get_file_info(self, file_path: str) -> Optional[Dict]:
-        """Get detailed information about a file"""
+        """
+        Get detailed information about a file
+        
+        Frontend Usage:
+        - Use this to get file metadata for display
+        - Returns file size, type, creation/modification times
+        """
         try:
             path = Path(file_path)
             if not path.exists():
@@ -446,7 +657,16 @@ class FileService:
             return None
     
     async def cleanup_temp_files(self, max_age_hours: int = 24) -> int:
-        """Clean up temporary files older than specified age"""
+        """
+        Clean up temporary files older than specified age
+        
+        Admin/Maintenance Usage:
+        - Call this periodically to clean up old temporary files
+        - Helps manage disk space usage
+        
+        Returns:
+            int: Number of files deleted
+        """
         try:
             temp_dir = Path(self.settings.TEMP_DIR)
             if not temp_dir.exists():
@@ -469,7 +689,17 @@ class FileService:
             return 0
     
     def get_storage_stats(self) -> Dict:
-        """Get storage statistics"""
+        """
+        Get storage statistics
+        
+        Admin/Dashboard Usage:
+        - Use this to display storage usage information
+        - Shows upload/temp directory sizes and file counts
+        - Useful for monitoring and analytics
+        
+        Returns:
+            Dict: Storage statistics including sizes and counts
+        """
         try:
             upload_dir = Path(self.settings.UPLOAD_DIR)
             temp_dir = Path(self.settings.TEMP_DIR)
@@ -497,11 +727,21 @@ class FileService:
             return {}
     
     def get_client_folder_path(self, client_id: str) -> Path:
-        """Get the folder path for a specific client"""
+        """
+        Get the folder path for a specific client
+        
+        Internal method - returns the file system path for client files
+        """
         return Path(self.settings.UPLOAD_DIR) / f"client_{client_id}"
     
     def get_client_folder_size(self, client_id: str) -> int:
-        """Get the total size of files in a client folder"""
+        """
+        Get the total size of files in a client folder
+        
+        Frontend Usage:
+        - Use this to show storage usage per user/client
+        - Returns size in bytes
+        """
         try:
             client_folder = self.get_client_folder_path(client_id)
             if not client_folder.exists():
@@ -518,7 +758,13 @@ class FileService:
             return 0
     
     def list_client_folders(self) -> List[str]:
-        """List all client folders"""
+        """
+        List all client folders
+        
+        Admin Usage:
+        - Get list of all client IDs that have uploaded files
+        - Useful for administration and analytics
+        """
         try:
             upload_dir = Path(self.settings.UPLOAD_DIR)
             if not upload_dir.exists():
@@ -536,7 +782,16 @@ class FileService:
             return []
     
     def cleanup_old_client_folders(self, max_age_hours: int = 24) -> int:
-        """Clean up client folders older than specified age"""
+        """
+        Clean up client folders older than specified age
+        
+        Admin/Maintenance Usage:
+        - Call this periodically to clean up old client data
+        - Helps manage disk space for inactive users
+        
+        Returns:
+            int: Number of folders deleted
+        """
         try:
             upload_dir = Path(self.settings.UPLOAD_DIR)
             if not upload_dir.exists():
@@ -568,6 +823,11 @@ class FileService:
     def get_downloadable_file(self, file_path: str) -> tuple[Path, str]:
         """
         Resolve file path and return the actual file path and filename for download.
+        
+        Frontend Usage:
+        - Use this to get secure file paths for download endpoints
+        - Handles different path formats and prevents directory traversal attacks
+        - Supports paths like: "uploads/client_123/file.txt", "client_123/file.txt", "output/file.txt"
         
         Args:
             file_path: The requested file path (can be uploads/client_*, client_*, or output/*)
@@ -632,11 +892,22 @@ class FileService:
         """
         Check if a file exists and return file information.
         
+        Frontend Usage:
+        - Use this to verify file existence before attempting download
+        - Returns detailed information about file status
+        - Useful for error handling and user feedback
+        
         Args:
             file_path: The requested file path
             
         Returns:
-            dict: File existence and metadata information
+            dict: {
+                'file_path': str,      # Resolved file path (if exists)
+                'exists': bool,        # Whether file exists
+                'size': int,           # File size in bytes
+                'parent_exists': bool, # Whether parent directory exists
+                'error': str           # Error message (if any)
+            }
         """
         try:
             logger.info(f"Checking file existence for: {file_path}")

@@ -73,15 +73,27 @@ cd slideflip
 # Install dependencies
 npm install
 
-# Set up environment variables
-cp .env.example .env.local
+# Set up environment variables (preferred)
+cp .env.example .env
 # Also copy for the backend runtime
-cp .env.example backend/.env.local
+cp .env.example backend/.env
 # Edit both files with your credentials and keys
 
 # Start development server
 npm run dev
 ```
+
+#### Markdown rendering in Content Planning
+
+The Content Planning step now renders the proposed plan using Markdown and uses a formatted WYSIWYG editor for changes (no raw Markdown or preview pane during editing).
+
+Install the required packages (already listed in `package.json`):
+
+```bash
+npm install react-markdown remark-gfm marked turndown
+```
+
+No additional configuration is required.
 
 ### 3. Backend Setup
 ```bash
@@ -97,6 +109,15 @@ pip install -r requirements.txt
 # Start backend server
 python main.py
 ```
+
+#### PDF and DOCX parsing
+
+The backend now supports server-side text extraction from PDF and DOCX uploads using `pdfminer.six` and `python-docx`.
+
+- Ensure you have the virtual environment activated (`source venv/bin/activate`).
+- Dependencies are included in `backend/requirements.txt` and are installed with the step above.
+- The WebSocket upload flow automatically extracts text for `.pdf` and `.docx` files via the backend.
+- The REST endpoint `POST /api/parse-documents` will mark PDFs/DOCX as “Uploaded for server-side parsing” and rely on the WebSocket pipeline for full extraction.
 
 ### 4. Access the Application
 - **Frontend**: http://localhost:3000
@@ -129,9 +150,9 @@ python main.py
 
 ### Environment Variables
 
-All variables are demonstrated in `.env.example` at the repo root. Copy it to `.env.local` (root) for the frontend and to `backend/.env.local` for the Python backend.
+All variables are demonstrated in `.env.example` at the repo root. Copy it to `.env` (root) for the frontend and to `backend/.env` for the Python backend.
 
-#### Root `.env.local` (Next.js / server routes)
+#### Root `.env` (Next.js / server routes)
 ```env
 # Supabase client (required)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -203,7 +224,7 @@ Troubleshooting
 - If logging in on localhost sends you to production, your localhost URL is likely missing from Supabase “Redirect URLs,” so Supabase falls back to the Site URL.
 - After changing Google or Supabase settings, wait 1–2 minutes, sign out, and retry. Clearing cookies for localhost and your prod domain can also help.
 
-#### Backend `backend/.env.local` (FastAPI)
+#### Backend `backend/.env` (FastAPI)
 ```env
 # Host/port and operational flags
 HOST=0.0.0.0
@@ -243,6 +264,35 @@ python -m pytest tests/
 2. Configure environment variables in Vercel dashboard
 3. Deploy automatically on push to main branch
 
+#### Note on bundling Node-only modules
+
+The app uses `pptxgenjs` for PPTX export in the browser. Some versions of this library include conditional imports of Node built-ins like `node:fs` and `node:https` inside the ESM bundle, which can cause bundlers to error when creating client chunks. To prevent this, the Next.js config stubs these modules for the browser build via aliases in `next.config.ts`:
+
+```ts
+// next.config.ts (excerpt)
+webpack: (config, { isServer }) => {
+  if (!isServer) {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      'node:fs': false,
+      'node:https': false,
+      fs: false,
+      https: false,
+      'image-size': false,
+      path: false,
+      os: false,
+      'node:path': false,
+    };
+    // Optional compatibility fallbacks
+    // @ts-ignore
+    config.resolve.fallback = { ...(config.resolve.fallback || {}), fs: false, https: false, path: false, os: false };
+  }
+  return config;
+}
+```
+
+This ensures successful builds on Vercel while keeping runtime behavior unchanged in the browser.
+
 ### Backend (Docker)
 ```dockerfile
 FROM python:3.11-slim
@@ -258,6 +308,42 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ### Recent Updates
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
+
+- Added reusable card style `card-contrast` in `app/globals.css` for high-emphasis cards with thin white borders on dark backgrounds. Apply it via `className="card-contrast"` alongside `variant="glass"` on `Card` components.
+ - Updated `card-contrast` to use a hairline `0.5px` border for a more refined outline on high-DPI displays.
+ - Added `builder-background` utility (Supabase-like pointillism) with a slightly lighter dark base. Applied to the builder root container in `app/build/page.tsx`.
+
+- Theme step UX: the Template selection and Color Palette sections are now collapsible using shadcn/ui `Accordion`. This makes the page easier to scan while preserving all functionality.
+  - New component: `components/ui/accordion.tsx`
+  - Updated: `components/builder/theme-step.tsx`
+
+- Templates now support Fabric.js/PptxGenJS JSON in Supabase:
+  - Added migration `009_update_slide_templates_for_fabric.sql` to add `slide_json JSONB` to `slide_templates`.
+  - API `app/api/examples/list` now prefers `slide_templates` with `slide_json` and falls back to legacy HTML examples.
+  - Template cards in `ThemeStep` can preview either HTML or Fabric JSON.
+  - Seed examples: `templates/fabric/hero-title-01.json`, `templates/fabric/three-column-kpis-01.json`.
+  - Upsert endpoint: `POST /api/templates/upsert-fabric` with body `{ id, name, description?, theme?, aspect_ratio?, tags? }` reads `templates/fabric/{id}.json` and stores it as `slide_json`.
+
+### Seeding Fabric templates
+
+```bash
+curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"hero-title-01","name":"Hero Title"}'
+
+curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"three-column-kpis-01","name":"Three Column KPIs"}'
+
+# Note: `id` refers to the JSON filename under templates/fabric; the DB row id remains a UUID.
+```
+
+### Debugging preview rendering
+
+- Visit `/test-fabric` to load all templates from `/api/examples/list` and preview them.
+- The page renders Fabric JSON on a canvas and shows the raw JSON for quick inspection.
+ - Sidebar includes "My Templates" entry linking to `/templates`.
+ - New page: `/templates` lists templates from `slide_templates` with Fabric and HTML previews.
 
 ### Assets
 - `public/slideo-waitlist.png` — static image used on the Waitlist page (QR/preview).

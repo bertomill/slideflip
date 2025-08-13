@@ -1,0 +1,23 @@
+{
+  "id": "professional-gradient-01",
+  "title": "Professional Gradient",
+  "notes": "Approximation of gradient look using layered translucent shapes",
+  "background": { "color": "6B7BF2" },
+  "objects": [
+    { "type": "shape", "shape": "roundRect", "options": { "x": 0, "y": 0, "w": 10, "h": 5.625, "fill": { "color": "764BA2", "transparency": 0.35 }, "rectRadius": 0 } },
+
+    { "type": "text", "text": "Your Main Title Here", "options": { "x": 1, "y": 0.9, "w": 8, "h": 1.2, "fontSize": 48, "fontFace": "Segoe UI", "bold": true, "color": "FFFFFF", "align": "center" } },
+    { "type": "text", "text": "Subtitle or Key Message", "options": { "x": 1.5, "y": 1.9, "w": 7, "h": 0.7, "fontSize": 26, "fontFace": "Segoe UI", "color": "E8EAF6", "align": "center" } },
+
+    { "type": "shape", "shape": "roundRect", "options": { "x": 1.1, "y": 2.7, "w": 7.8, "h": 1.0, "fill": { "color": "FFFFFF", "transparency": 0.25 }, "rectRadius": 0.25, "line": { "color": "FFFFFF", "width": 2 } } },
+    { "type": "text", "text": "85%", "options": { "x": 4.5, "y": 2.9, "w": 1.0, "h": 0.6, "fontSize": 34, "fontFace": "Segoe UI", "bold": true, "color": "FFFFFF", "align": "center", "valign": "middle" } },
+    { "type": "text", "text": "Key Statistic or Metric", "options": { "x": 4.0, "y": 3.35, "w": 2.0, "h": 0.4, "fontSize": 12, "fontFace": "Segoe UI", "color": "E8EAF6", "align": "center" } },
+
+    { "type": "shape", "shape": "roundRect", "options": { "x": 1.1, "y": 4.0, "w": 3.2, "h": 1.2, "fill": { "color": "FFFFFF", "transparency": 0.15 }, "rectRadius": 0.25 } },
+    { "type": "shape", "shape": "roundRect", "options": { "x": 5.7, "y": 4.0, "w": 3.2, "h": 1.2, "fill": { "color": "FFFFFF", "transparency": 0.15 }, "rectRadius": 0.25 } },
+    { "type": "text", "text": "Key Point 1", "options": { "x": 1.2, "y": 4.15, "w": 3.0, "h": 0.5, "fontSize": 18, "fontFace": "Segoe UI", "bold": true, "color": "FFFFFF", "align": "center" } },
+    { "type": "text", "text": "Key Point 2", "options": { "x": 5.8, "y": 4.15, "w": 3.0, "h": 0.5, "fontSize": 18, "fontFace": "Segoe UI", "bold": true, "color": "FFFFFF", "align": "center" } }
+  ]
+}
+
+

@@ -18,6 +18,9 @@ networkx
 scikit-learn
 numpy
 tiktoken
+pdfminer.six
+python-docx
+pydantic-settings
 
 # Phase 1: LangGraph and LangChain for agentic research
 langgraph>=0.2.0

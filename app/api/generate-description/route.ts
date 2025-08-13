@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body to extract document information
     // Expected format: { documents: [{ name: string, ... }] }
-    const { documents } = await request.json();
+    const { documents, model: requestedModel } = await request.json();
     
     // Create contextual information about uploaded documents
     // This helps the AI understand what content is available for the slide
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     // Make API call to OpenAI's chat completion endpoint
     // Using GPT-3.5-turbo for cost-effective, fast responses
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",           // Cost-effective model for text generation
+      model: requestedModel || "gpt-3.5-turbo",           // Cost-effective model for text generation
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: userPrompt }

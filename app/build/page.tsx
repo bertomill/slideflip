@@ -252,7 +252,7 @@ export default function Build() {
             connectionStatus={connectionStatus}
             sendFileUpload={sendFileUpload}
             sendSlideDescription={sendSlideDescription}
-            lastMessage={lastMessage}
+             lastMessage={lastMessage as any}
           />
         );
       case 2:
@@ -261,8 +261,7 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-            onPrev={prevStep}
-            sendThemeSelection={sendThemeSelection}
+             onPrev={prevStep}
           />
         );
       case 3:
@@ -271,8 +270,7 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-            onPrev={prevStep}
-            sendGenerateSlide={sendGenerateSlide}
+             onPrev={prevStep}
           />
         );
       case 4:
@@ -291,7 +289,6 @@ export default function Build() {
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
             onPrev={prevStep}
-            sendGenerateSlide={sendGenerateSlide}
           />
         );
       // case 6: Download step removed - export functionality moved to Preview step
@@ -342,10 +339,10 @@ export default function Build() {
                     } ${step.id < currentStep ? "hover:scale-[1.02]" : ""}`}
                 >
                   <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "border-muted-foreground text-muted-foreground"
-                      } text-sm font-medium`}
+                    className={`step-indicator w-8 h-8 ${currentStep >= step.id
+                      ? "step-indicator-active"
+                      : "step-indicator-inactive"
+                      }`}
                   >
                     {step.id}
                   </div>
@@ -366,17 +363,17 @@ export default function Build() {
                     {/* Step indicator column */}
                     <div className="flex flex-col items-center mr-3 flex-shrink-0">
                       <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-muted-foreground text-muted-foreground"
-                          } text-sm font-medium`}
+                        className={`step-indicator w-8 h-8 ${currentStep >= step.id
+                          ? "step-indicator-active"
+                          : "step-indicator-inactive"
+                          }`}
                       >
                         {step.id}
                       </div>
                       {/* Connecting line */}
                       {index < steps.length - 1 && (
                         <div
-                          className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                          className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "step-connector-active" : "step-connector-inactive"
                             }`}
                         />
                       )}
@@ -415,7 +412,7 @@ export default function Build() {
   // Renders a full-screen layout with collapsible sidebars and dynamic step content
   // Layout adapts responsively between desktop (dual sidebars) and mobile (single column)
   return (
-    <div className="min-h-screen gradient-dark-blue flex">
+    <div className="min-h-screen builder-background flex">
       {/* ========================================================================
           LEFT SIDEBAR: User profile and main navigation
           ========================================================================
@@ -453,34 +450,23 @@ export default function Build() {
         } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-80'
         }`}>
         {/* ====================================================================
-            TOP NAVIGATION: Branding and controls
+            MINIMAL HEADER: Just theme toggle and mobile menu
             ====================================================================
             - Mobile menu toggle for responsive navigation
-            - SlideFlip Builder branding with logo
             - Theme toggle for light/dark mode switching
+            - Company branding now handled by sidebar
             ==================================================================== */}
-        <Navigation variant="premium">
-          <NavigationBrand>
-            {/* Mobile menu toggle - only visible on small screens */}
-            <MobileMenuButton
-              isOpen={mobileMenuOpen}
-              onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="mr-2"
-            />
-            {/* App logo - simple geometric design */}
-            <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-              <div className="h-3 w-3 bg-background rounded-sm"></div>
-            </div>
-            {/* App name with responsive text sizing */}
-            <span className="font-semibold text-foreground text-sm sm:text-base">
-              Slideo Builder
-            </span>
-          </NavigationBrand>
-          {/* Right side controls */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
-          </div>
-        </Navigation>
+        <div className="flex justify-between items-center p-4">
+          {/* Mobile menu toggle - only visible on small screens */}
+          <MobileMenuButton
+            isOpen={mobileMenuOpen}
+            onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden"
+          />
+          <div className="hidden md:block" /> {/* Spacer for desktop */}
+          {/* Theme toggle */}
+          <ThemeToggle />
+        </div>
 
         {/* MAIN CONTAINER: Full-width container with responsive padding */}
         <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">
@@ -522,16 +508,16 @@ export default function Build() {
                         >
                           <div className="flex flex-col items-center mr-3 flex-shrink-0">
                             <div
-                              className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-premium ${currentStep >= step.id
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-muted-foreground text-muted-foreground"
-                                } text-sm font-medium`}
+                              className={`step-indicator w-8 h-8 ${currentStep >= step.id
+                                ? "step-indicator-active"
+                                : "step-indicator-inactive"
+                                }`}
                             >
                               {step.id}
                             </div>
                             {index < steps.length - 1 && (
                               <div
-                                className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "bg-primary" : "bg-muted"
+                                className={`w-0.5 h-8 mt-2 ${currentStep > step.id ? "step-connector-active" : "step-connector-inactive"
                                   }`}
                               />
                             )}

@@ -86,7 +86,7 @@ export default function PresentationsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen gradient-dark-blue flex overflow-x-hidden">
+    <div className="min-h-screen builder-background flex overflow-x-hidden">
       {/* Fixed theme toggle in top right corner */}
       <div className="fixed top-4 right-4 z-50">
         <Button

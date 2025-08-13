@@ -31,6 +31,8 @@ from src.services.file_service import FileService, FileInfo
 from src.services.slide_service import SlideService
 from src.services.knowledge_graph_service import KnowledgeGraphService
 from src.services.kg_task_manager import KnowledgeGraphTaskManager
+from src.services.graph_query_service import GraphQueryService
+from src.services.llm_service import LLMService
 from src.services.kg_processing import process_file_for_knowledge_graph, perform_final_clustering, get_current_timestamp
 from src.handlers.kg_message_handlers import (
     handle_kg_status_request,
@@ -522,10 +524,8 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 client_id
             )
 
-            # Extract content (text and images) for HTML files
-            content_info = None
-            if file_data.filename.lower().endswith(('.html', '.htm', '.txt', '.md')):
-                content_info = await file_service.extract_content_from_file(str(file_path))
+            # Extract content (text and images) for all supported files
+            content_info = await file_service.extract_content_from_file(str(file_path))
 
             # Store extracted content in slide service
             if client_id:
@@ -591,10 +591,8 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 client_id
             )
 
-            # Extract content (text and images) for HTML files
-            content_info = None
-            if file_data.filename.lower().endswith(('.html', '.htm', '.txt', '.md')):
-                content_info = await file_service.extract_content_from_file(str(file_path))
+            # Extract content (text and images) for all supported files
+            content_info = await file_service.extract_content_from_file(str(file_path))
 
             # Store extracted content in slide service
             if client_id:
@@ -655,10 +653,8 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
             client_id
         )
 
-        # Extract content (text and images) for HTML files
-        content_info = None
-        if file_data.filename.lower().endswith(('.html', '.htm', '.txt', '.md')):
-            content_info = await file_service.extract_content_from_file(str(file_path))
+        # Extract content (text and images) for all supported files
+        content_info = await file_service.extract_content_from_file(str(file_path))
 
         # Store extracted content in slide service
         if client_id:
@@ -1004,6 +1000,73 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             "Analyzing uploaded files and generating slide content..."
         )
 
+        # Phase 2: Query knowledge graph for relevant content using enhanced GraphQueryService
+        await send_enhanced_progress_update(
+            websocket, client_id, "slide_generation", 35,
+            "Querying knowledge graph for relevant content..."
+        )
+
+        # Initialize knowledge graph service and query service
+        kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
+        llm_service = LLMService()
+        logger.info(f"Knowledge graph service: {kg_service}")
+        logger.info(f"LLM service: {llm_service}")
+        query_service = GraphQueryService(
+            knowledge_graph_service=kg_service,
+            llm_service=llm_service
+        )
+
+        # Query the knowledge graph for relevant content
+        graph_query_result = None
+        try:
+            logger.info(f"Querying knowledge graph for client {client_id} with description: {description[:100]}...")
+            
+            graph_query_result = await query_service.query_graph_for_slide_content(
+                slide_description=description,
+                top_k=10,  # Get top 10 results for each category
+                similarity_threshold=0.3,  # Balanced similarity threshold
+                include_embeddings=False,  # Don't include embedding data in response
+                max_tokens=1500  # Limit LLM response tokens
+            )
+            
+            if "error" in graph_query_result:
+                logger.warning(f"Graph query failed for client {client_id}: {graph_query_result['error']}")
+                # Continue without graph query results - slide generation will still work
+            else:
+                logger.info(f"Graph query successful for client {client_id}: "
+                           f"Found {graph_query_result['metadata']['total_entities_found']} entities, "
+                           f"{graph_query_result['metadata']['total_facts_found']} facts")
+                
+                # Log the key insights for debugging
+                insights = graph_query_result.get('high_level_insights', {})
+                if insights:
+                    logger.info(f"Key insights for client {client_id}: "
+                               f"Main themes: {insights.get('main_themes', [])[:3]}, "
+                               f"Central entities: {insights.get('central_entities', [])[:3]}")
+                
+                # Send progress update with knowledge graph results summary
+                await send_enhanced_progress_update(
+                    websocket, client_id, "slide_generation", 38,
+                    f"Knowledge graph analysis complete: Found {graph_query_result['metadata']['total_entities_found']} relevant entities and {graph_query_result['metadata']['total_facts_found']} facts"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error querying knowledge graph for client {client_id}: {e}")
+            # Continue without graph query results - slide generation will still work
+            graph_query_result = None
+            
+            # Send progress update indicating fallback
+            await send_enhanced_progress_update(
+                websocket, client_id, "slide_generation", 38,
+                "Knowledge graph analysis unavailable, proceeding with standard content generation"
+            )
+
+        # Phase 2: Update progress
+        await send_enhanced_progress_update(
+            websocket, client_id, "slide_generation", 40,
+            "Starting AI-powered slide generation with knowledge graph insights..."
+        )
+
         # Create status callback function
         async def send_status_update(message: str, progress: int):
             try:
@@ -1017,22 +1080,36 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             except Exception as e:
                 logger.error(f"Error sending status update: {e}")
 
-        # Phase 2: Update progress
-        await send_enhanced_progress_update(
-            websocket, client_id, "slide_generation", 40,
-            "Starting AI-powered slide generation..."
-        )
-
         # Generate the slide with the provided parameters and status callback
         logger.info(f"Starting slide generation for client {client_id}")
-        slide_result = await slide_service.generate_slide_with_params(
-            files,
-            description,
-            theme,
-            wants_research,
-            client_id,
-            status_callback=send_status_update
-        )
+        
+        # Pass graph query results as additional context if available
+        generation_kwargs = {
+            "files": files,
+            "description": description,
+            "theme": theme,
+            "wants_research": wants_research,
+            "client_id": client_id,
+            "status_callback": send_status_update
+        }
+        
+        # Add knowledge graph context if available
+        if graph_query_result and "error" not in graph_query_result:
+            generation_kwargs["knowledge_graph_context"] = {
+                "entities": graph_query_result.get("results", {}).get("entities", []),
+                "facts": graph_query_result.get("results", {}).get("facts", []),
+                "chunks": graph_query_result.get("results", {}).get("chunks", []),
+                "relationships": graph_query_result.get("results", {}).get("relationships", []),
+                "insights": graph_query_result.get("high_level_insights", {}),
+                "llm_analysis": graph_query_result.get("llm_analysis", {})
+            }
+            logger.info(f"Using knowledge graph context for client {client_id}: "
+                       f"{len(generation_kwargs['knowledge_graph_context']['entities'])} entities, "
+                       f"{len(generation_kwargs['knowledge_graph_context']['facts'])} facts")
+        else:
+            logger.info(f"No knowledge graph context available for client {client_id}, proceeding with standard generation")
+        
+        slide_result = await slide_service.generate_slide_with_params(**generation_kwargs)
 
         # Phase 2: Update progress
         await send_enhanced_progress_update(
@@ -1059,6 +1136,22 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             "wants_research": wants_research,
             "message": "Slide generation completed successfully"
         }
+        
+        # Add knowledge graph context information if available
+        if graph_query_result and "error" not in graph_query_result:
+            message_data["knowledge_graph_used"] = True
+            message_data["knowledge_graph_summary"] = {
+                "entities_found": graph_query_result['metadata']['total_entities_found'],
+                "facts_found": graph_query_result['metadata']['total_facts_found'],
+                "chunks_found": graph_query_result['metadata']['total_chunks_found'],
+                "relationships_found": graph_query_result['metadata']['total_relationships_found'],
+                "main_themes": graph_query_result.get('high_level_insights', {}).get('main_themes', [])[:3],
+                "central_entities": graph_query_result.get('high_level_insights', {}).get('central_entities', [])[:3]
+            }
+            logger.info(f"Knowledge graph context included in completion message for client {client_id}")
+        else:
+            message_data["knowledge_graph_used"] = False
+            message_data["knowledge_graph_summary"] = None
 
         completion_message = ServerMessage(
             type="slide_generation_complete",
@@ -1098,12 +1191,30 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
                 "ppt_file_path": slide_result.get("ppt_file_path", ""),
                 "processing_time": slide_result.get("processing_time", 0),
                 "theme": theme,
-                "wants_research": wants_research
+                "wants_research": wants_research,
+                "knowledge_graph_used": message_data.get("knowledge_graph_used", False),
+                "knowledge_graph_summary": message_data.get("knowledge_graph_summary")
             }
         )
 
         logger.info(
             f"Slide generation completed for client {client_id} with theme: {theme}, research: {wants_research}")
+
+        # Log knowledge graph integration summary
+        if graph_query_result and "error" not in graph_query_result:
+            logger.info(f"Knowledge graph integration summary for client {client_id}:")
+            logger.info(f"  - Entities used: {graph_query_result['metadata']['total_entities_found']}")
+            logger.info(f"  - Facts used: {graph_query_result['metadata']['total_facts_found']}")
+            logger.info(f"  - Chunks used: {graph_query_result['metadata']['total_chunks_found']}")
+            logger.info(f"  - Relationships used: {graph_query_result['metadata']['total_relationships_found']}")
+            
+            insights = graph_query_result.get('high_level_insights', {})
+            if insights:
+                logger.info(f"  - Main themes: {insights.get('main_themes', [])}")
+                logger.info(f"  - Central entities: {insights.get('central_entities', [])}")
+                logger.info(f"  - Key relationships: {insights.get('key_relationships', [])}")
+        else:
+            logger.info(f"No knowledge graph context used for client {client_id} - standard generation mode")
 
     except Exception as e:
         logger.error(f"Error generating slide: {e}")
