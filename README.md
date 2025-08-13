@@ -110,6 +110,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Quick start from project root:
+
+```bash
+# one-command start from repo root
+npm run backend:start
+```
+
 #### PDF and DOCX parsing
 
 The backend now supports server-side text extraction from PDF and DOCX uploads using `pdfminer.six` and `python-docx`.

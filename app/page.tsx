@@ -179,28 +179,6 @@ export default function Home() {
 
         {/* Main content area that adjusts based on sidebar state */}
         <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
-          {/* Top navigation bar with branding */}
-          <Navigation variant="premium">
-            <NavigationBrand>
-              {/* Mobile menu toggle button - only visible on small screens */}
-              <MobileMenuButton
-                isOpen={mobileMenuOpen}
-                onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="mr-2"
-              />
-              {/* App logo and brand name */}
-              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <SlideoLogo className="h-6 w-6" />
-                <span className="font-semibold text-foreground text-sm sm:text-base">
-                  Slideo
-                </span>
-              </Link>
-            </NavigationBrand>
-            <div className="flex items-center gap-2 sm:gap-4">
-              {/* Theme toggle removed - using fixed one in top right corner */}
-            </div>
-          </Navigation>
-
           {/* Main dashboard content with responsive padding */}
           <div className="py-4 px-2 sm:py-8 sm:px-8 overflow-x-hidden">
             <div>

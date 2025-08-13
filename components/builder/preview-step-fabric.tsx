@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowLeft, RefreshCw, MessageSquare, Sparkles, Download } from "lucide-react";
+import { Eye, ArrowLeft, RefreshCw, MessageSquare, Sparkles, Download, Save, Heart } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
@@ -59,6 +59,8 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -317,6 +319,50 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     await pptx.writeFile({ fileName: 'slide-export.pptx' });
   };
 
+  // Save current slide as a template
+  const saveAsTemplate = async () => {
+    if (!extendedSlideData.slideJson || isSavingTemplate) return;
+    
+    const templateName = prompt('Enter a name for your template:', slideData.description || 'My Custom Template');
+    if (!templateName) return;
+    
+    const templateDescription = prompt('Enter a description (optional):', '') || '';
+    
+    setIsSavingTemplate(true);
+    try {
+      const response = await fetch('/api/templates/upsert-fabric', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: templateName,
+          description: templateDescription,
+          theme: 'Custom',
+          slide_json: extendedSlideData.slideJson,
+          is_active: true
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to save template: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setTemplateSaved(true);
+        // Reset the success message after a few seconds
+        setTimeout(() => setTemplateSaved(false), 3000);
+      } else {
+        throw new Error(data.error || 'Failed to save template');
+      }
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('Failed to save template. Please try again.');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
   const canProceed = extendedSlideData.slideJson && !isGenerating && !isRegenerating;
 
   return (
@@ -363,6 +409,21 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                     onClick={openInGoogleSlides}
                   >
                     Open in Google Slides
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={saveAsTemplate}
+                    disabled={isSavingTemplate}
+                    className="border-green-200 text-green-700 hover:bg-green-50"
+                  >
+                    {isSavingTemplate ? (
+                      <>Saving...</>
+                    ) : templateSaved ? (
+                      <><Heart className="h-3 w-3 mr-1 fill-current" />Saved!</>
+                    ) : (
+                      <><Save className="h-3 w-3 mr-1" />Save as Template</>
+                    )}
                   </Button>
                   <Button 
                     size="sm" 
@@ -472,6 +533,21 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
           Back to Content Planning
         </Button>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="lg" 
+            onClick={saveAsTemplate}
+            disabled={isSavingTemplate || !canProceed}
+            className="border-green-200 text-green-700 hover:bg-green-50"
+          >
+            {isSavingTemplate ? (
+              <>Saving...</>
+            ) : templateSaved ? (
+              <><Heart className="h-4 w-4 mr-2 fill-current" />Saved!</>
+            ) : (
+              <><Save className="h-4 w-4 mr-2" />Save as Template</>
+            )}
+          </Button>
           <Button variant="engineering" size="lg" onClick={exportToPowerPoint} disabled={!canProceed}>
             <Download className="h-4 w-4 mr-2" />
             Download PPTX

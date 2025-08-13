@@ -1,70 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 
-// This file handles retrieving PowerPoint/HTML examples from our database
-// It's used to show previews of templates in the user interface
+// This file handles retrieving Fabric.js JSON templates from the local filesystem
+// It loads templates directly from /templates/fabric/ directory
 
-// The GET function retrieves up to 24 of the most recently created examples
 export async function GET(_req: NextRequest) {
   try {
-    // Connect to our database
-    const supabase = await createClient();
+    const templatesDir = join(process.cwd(), 'templates', 'fabric');
+    
+    // Define the templates we want to load
+    const templateFiles = [
+      'professional-gradient-01.json',
+      'hero-title-01.json', 
+      'three-column-kpis-01.json'
+    ];
 
-    // Get examples from the database, ordered by newest first
-    // We select specific fields we need: template ID, name, tags, etc.
-    // Prefer new slide_templates with Fabric-compatible JSON. Fallback to legacy table if empty.
-    const { data: modern, error: modernError } = await supabase
-      .from('slide_templates')
-      .select('id,name,tags,aspect_ratio,slide_json,html_content,description,created_at')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(24);
+    const examples = [];
 
-    if (!modernError && modern && modern.length > 0) {
-      const examples = modern.map((row) => ({
-        id: String(row.id),
-        name: (row.name as string) || String(row.id),
-        theme: 'Curated',
-        description: (row.description as string) || 'Curated Fabric template',
-        aspect_ratio: (row.aspect_ratio as string) || '16:9',
-        // Provide fallback HTML if present in slide_templates.html_content
-        html: (row as any).html_content || '',
-        slide_json: (row as any).slide_json ?? null,
-        tags: (row.tags as string[]) || [],
-      }));
-      return NextResponse.json({ examples });
+    // Load each template file
+    for (const filename of templateFiles) {
+      try {
+        const filePath = join(templatesDir, filename);
+        const fileContent = await readFile(filePath, 'utf8');
+        const slideJson = JSON.parse(fileContent);
+
+        // Create example object from the JSON template
+        examples.push({
+          id: slideJson.id,
+          name: slideJson.title || slideJson.id,
+          theme: 'Curated',
+          description: slideJson.notes || 'Fabric JSON template',
+          aspect_ratio: '16:9',
+          html: '', // No HTML fallback needed
+          slide_json: slideJson,
+          tags: [], // Could be extracted from filename or added to JSON
+        });
+      } catch (fileError) {
+        console.error(`Error loading template ${filename}:`, fileError);
+        // Continue loading other templates if one fails
+      }
     }
 
-    const { data, error } = await supabase
-      .from('pptx_html_examples')
-      .select('template_id,name,tags,aspect_ratio,html,notes,created_at')
-      .order('created_at', { ascending: false })
-      .limit(24);
-
-    // Convert the database rows into a format our frontend can use
-    // For each example, we create an object with properties like:
-    // - id: unique identifier for the template
-    // - name: display name (falls back to template ID if no name given)
-    // - theme: always set to 'Curated' for these examples
-    // - description: notes about the example or a default description
-    // - aspect_ratio: slide dimensions (default 16:9)
-    // - html: the actual template content
-    // - tags: keywords/categories for the template
-    const examples = (data || []).map((row) => ({
-      id: row.template_id as string,
-      name: (row.name as string) || row.template_id,
-      theme: 'Curated',
-      description: (row.notes as string) || 'Curated PPTX/HTML example',
-      aspect_ratio: (row.aspect_ratio as string) || '16:9',
-      html: (row.html as string) || '',
-      slide_json: null,
-      tags: (row.tags as string[]) || [],
-    }));
-
-    // Return the processed examples to the frontend
     return NextResponse.json({ examples });
-  } catch (e: any) {
-    // If anything goes wrong, return an empty list and the error message
-    return NextResponse.json({ examples: [], error: e?.message || 'Unknown error' }, { status: 200 });
+  } catch (error) {
+    console.error('Error loading fabric templates:', error);
+    return NextResponse.json({ 
+      examples: [], 
+      error: 'Failed to load templates' 
+    }, { status: 500 });
   }
 }

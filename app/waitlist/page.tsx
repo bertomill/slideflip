@@ -54,15 +54,9 @@ export default function WaitlistPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen builder-background flex overflow-x-hidden">
       <Toaster richColors position="top-center" />
-      {/* Mobile header */}
-      <div className="md:hidden sticky top-0 z-40 w-full bg-background/80 backdrop-blur border-b border-border flex items-center justify-between px-4 py-3">
-        <MobileMenuButton isOpen={mobileMenuOpen} onToggle={() => setMobileMenuOpen((o) => !o)} />
-        <div className="font-semibold">Waitlist</div>
-        <div className="w-8" />
-      </div>
-
+      
       {/* Sidebar */}
       <Sidebar
         user={user}
@@ -72,13 +66,22 @@ export default function WaitlistPage() {
         onToggle={() => setMobileMenuOpen((o) => !o)}
       />
 
-      {/* Content */}
-      <main
-        className={`transition-all duration-300 ${
-          sidebarCollapsed ? "md:ml-16" : "md:ml-64"
-        } px-8 py-12`}
-      >
-        <div className="max-w-5xl mx-auto space-y-10">
+      {/* Main content area */}
+      <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? "md:ml-16" : "md:ml-64"}`}>
+        {/* Minimal header with mobile menu and spacing */}
+        <div className="flex justify-between items-center p-4">
+          {/* Mobile menu toggle - only visible on small screens */}
+          <MobileMenuButton
+            isOpen={mobileMenuOpen}
+            onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden"
+          />
+          <div className="hidden md:block" /> {/* Spacer for desktop */}
+        </div>
+
+        {/* MAIN CONTAINER: Full-width container with increased horizontal padding for better spacing */}
+        <div className="w-full px-6 sm:px-8 lg:px-12 py-2 sm:py-8 min-h-screen">
+          <div className="max-w-5xl mx-auto space-y-10">
           <div className="space-y-2">
             <h1 className="text-4xl md:text-5xl font-bold">Join the Waitlist</h1>
             <p className="text-lg text-muted-foreground">
@@ -141,7 +144,8 @@ export default function WaitlistPage() {
             </Card>
           </div>
         </div>
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

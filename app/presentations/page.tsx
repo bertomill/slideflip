@@ -54,9 +54,18 @@ export default function PresentationsPage() {
   useEffect(() => {
     const load = async () => {
       const supabase = createClient();
+      
+      // Seeded flow descriptions to filter out
+      const seededDescriptions = [
+        'Q2 Executive Summary',
+        'Product highlights for launch deck',
+        'Marketing performance snapshot'
+      ];
+      
       const { data: flows } = await supabase
         .from('flows')
         .select('id, description, created_at, status')
+        .not('description', 'in', `(${seededDescriptions.map(d => `"${d}"`).join(',')})`)
         .order('created_at', { ascending: false })
         .limit(12);
 
@@ -112,29 +121,19 @@ export default function PresentationsPage() {
 
       {/* Main content area */}
       <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
-        {/* Top navigation bar with branding and theme toggle */}
-        <Navigation variant="premium">
-          <NavigationBrand>
-            <MobileMenuButton
-              isOpen={mobileMenuOpen}
-              onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="mr-2"
-            />
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-                <div className="h-3 w-3 bg-background rounded-sm"></div>
-              </div>
-              <span className="font-semibold text-foreground">
-                Slideo
-              </span>
-            </Link>
-          </NavigationBrand>
-          <div className="flex items-center gap-2 sm:gap-4">
-            {/* Theme toggle removed - using fixed one in top right corner */}
-          </div>
-        </Navigation>
+        {/* Minimal header with mobile menu and spacing */}
+        <div className="flex justify-between items-center p-4">
+          {/* Mobile menu toggle - only visible on small screens */}
+          <MobileMenuButton
+            isOpen={mobileMenuOpen}
+            onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden"
+          />
+          <div className="hidden md:block" /> {/* Spacer for desktop */}
+        </div>
 
-        <div className="px-4 py-8">
+        {/* MAIN CONTAINER: Full-width container with increased horizontal padding for better spacing */}
+        <div className="w-full px-6 sm:px-8 lg:px-12 py-2 sm:py-8 min-h-screen">
           <div className="flex-1 w-full flex flex-col gap-8">
             <div className="flex items-center justify-between">
               <div>
