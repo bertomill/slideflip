@@ -26,6 +26,8 @@ dependencies = [
     "transformers",
     "pydantic-settings>=2.10.1",
     "tiktoken>=0.11.0",
+    "tavily-python>=0.7.10",
+    "firecrawl-py>=2.16.5",
 ]
 
 [build-system]

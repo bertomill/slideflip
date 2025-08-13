@@ -7,17 +7,18 @@ from pathlib import Path
 from typing import Optional
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     """Application settings"""
-    
+
     # Server settings
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
-    
+
     # File storage settings
     UPLOAD_DIR: str = "uploads"
-    KNOWLEDGE_GRAPH_BASE_DIR:str = "kg"
+    KNOWLEDGE_GRAPH_BASE_DIR: str = "kg"
     TEMP_DIR: str = "temp"
     OUTPUT_DIR: str = "output"
     MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50MB
@@ -30,29 +31,39 @@ class Settings(BaseSettings):
         "text/html",
         "application/xhtml+xml"
     ]
-    
+
     # WebSocket settings
     WEBSOCKET_PING_INTERVAL: int = 30
     WEBSOCKET_PING_TIMEOUT: int = 10
-    
+
     # Processing settings
     MAX_PROCESSING_TIME: int = 300  # 5 minutes
     CONCURRENT_PROCESSES: int = 4
     MAX_THREADS: int = 4  # Maximum threads for parallel processing
-    
+
     # Logging settings
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     # Security settings
     SECRET_KEY: str = "your-secret-key-here"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
+
     # OpenAI settings
     OPENAI_API_KEY: Optional[str] = None
-    
+
+    # Phase 1: Agentic research settings
+    TAVILY_API_KEY: Optional[str] = None
+    FIRECRAWL_API_KEY: Optional[str] = None
+    RESEARCH_CACHE_TTL: int = 3600  # 1 hour cache
+    MAX_CONCURRENT_AGENTS: int = 4
+    AGENT_TIMEOUT: int = 60  # seconds
+    # Trigger Firecrawl for high-quality queries
+    DEEP_RESEARCH_THRESHOLD: float = 0.8
+    ENABLE_AGENTIC_RESEARCH: bool = False  # Feature flag for gradual rollout
+
     class Config:
         env_file = ".env.local"
         env_file_encoding = "utf-8"
-        case_sensitive = True 
+        case_sensitive = True

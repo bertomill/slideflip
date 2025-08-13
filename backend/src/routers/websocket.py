@@ -23,7 +23,9 @@ from src.models.message_models import (
     ResearchRequestMessage,
     ContentPlanningMessage,
     ContentPlanResponseMessage,
-    ProgressUpdateMessage
+    ProgressUpdateMessage,
+    AgenticResearchRequestMessage,
+    EnhancedResearchOptions
 )
 from src.services.file_service import FileService, FileInfo
 from src.services.slide_service import SlideService
@@ -77,7 +79,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
         # Check if this client has pending knowledge graph tasks that need clustering
         if await kg_task_manager.is_clustering_needed(client_id):
-            logger.info(f"Client {client_id} has pending knowledge graph tasks, performing clustering")
+            logger.info(
+                f"Client {client_id} has pending knowledge graph tasks, performing clustering")
             # Wait for any pending tasks to complete
             await kg_task_manager.wait_for_client_tasks(client_id)
 
@@ -90,8 +93,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 await kg_task_manager.mark_clustering_completed(client_id)
 
         else:
-            logger.info(f"Client {client_id} has no pending knowledge graph tasks")
-        
+            logger.info(
+                f"Client {client_id} has no pending knowledge graph tasks")
+
         # Try to load existing graphs if available
         if await kg_task_manager.load_existing_graphs_if_available(client_id):
             logger.info(
@@ -122,7 +126,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     timeout=10.0
                 )
             except Exception as e:
-                logger.warning(f"Could not send status update to client {client_id}: {e}")
+                logger.warning(
+                    f"Could not send status update to client {client_id}: {e}")
         else:
             logger.info(f"Client {client_id} has no existing knowledge graphs")
         # Main message loop
@@ -351,6 +356,10 @@ async def handle_client_message(websocket: WebSocket, client_id: str, message: C
         elif message.type == "research_request":
             logger.info(f"Received research request from client {client_id}")
             await handle_research_request(websocket, client_id, message.data)
+        elif message.type == "agentic_research_request":
+            logger.info(
+                f"Received agentic research request from client {client_id}")
+            await handle_agentic_research_request(websocket, client_id, message.data)
         elif message.type == "content_planning":
             logger.info(
                 f"Received content planning request from client {client_id}")
@@ -1332,3 +1341,103 @@ async def handle_content_planning(websocket: WebSocket, client_id: str, data: di
         except Exception as send_error:
             logger.error(f"Error sending content planning error: {send_error}")
             raise
+
+
+async def handle_agentic_research_request(websocket: WebSocket, client_id: str, data: dict):
+    """Handle agentic research request from client"""
+    try:
+        logger.info(
+            f"Processing agentic research request for client {client_id}")
+
+        # Parse enhanced research request
+        query = data.get("query", "")
+        description = data.get("description", "")
+        options = data.get("options", {})
+
+        # Validate required parameters
+        if not query or not description:
+            error_message = ServerMessage(
+                type="agentic_research_error",
+                data={
+                    "error": "Query and description are required",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"]
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Check if agentic research is enabled
+        from src.core.config import Settings
+        settings = Settings()
+
+        if not settings.ENABLE_AGENTIC_RESEARCH:
+            # Fallback to regular research
+            logger.info(
+                f"Agentic research disabled, falling back to regular research for client {client_id}")
+            await handle_research_request(websocket, client_id, {
+                "description": description,
+                "research_options": options,
+                "wants_research": True
+            })
+            return
+
+        # Initialize agentic research service
+        from src.services.agentic_research_service import AgenticResearchService
+        research_service = AgenticResearchService(websocket_manager)
+
+        # Send initial progress update
+        await send_enhanced_progress_update(
+            websocket, client_id, "agentic_research", 5,
+            "Starting agentic research workflow..."
+        )
+
+        # Start research workflow
+        result = await research_service.start_research(
+            query=query,
+            description=description,
+            options=options,
+            client_id=client_id
+        )
+
+        # Send completion message
+        completion_message = ServerMessage(
+            type="agentic_research_complete",
+            data={
+                "status": "completed",
+                "workflow_id": result["workflow_id"],
+                "research_data": result["synthesized_content"],
+                "quality_score": result["quality_score"],
+                "sources": result["sources"],
+                "enabled_agents": result["enabled_agents"],
+                "processing_time": result["processing_time"],
+                "cost_metrics": result["cost_metrics"],
+                "message": "Agentic research completed successfully"
+            }
+        )
+
+        await websocket.send_text(completion_message.model_dump_json())
+        logger.info(f"Agentic research completed for client {client_id}")
+
+        # Update progress to completed
+        await send_enhanced_progress_update(
+            websocket, client_id, "agentic_research", 100,
+            "Agentic research completed successfully",
+            {
+                "workflow_id": result["workflow_id"],
+                "quality_score": result["quality_score"],
+                "sources_count": len(result["sources"]),
+                "enabled_agents": result["enabled_agents"]
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error handling agentic research request: {e}")
+        error_message = ServerMessage(
+            type="agentic_research_error",
+            data={
+                "error": "Failed to process agentic research request",
+                "details": str(e),
+                "error_code": ERROR_CODES["PROCESSING_ERROR"]
+            }
+        )
+        await websocket.send_text(error_message.model_dump_json())

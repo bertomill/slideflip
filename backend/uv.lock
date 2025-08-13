@@ -137,6 +137,7 @@ dependencies = [
     { name = "asyncio-mqtt" },
     { name = "beautifulsoup4" },
     { name = "fastapi" },
+    { name = "firecrawl-py" },
     { name = "networkx" },
     { name = "numpy" },
     { name = "openai" },
@@ -150,6 +151,7 @@ dependencies = [
     { name = "python-pptx" },
     { name = "python-socketio" },
     { name = "scikit-learn" },
+    { name = "tavily-python" },
     { name = "tiktoken" },
     { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
@@ -163,6 +165,7 @@ requires-dist = [
     { name = "asyncio-mqtt" },
     { name = "beautifulsoup4" },
     { name = "fastapi" },
+    { name = "firecrawl-py", specifier = ">=2.16.5" },
     { name = "networkx" },
     { name = "numpy" },
     { name = "openai" },
@@ -176,6 +179,7 @@ requires-dist = [
     { name = "python-pptx" },
     { name = "python-socketio" },
     { name = "scikit-learn" },
+    { name = "tavily-python", specifier = ">=0.7.10" },
     { name = "tiktoken", specifier = ">=0.11.0" },
     { name = "transformers" },
     { name = "uvicorn", extras = ["standard"] },
@@ -436,6 +440,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0a/10/c23352565a6544bdc5353e0b15fc1c563352101f30e24bf500207a54df9a/filelock-3.18.0.tar.gz", hash = "sha256:adbc88eabb99d2fec8c9c1b229b171f18afa655400173ddc653d5d01501fb9f2", size = 18075, upload-time = "2025-03-14T07:11:40.47Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4d/36/2a115987e2d8c300a974597416d9de88f2444426de9571f4b59b2cca3acc/filelock-3.18.0-py3-none-any.whl", hash = "sha256:c401f4f8377c4464e6db25fff06205fd89bdd83b65eb0488ed1b160f780e21de", size = 16215, upload-time = "2025-03-14T07:11:39.145Z" },
+]
+
+[[package]]
+name = "firecrawl-py"
+version = "2.16.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "nest-asyncio" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/7a/e6911fe11d140db5b5deda7a3ad6ee80c7615fcb248097ec7a4bc784eff6/firecrawl_py-2.16.5.tar.gz", hash = "sha256:7f5186bba359a426140a6827b550a604e62bfbeda33ded757952899b1cca4c83", size = 40154, upload-time = "2025-08-06T20:38:23.92Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/99/fa2a41e2c1c5ff3e01150470b0a8a630792a363724c188bf6522e6798be7/firecrawl_py-2.16.5-py3-none-any.whl", hash = "sha256:3caed19b8f21522ab9c2193c2226990f2468e6bc5669ef54aa156e4230a5e35e", size = 75978, upload-time = "2025-08-06T20:38:22.857Z" },
 ]
 
 [[package]]
@@ -767,6 +788,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b2/0a/2436550b1520091af0600dff547913cb2d66fbac27a8c33bc1b1bccd8d98/multidict-6.6.4-cp313-cp313t-win_amd64.whl", hash = "sha256:6d46a180acdf6e87cc41dc15d8f5c2986e1e8739dc25dbb7dac826731ef381a4", size = 53100, upload-time = "2025-08-11T12:08:13.823Z" },
     { url = "https://files.pythonhosted.org/packages/97/ea/43ac51faff934086db9c072a94d327d71b7d8b40cd5dcb47311330929ef0/multidict-6.6.4-cp313-cp313t-win_arm64.whl", hash = "sha256:756989334015e3335d087a27331659820d53ba432befdef6a718398b0a8493ad", size = 45501, upload-time = "2025-08-11T12:08:15.173Z" },
     { url = "https://files.pythonhosted.org/packages/fd/69/b547032297c7e63ba2af494edba695d781af8a0c6e89e4d06cf848b21d80/multidict-6.6.4-py3-none-any.whl", hash = "sha256:27d8f8e125c07cb954e54d75d04905a9bba8a439c1d84aca94949d4d03d8601c", size = 12313, upload-time = "2025-08-11T12:08:46.891Z" },
+]
+
+[[package]]
+name = "nest-asyncio"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/f8/51569ac65d696c8ecbee95938f89d4abf00f47d58d48f6fbabfe8f0baefe/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe", size = 7418, upload-time = "2024-01-21T14:25:19.227Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c", size = 5195, upload-time = "2024-01-21T14:25:17.223Z" },
 ]
 
 [[package]]
@@ -1441,6 +1471,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/04/57/d062573f391d062710d4088fa1369428c38d51460ab6fedff920efef932e/starlette-0.47.2.tar.gz", hash = "sha256:6ae9aa5db235e4846decc1e7b79c4f346adf41e9777aebeb49dfd09bbd7023d8", size = 2583948, upload-time = "2025-07-20T17:31:58.522Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/1f/b876b1f83aef204198a42dc101613fefccb32258e5428b5f9259677864b4/starlette-0.47.2-py3-none-any.whl", hash = "sha256:c5847e96134e5c5371ee9fac6fdf1a67336d5815e09eb2a01fdb57a351ef915b", size = 72984, upload-time = "2025-07-20T17:31:56.738Z" },
+]
+
+[[package]]
+name = "tavily-python"
+version = "0.7.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "requests" },
+    { name = "tiktoken" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/04/0e/d4aa0f4dec298298b510ee5209f5ff29352bbbba106fd7ea0221ba8840dc/tavily_python-0.7.10.tar.gz", hash = "sha256:c87b4c0549ab2e416cf4ac3da8fe3ce5db106288408b06e197d4b5ba8ec7ead9", size = 19275, upload-time = "2025-07-17T23:57:01.239Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/60/4c4678a28b3b5061aa2ab45b215290d3a71810e7996bafdf6b7313e75fb3/tavily_python-0.7.10-py3-none-any.whl", hash = "sha256:a99958e14dd091271611be7fb1e1a8a86f5bff3a9022b9626f4c4f1513338088", size = 15786, upload-time = "2025-07-17T23:56:58.404Z" },
 ]
 
 [[package]]
