@@ -18,6 +18,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import openai
 import tiktoken  # Add this import
+from datetime import datetime
 
 from src.models.message_models import FileInfo
 from src.core.config import Settings
@@ -114,7 +115,6 @@ class KnowledgeGraphService:
         all_chunk_data = await self._process_chunks_in_parallel(
             content_chunks, file_info.filename, file_info.file_path
         )
-        
         # Merge graph data from all chunks
         merged_graph_data = self._merge_graph_data_with_weights(all_chunk_data)
         
@@ -261,28 +261,20 @@ class KnowledgeGraphService:
     
     def _merge_graph_data_with_weights(self, all_chunk_data: List[dict]) -> dict:
         """
-        Merge graph data from multiple chunks with weighted edges based on entity frequency
-        and proper metadata preservation using delimiters
+        Merge graph data from multiple chunks into a clustered structure optimized for NetworkX
         
         Args:
             all_chunk_data: List of graph data dictionaries from chunks
+            Each chunk contains: entities, relationships, facts, and metadata
             
         Returns:
-            Merged graph data dictionary with weighted relationships
+            Clustered graph data dictionary with entities as the central structure
+            Each entity contains its connections, relationships, facts, and metadata
         """
-        merged_data = {
-            "entities": [],
-            "relationships": [],
-            "facts": [],
-            "metadata": {
-                "total_chunks": len(all_chunk_data),
-                "merge_timestamp": self._get_current_timestamp()
-            }
-        }
-        
-        # Track entity frequency across chunks
+        # Track entity frequency and create unified entity mapping
         entity_frequency = defaultdict(int)
         entity_mapping = {}  # Maps entity names to unified IDs
+        entity_data = {}  # Stores complete entity information
         
         # First pass: collect all entities and count frequency
         for chunk_data in all_chunk_data:
@@ -292,7 +284,7 @@ class KnowledgeGraphService:
                     if entity_name:
                         entity_frequency[entity_name.lower()] += 1
         
-        # Second pass: merge entities and assign weights
+        # Second pass: merge entities and collect all their data
         for chunk_data in all_chunk_data:
             if "entities" in chunk_data:
                 for entity in chunk_data["entities"]:
@@ -307,41 +299,47 @@ class KnowledgeGraphService:
                     extraction_timestamp = entity.get("extraction_timestamp", "")
                     
                     if entity_name.lower() in entity_mapping:
-                        # Entity exists, merge metadata with delimiters
-                        existing_entity = next(e for e in merged_data["entities"] if e["id"] == entity_mapping[entity_name.lower()])
-                        existing_entity["chunks"].append(chunk_index)
-                        existing_entity["chunk_content"] += f" ||| {chunk_content}"
-                        existing_entity["filename"] += f" ||| {filename}"
-                        existing_entity["file_path"] += f" ||| {file_path}"
-                        existing_entity["extraction_timestamp"] += f" ||| {extraction_timestamp}"
+                        # Entity exists, merge metadata
+                        unified_id = entity_mapping[entity_name.lower()]
+                        existing_entity = entity_data[unified_id]
+                        
+                        # Merge chunk information
+                        if chunk_index not in existing_entity["chunks"]:
+                            existing_entity["chunks"].append(chunk_index)
+                        existing_entity["chunk_content"].append(chunk_content)
+                        existing_entity["filename"].append(filename)
+                        existing_entity["file_path"].append(file_path)
+                        existing_entity["extraction_timestamp"].append(extraction_timestamp)
                         
                         # Merge other fields if they're different
                         if entity.get("type") and entity.get("type") not in existing_entity["type"]:
-                            existing_entity["type"] += f" ||| {entity.get('type')}"
+                            existing_entity["type"].append(entity.get("type"))
                         if entity.get("description") and entity.get("description") not in existing_entity["description"]:
-                            existing_entity["description"] += f" ||| {entity.get('description')}"
+                            existing_entity["description"].append(entity.get("description"))
                     else:
                         # New entity, create unified ID
-                        unified_id = f"entity_{len(merged_data['entities'])}"
+                        unified_id = f"entity_{len(entity_data)}"
                         entity_mapping[entity_name.lower()] = unified_id
                         
-                        # Add entity to merged data
-                        merged_entity = {
+                        # Initialize entity data structure
+                        entity_data[unified_id] = {
                             "id": unified_id,
                             "name": entity_name,
-                            "type": entity.get("type", ""),
-                            "description": entity.get("description", ""),
-                            "confidence": entity.get("confidence", 0.0),
+                            "type": [entity.get("type", "")] if entity.get("type") else [],
+                            "description": [entity.get("description", "")] if entity.get("description") else [],
                             "frequency": entity_frequency[entity_name.lower()],
                             "chunks": [chunk_index],
-                            "chunk_content": chunk_content,
-                            "filename": filename,
-                            "file_path": file_path,
-                            "extraction_timestamp": extraction_timestamp
+                            "chunk_content": [chunk_content],
+                            "filename": [filename],
+                            "file_path": [file_path],
+                            "extraction_timestamp": [extraction_timestamp],
+                            "connections": [],  # Will store relationship data
+                            "facts": [],  # Will store facts related to this entity
+                            "metadata": {}  # Will store additional metadata
                         }
-                        merged_data["entities"].append(merged_entity)
-            
-            # Process relationships
+        
+        # Process relationships and connect entities
+        for chunk_data in all_chunk_data:
             if "relationships" in chunk_data:
                 for rel in chunk_data["relationships"]:
                     source = rel.get("source", "").strip()
@@ -351,41 +349,50 @@ class KnowledgeGraphService:
                     if not all([source, target, rel_type]):
                         continue
                     
-                    chunk_index = chunk_data.get("chunk_index", 0)
-                    filename = chunk_data.get("filename", "")
-                    file_path = chunk_data.get("file_path", "")
-                    chunk_content = rel.get("chunk_content", "")
-                    extraction_timestamp = rel.get("extraction_timestamp", "")
+                    # Find the unified IDs for source and target entities
+                    source_id = None
+                    target_id = None
                     
-                    rel_key = f"{source}::{rel_type}::{target}"
+                    for entity_id, entity_info in entity_data.items():
+                        if entity_info["name"].lower() == source.lower():
+                            source_id = entity_id
+                        if entity_info["name"].lower() == target.lower():
+                            target_id = entity_id
                     
-                    if rel_key in [r.get("key", "") for r in merged_data["relationships"]]:
-                        # Relationship exists, merge metadata with delimiters
-                        existing_rel = next(r for r in merged_data["relationships"] if r.get("key") == rel_key)
-                        existing_rel["chunks"].append(chunk_index)
-                        existing_rel["chunk_content"] += f" ||| {chunk_content}"
-                        existing_rel["filename"] += f" ||| {filename}"
-                        existing_rel["file_path"] += f" ||| {file_path}"
-                        existing_rel["extraction_timestamp"] += f" ||| {extraction_timestamp}"
-                        existing_rel["frequency"] += 1
-                    else:
-                        # New relationship
-                        merged_rel = {
-                            "source": source,
-                            "target": target,
-                            "type": rel_type,
-                            "key": rel_key,
-                            "confidence": rel.get("confidence", 0.0),
-                            "frequency": 1,
-                            "chunks": [chunk_index],
-                            "chunk_content": chunk_content,
-                            "filename": filename,
-                            "file_path": file_path,
-                            "extraction_timestamp": extraction_timestamp
+                    if source_id and target_id:
+                        # Add connection to source entity
+                        connection = {
+                            "target_entity": target_id,
+                            "target_name": target,
+                            "relationship_type": rel_type,
+                            "chunks": [chunk_data.get("chunk_index", 0)],
+                            "chunk_content": [rel.get("chunk_content", "")],
+                            "filename": [chunk_data.get("filename", "")],
+                            "file_path": [chunk_data.get("file_path", "")],
+                            "extraction_timestamp": [rel.get("extraction_timestamp", "")]
                         }
-                        merged_data["relationships"].append(merged_rel)
-            
-            # Process facts
+                        
+                        # Check if this connection already exists
+                        existing_connection = None
+                        for conn in entity_data[source_id]["connections"]:
+                            if (conn["target_entity"] == target_id and 
+                                conn["relationship_type"] == rel_type):
+                                existing_connection = conn
+                                break
+                        
+                        if existing_connection:
+                            # Merge with existing connection
+                            if chunk_data.get("chunk_index") not in existing_connection["chunks"]:
+                                existing_connection["chunks"].append(chunk_data.get("chunk_index", 0))
+                            existing_connection["chunk_content"].append(rel.get("chunk_content", ""))
+                            existing_connection["filename"].append(chunk_data.get("filename", ""))
+                            existing_connection["file_path"].append(chunk_data.get("file_path", ""))
+                            existing_connection["extraction_timestamp"].append(rel.get("extraction_timestamp", ""))
+                        else:
+                            entity_data[source_id]["connections"].append(connection)
+        
+        # Process facts and associate them with entities
+        for chunk_data in all_chunk_data:
             if "facts" in chunk_data:
                 for fact in chunk_data["facts"]:
                     fact_text = fact.get("text", "").strip()
@@ -398,56 +405,371 @@ class KnowledgeGraphService:
                     chunk_content = fact.get("chunk_content", "")
                     extraction_timestamp = fact.get("extraction_timestamp", "")
                     
-                    fact_key = fact_text.lower()
+                    fact_data = {
+                        "text": fact_text,
+                        "chunks": [chunk_index],
+                        "chunk_content": [chunk_content],
+                        "filename": [filename],
+                        "file_path": [file_path],
+                        "extraction_timestamp": [extraction_timestamp]
+                    }
                     
-                    if fact_key in [f.get("key", "") for f in merged_data["facts"]]:
-                        # Fact exists, merge metadata with delimiters
-                        existing_fact = next(f for f in merged_data["facts"] if f.get("key") == fact_key)
-                        existing_fact["chunks"].append(chunk_index)
-                        existing_fact["chunk_content"] += f" ||| {chunk_content}"
-                        existing_fact["filename"] += f" ||| {filename}"
-                        existing_fact["file_path"] += f" ||| {file_path}"
-                        existing_fact["extraction_timestamp"] += f" ||| {extraction_timestamp}"
-                        existing_fact["frequency"] += 1
-                    else:
-                        # New fact
-                        merged_fact = {
-                            "text": fact_text,
-                            "key": fact_key,
-                            "confidence": fact.get("confidence", 0.0),
-                            "frequency": 1,
-                            "chunks": [chunk_index],
-                            "chunk_content": chunk_content,
-                            "filename": filename,
-                            "file_path": file_path,
-                            "extraction_timestamp": extraction_timestamp
-                        }
-                        merged_data["facts"].append(merged_fact)
+                    # Associate fact with entities mentioned in it
+                    for entity_id, entity_info in entity_data.items():
+                        if entity_info["name"].lower() in fact_text.lower():
+                            # Check if this fact already exists for this entity
+                            fact_exists = False
+                            for existing_fact in entity_info["facts"]:
+                                if existing_fact["text"].lower() == fact_text.lower():
+                                    # Merge with existing fact
+                                    if chunk_index not in existing_fact["chunks"]:
+                                        existing_fact["chunks"].append(chunk_index)
+                                    existing_fact["chunk_content"].append(chunk_content)
+                                    existing_fact["filename"].append(filename)
+                                    existing_fact["file_path"].append(file_path)
+                                    existing_fact["extraction_timestamp"].append(extraction_timestamp)
+                                    fact_exists = True
+                                    break
+                            
+                            if not fact_exists:
+                                entity_info["facts"].append(fact_data)
         
-        # Calculate weights for relationships based on entity frequency
-        for rel in merged_data["relationships"]:
-            source_freq = entity_frequency.get(rel["source"].lower(), 1)
-            target_freq = entity_frequency.get(rel["target"].lower(), 1)
-            rel["weight"] = self._calculate_relationship_weight(
-                source_freq, target_freq, rel["frequency"]
+        # Calculate weights for connections based on frequency and confidence
+        for entity_id, entity_info in entity_data.items():
+            for connection in entity_info["connections"]:
+                target_entity = entity_data[connection["target_entity"]]
+                source_freq = entity_info["frequency"]
+                target_freq = target_entity["frequency"]
+                rel_freq = len(connection["chunks"])
+                
+                connection["weight"] = self._calculate_connection_weight(
+                    source_freq, target_freq, rel_freq, connection.get("confidence", 0.5)
+                )
+        
+        # Filter to keep only the most important entities and connections
+        # Sort entities by importance score (frequency + total connections + total facts)
+        entity_importance = []
+        for entity_id, entity_info in entity_data.items():
+            importance_score = (
+                entity_info["frequency"] * 2 +  # Frequency has highest weight
+                len(entity_info["connections"]) * 1.5 +  # Connections are important
+                len(entity_info["facts"]) * 1.0  # Facts add value
             )
+            entity_importance.append((entity_id, importance_score, entity_info))
+        
+        # Sort by importance score (descending) and take top 200 entities
+        entity_importance.sort(key=lambda x: x[1], reverse=True)
+        top_entities = entity_importance[:200]
+        
+        # Create filtered entity data
+        filtered_entity_data = {}
+        for entity_id, _, entity_info in top_entities:
+            filtered_entity_data[entity_id] = entity_info
+        
+        # Now filter connections to keep only those between top entities
+        # and limit total connections to 400
+        all_connections = []
+        for entity_id, entity_info in filtered_entity_data.items():
+            for connection in entity_info["connections"]:
+                target_id = connection["target_entity"]
+                if target_id in filtered_entity_data:  # Only keep connections to top entities
+                    connection_score = (
+                        connection["weight"] * 2 +  # Connection weight
+                        len(connection["chunks"]) * 1.5 +  # Frequency of relationship
+                        (entity_info["frequency"] + filtered_entity_data[target_id]["frequency"]) * 0.5  # Combined entity frequency
+                    )
+                    all_connections.append((entity_id, connection, connection_score))
+        
+        # Sort connections by score and take top 400
+        all_connections.sort(key=lambda x: x[2], reverse=True)
+        top_connections = all_connections[:400]
+        
+        # Rebuild entity data with filtered connections
+        final_entity_data = {}
+        for entity_id, entity_info in filtered_entity_data.items():
+            # Get only the connections that made it to top 400
+            entity_connections = []
+            for conn_entity_id, connection, _ in top_connections:
+                if conn_entity_id == entity_id:
+                    entity_connections.append(connection)
+            
+            # Create final entity with filtered connections
+            final_entity = entity_info.copy()
+            final_entity["connections"] = entity_connections
+            final_entity_data[entity_id] = final_entity
+        
+        # Convert to final structure
+        clustered_data = {
+            "entities": list(final_entity_data.values()),
+            "total_entities": len(final_entity_data),
+            "total_connections": sum(len(entity["connections"]) for entity in final_entity_data.values()),
+            "total_facts": sum(len(entity["facts"]) for entity in final_entity_data.values()),
+            "metadata": {
+                "chunk_count": len(all_chunk_data),
+                "extraction_timestamp": datetime.now().isoformat(),
+                "filtering_applied": True,
+                "original_entities": len(entity_data),
+                "original_connections": sum(len(entity["connections"]) for entity in entity_data.values()),
+                "entity_limit": 200,
+                "connection_limit": 400
+            }
+        }
         
         logger.info(f"Merged graph data from {len(all_chunk_data)} chunks")
-        logger.info(f"  Total entities: {len(merged_data['entities'])}")
-        logger.info(f"  Total relationships: {len(merged_data['relationships'])}")
-        logger.info(f"  Total facts: {len(merged_data['facts'])}")
+        logger.info(f"  Original entities: {len(entity_data)} -> Filtered to: {clustered_data['total_entities']}")
+        logger.info(f"  Original connections: {sum(len(entity['connections']) for entity in entity_data.values())} -> Filtered to: {clustered_data['total_connections']}")
+        logger.info(f"  Total facts: {clustered_data['total_facts']}")
+        logger.info(f"  Filtering limits: 200 entities, 400 connections")
         
-        return merged_data
+        return clustered_data
     
-    def _calculate_relationship_weight(self, source_freq: int, target_freq: int, rel_freq: int) -> float:
-        """Calculate normalized weight for relationships"""
-        # Weight based on entity frequency and relationship frequency
+    def _calculate_connection_weight(self, source_freq: int, target_freq: int, rel_freq: int, confidence: float = None) -> float:
+        """Calculate normalized weight for entity connections"""
+        # Weight based on entity frequency, relationship frequency, and confidence
         base_weight = (source_freq + target_freq) / 2.0
         rel_weight = rel_freq
+        conf_weight = confidence if confidence is not None else 0.5
         
         # Normalize to 0-1 range
-        normalized_weight = min(1.0, (base_weight + rel_weight) / 10.0)
+        normalized_weight = min(1.0, (base_weight + rel_weight + conf_weight) / 15.0)
         return round(normalized_weight, 3)
+    
+    def convert_clustered_to_legacy_format(self, clustered_data: dict) -> dict:
+        """
+        Convert clustered data structure back to legacy format for backward compatibility
+        
+        Args:
+            clustered_data: The new clustered data structure
+            
+        Returns:
+            Legacy format data structure with separate entities, relationships, and facts lists
+        """
+        legacy_data = {
+            "entities": [],
+            "relationships": [],
+            "facts": [],
+            "metadata": clustered_data.get("metadata", {})
+        }
+        
+        # Convert entities
+        for entity in clustered_data.get("entities", []):
+            legacy_entity = {
+                "id": entity["id"],
+                "name": entity["name"],
+                "type": " ||| ".join(entity.get("type", [])) if entity.get("type") else "",
+                "description": " ||| ".join(entity.get("description", [])) if entity.get("description") else "",
+                "confidence": entity.get("confidence", 0.0),
+                "frequency": entity.get("frequency", 1),
+                "chunks": entity.get("chunks", []),
+                "chunk_content": " ||| ".join(entity.get("chunk_content", [])),
+                "filename": " ||| ".join(entity.get("filename", [])),
+                "file_path": " ||| ".join(entity.get("file_path", [])),
+                "extraction_timestamp": " ||| ".join(entity.get("extraction_timestamp", []))
+            }
+            legacy_data["entities"].append(legacy_entity)
+        
+        # Convert connections to relationships
+        for entity in clustered_data.get("entities", []):
+            for connection in entity.get("connections", []):
+                legacy_relationship = {
+                    "source": entity["name"],
+                    "target": connection["target_name"],
+                    "type": connection["relationship_type"],
+                    "key": f"{entity['name']}::{connection['relationship_type']}::{connection['target_name']}",
+                    "confidence": connection.get("confidence", 0.0),
+                    "frequency": len(connection.get("chunks", [])),
+                    "chunks": connection.get("chunks", []),
+                    "chunk_content": " ||| ".join(connection.get("chunk_content", [])),
+                    "filename": " ||| ".join(connection.get("filename", [])),
+                    "file_path": " ||| ".join(connection.get("file_path", [])),
+                    "extraction_timestamp": " ||| ".join(connection.get("extraction_timestamp", [])),
+                    "weight": connection.get("weight", 1.0)
+                }
+                legacy_data["relationships"].append(legacy_relationship)
+        
+        # Convert facts
+        for entity in clustered_data.get("entities", []):
+            for fact in entity.get("facts", []):
+                legacy_fact = {
+                    "text": fact["text"],
+                    "key": fact["text"].lower(),
+                    "confidence": fact.get("confidence", 0.0),
+                    "frequency": len(fact.get("chunks", [])),
+                    "chunks": fact.get("chunks", []),
+                    "chunk_content": " ||| ".join(fact.get("chunk_content", [])),
+                    "filename": " ||| ".join(fact.get("filename", [])),
+                    "file_path": " ||| ".join(fact.get("file_path", [])),
+                    "extraction_timestamp": " ||| ".join(fact.get("extraction_timestamp", []))
+                }
+                legacy_data["facts"].append(legacy_fact)
+        
+        return legacy_data
+    
+    def get_clustered_data_summary(self, clustered_data: dict) -> dict:
+        """
+        Get a summary of the clustered data structure
+        
+        Args:
+            clustered_data: The clustered data structure
+            
+        Returns:
+            Summary dictionary with key statistics and insights
+        """
+        entities = clustered_data.get("entities", [])
+        
+        # Entity type distribution
+        type_distribution = {}
+        for entity in entities:
+            for entity_type in entity.get("type", ["unknown"]):
+                type_distribution[entity_type] = type_distribution.get(entity_type, 0) + 1
+        
+        # Connection type distribution
+        connection_type_distribution = {}
+        total_connections = 0
+        for entity in entities:
+            for connection in entity.get("connections", []):
+                rel_type = connection.get("relationship_type", "unknown")
+                connection_type_distribution[rel_type] = connection_type_distribution.get(rel_type, 0) + 1
+                total_connections += 1
+        
+        # Entity connectivity analysis
+        connectivity_stats = []
+        for entity in entities:
+            connections = len(entity.get("connections", []))
+            facts = len(entity.get("facts", []))
+            connectivity_stats.append({
+                "entity_name": entity["name"],
+                "connections": connections,
+                "facts": facts,
+                "frequency": entity.get("frequency", 1)
+            })
+        
+        # Sort by connectivity
+        connectivity_stats.sort(key=lambda x: x["connections"], reverse=True)
+        
+        summary = {
+            "total_entities": len(entities),
+            "total_connections": total_connections,
+            "total_facts": sum(len(entity.get("facts", [])) for entity in entities),
+            "entity_type_distribution": type_distribution,
+            "connection_type_distribution": connection_type_distribution,
+            "most_connected_entities": connectivity_stats[:10],  # Top 10
+            "entity_frequency_stats": {
+                "min": min((entity.get("frequency", 1) for entity in entities), default=1),
+                "max": max((entity.get("frequency", 1) for entity in entities), default=1),
+                "avg": sum(entity.get("frequency", 1) for entity in entities) / len(entities) if entities else 0
+            }
+        }
+        
+        # Add filtering information if available
+        if clustered_data.get("metadata", {}).get("filtering_applied"):
+            summary["filtering_info"] = {
+                "filtering_applied": True,
+                "original_entities": clustered_data["metadata"].get("original_entities", 0),
+                "original_connections": clustered_data["metadata"].get("original_connections", 0),
+                "entity_limit": clustered_data["metadata"].get("entity_limit", 200),
+                "connection_limit": clustered_data["metadata"].get("connection_limit", 400),
+                "entities_filtered": clustered_data["metadata"].get("original_entities", 0) - len(entities),
+                "connections_filtered": clustered_data["metadata"].get("original_connections", 0) - total_connections
+            }
+        
+        return summary
+    
+    def test_filtering_logic(self, sample_chunk_data: List[dict]) -> dict:
+        """
+        Test the filtering logic with sample data to demonstrate entity and connection limits
+        
+        Args:
+            sample_chunk_data: Sample chunk data to test with
+            
+        Returns:
+            Dictionary showing filtering results and statistics
+        """
+        # Create a large sample dataset to test filtering
+        large_chunk_data = []
+        
+        # Generate 500 entities across multiple chunks
+        for chunk_idx in range(10):
+            chunk_entities = []
+            chunk_relationships = []
+            chunk_facts = []
+            
+            # Add 50 entities per chunk
+            for entity_idx in range(50):
+                entity_id = f"entity_{chunk_idx}_{entity_idx}"
+                entity_name = f"Entity_{chunk_idx}_{entity_idx}"
+                
+                # Vary frequency and importance
+                frequency = (chunk_idx + 1) * (entity_idx + 1) % 10 + 1
+                
+                chunk_entities.append({
+                    "id": entity_id,
+                    "name": entity_name,
+                    "type": f"type_{entity_idx % 5}",
+                    "description": f"Description for {entity_name}",
+                    "chunk_content": f"Content mentioning {entity_name}",
+                    "chunk_index": chunk_idx,
+                    "filename": f"chunk_{chunk_idx}.txt",
+                    "file_path": f"/path/to/chunk_{chunk_idx}.txt",
+                    "extraction_timestamp": "2024-01-01T10:00:00"
+                })
+                
+                # Add some relationships
+                if entity_idx > 0:
+                    chunk_relationships.append({
+                        "source": entity_name,
+                        "target": f"Entity_{chunk_idx}_{entity_idx-1}",
+                        "type": "related_to",
+                        "chunk_content": f"Relationship between {entity_name} and Entity_{chunk_idx}_{entity_idx-1}",
+                        "chunk_index": chunk_idx,
+                        "filename": f"chunk_{chunk_idx}.txt",
+                        "file_path": f"/path/to/chunk_{chunk_idx}.txt",
+                        "extraction_timestamp": "2024-01-01T10:00:00"
+                    })
+                
+                # Add some facts
+                chunk_facts.append({
+                    "text": f"Fact about {entity_name}",
+                    "chunk_content": f"Content with fact about {entity_name}",
+                    "chunk_index": chunk_idx,
+                    "filename": f"chunk_{chunk_idx}.txt",
+                    "file_path": f"/path/to/chunk_{chunk_idx}.txt",
+                    "extraction_timestamp": "2024-01-01T10:00:00"
+                })
+            
+            large_chunk_data.append({
+                "entities": chunk_entities,
+                "relationships": chunk_relationships,
+                "facts": chunk_facts,
+                "chunk_index": chunk_idx,
+                "filename": f"chunk_{chunk_idx}.txt",
+                "file_path": f"/path/to/chunk_{chunk_idx}.txt"
+            })
+        
+        # Process with filtering
+        filtered_data = self._merge_graph_data_with_weights(large_chunk_data)
+        
+        # Get summary
+        summary = self.get_clustered_data_summary(filtered_data)
+        
+        return {
+            "test_results": {
+                "input_chunks": len(large_chunk_data),
+                "input_entities": sum(len(chunk.get("entities", [])) for chunk in large_chunk_data),
+                "input_relationships": sum(len(chunk.get("relationships", [])) for chunk in large_chunk_data),
+                "input_facts": sum(len(chunk.get("facts", [])) for chunk in large_chunk_data)
+            },
+            "filtered_results": {
+                "output_entities": filtered_data["total_entities"],
+                "output_connections": filtered_data["total_connections"],
+                "output_facts": filtered_data["total_facts"]
+            },
+            "filtering_summary": summary,
+            "limits_applied": {
+                "entity_limit": 200,
+                "connection_limit": 400
+            }
+        }
     
     async def _save_graph_data_to_json(self, filename: str, graph_data: dict) -> str:
         """Save graph data to a JSON file"""
@@ -470,65 +792,87 @@ class KnowledgeGraphService:
             return ""
     
     def _generate_networkx_graph_from_graph_data(self, graph_data: dict, filename: str, file_path: str) -> nx.DiGraph:
-        """Generate a NetworkX graph from graph data with metadata"""
+        """Generate a NetworkX graph from clustered graph data with metadata"""
         graph = nx.DiGraph()
         
         # Add entities as nodes with metadata
         if "entities" in graph_data:
             for entity_data in graph_data["entities"]:
                 node_id = entity_data["id"]
-                graph.add_node(node_id, 
-                             name=entity_data["name"],
-                             type=entity_data.get("type", "unknown"),
-                             description=entity_data.get("description", ""),
-                             confidence=entity_data.get("confidence", 0.0),
-                             frequency=entity_data.get("frequency", 1),
-                             chunks=entity_data.get("chunks", []),
-                             filename=filename,
-                             file_path=file_path,
-                             node_type="entity")
-        
-        # Add relationships as edges with metadata
-        if "relationships" in graph_data:
-            for relationship_data in graph_data["relationships"]:
-                source = relationship_data["source"]
-                target = relationship_data["target"]
                 
-                if source in graph.nodes and target in graph.nodes:
-                    graph.add_edge(source, target,
-                                 relationship_type=relationship_data.get("type", "related"),
-                                 weight=relationship_data.get("weight", 1.0),
-                                 confidence=relationship_data.get("confidence", 0.0),
-                                 chunk_index=relationship_data.get("chunks", []),
-                                 filename=filename,
-                                 file_path=file_path,
-                                 edge_type="relationship")
+                # Prepare node attributes
+                node_attrs = {
+                    "name": entity_data["name"],
+                    "type": entity_data.get("type", ["unknown"])[0] if entity_data.get("type") else "unknown",
+                    "description": entity_data.get("description", [""])[0] if entity_data.get("description") else "",
+                    "frequency": entity_data.get("frequency", 1),
+                    "chunks": entity_data.get("chunks", []),
+                    "filename": filename,
+                    "file_path": file_path,
+                    "node_type": "entity",
+                    "total_connections": len(entity_data.get("connections", [])),
+                    "total_facts": len(entity_data.get("facts", []))
+                }
+                
+                # Add all types and descriptions as lists
+                if entity_data.get("type"):
+                    node_attrs["all_types"] = entity_data["type"]
+                if entity_data.get("description"):
+                    node_attrs["all_descriptions"] = entity_data["description"]
+                
+                graph.add_node(node_id, **node_attrs)
+        
+        # Add connections as edges with metadata
+        if "entities" in graph_data:
+            for entity_data in graph_data["entities"]:
+                source_id = entity_data["id"]
+                
+                for connection in entity_data.get("connections", []):
+                    target_id = connection["target_entity"]
+                    
+                    if source_id in graph.nodes and target_id in graph.nodes:
+                        edge_attrs = {
+                            "relationship_type": connection.get("relationship_type", "related"),
+                            "weight": connection.get("weight", 1.0),
+                            "confidence": connection.get("confidence", 0.0),
+                            "chunks": connection.get("chunks", []),
+                            "filename": filename,
+                            "file_path": file_path,
+                            "edge_type": "entity_connection",
+                            "target_name": connection.get("target_name", "")
+                        }
+                        
+                        graph.add_edge(source_id, target_id, **edge_attrs)
         
         # Add facts as special nodes connected to entities
-        if "facts" in graph_data:
-            for fact_data in graph_data["facts"]:
-                fact_id = f"fact_{hash(fact_data['text'])}"
-                graph.add_node(fact_id,
-                             content=fact_data["text"],
-                             confidence=fact_data.get("confidence", 0.0),
-                             chunk_index=fact_data.get("chunks", []),
-                             filename=filename,
-                             file_path=file_path,
-                             node_type="fact")
+        if "entities" in graph_data:
+            for entity_data in graph_data["entities"]:
+                entity_id = entity_data["id"]
                 
-                # Connect fact to entities mentioned in it
-                for entity_data in graph_data.get("entities", []):
-                    if entity_data["name"].lower() in fact_data["text"].lower():
-                        entity_id = entity_data["id"]
-                        if entity_id in graph.nodes:
-                            graph.add_edge(fact_id, entity_id,
-                                         relationship_type="mentions",
-                                         weight=0.3,
-                                         confidence=fact_data.get("confidence", 0.0),
-                                         chunk_index=fact_data.get("chunks", []),
-                                         filename=filename,
-                                         file_path=file_path,
-                                         edge_type="fact_entity")
+                for fact in entity_data.get("facts", []):
+                    fact_id = f"fact_{hash(fact['text'])}"
+                    
+                    # Check if fact node already exists
+                    if fact_id not in graph.nodes:
+                        fact_attrs = {
+                            "content": fact["text"],
+                            "confidence": fact.get("confidence", 0.0),
+                            "chunks": fact.get("chunks", []),
+                            "filename": filename,
+                            "file_path": file_path,
+                            "node_type": "fact"
+                        }
+                        graph.add_node(fact_id, **fact_attrs)
+                    
+                    # Connect fact to entity
+                    graph.add_edge(fact_id, entity_id,
+                                 relationship_type="mentions",
+                                 weight=0.3,
+                                 confidence=fact.get("confidence", 0.0),
+                                 chunks=fact.get("chunks", []),
+                                 filename=filename,
+                                 file_path=file_path,
+                                 edge_type="fact_entity")
         
         logger.info(f"Generated NetworkX graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges")
         return graph
@@ -618,7 +962,7 @@ class KnowledgeGraphService:
             # Get all entity names in this cluster
             cluster_entity_names = [list(entity_to_graph.keys())[i] for i in entity_indices]
             
-            # Find the best representative entity (highest frequency/confidence)
+            # Find the best representative entity using new importance scoring
             best_entity = None
             best_score = -1
             
@@ -629,8 +973,12 @@ class KnowledgeGraphService:
                 
                 if entity_name in graph.nodes:
                     attrs = graph.nodes[entity_name]
-                    # Score based on frequency and confidence
-                    score = attrs.get('frequency', 1) * attrs.get('confidence', 0.5)
+                    # Use new importance scoring: frequency + connections + facts
+                    frequency = attrs.get('frequency', 1)
+                    connections = attrs.get('total_connections', 0)
+                    facts = attrs.get('total_facts', 0)
+                    score = (frequency * 2) + (connections * 1.5) + (facts * 1.0)
+                    
                     if score > best_score:
                         best_score = score
                         best_entity = entity_name
@@ -724,7 +1072,6 @@ class KnowledgeGraphService:
         all_types = set([base_attrs.get('type', '')])
         all_descriptions = set([base_attrs.get('description', '')])
         total_frequency = base_attrs.get('frequency', 1)
-        total_confidence = base_attrs.get('confidence', 0.0)
         entity_count = 1
         
         # Collect metadata from all entities in the cluster
@@ -751,9 +1098,8 @@ class KnowledgeGraphService:
                 if 'description' in attrs and attrs['description']:
                     all_descriptions.add(attrs['description'])
                 
-                # Accumulate frequency and confidence
+                # Accumulate frequency
                 total_frequency += attrs.get('frequency', 1)
-                total_confidence += attrs.get('confidence', 0.0)
                 entity_count += 1
         
         # Update merged attributes
@@ -763,7 +1109,6 @@ class KnowledgeGraphService:
         merged_attrs['type'] = ' ||| '.join(sorted(all_types)) if all_types else 'unknown'
         merged_attrs['description'] = ' ||| '.join(sorted(all_descriptions)) if all_descriptions else ''
         merged_attrs['frequency'] = total_frequency
-        merged_attrs['confidence'] = round(total_confidence / entity_count, 3)  # Average confidence
         merged_attrs['cluster_size'] = entity_count
         merged_attrs['clustered'] = True
         merged_attrs['cluster_entities'] = cluster_entity_names
@@ -819,14 +1164,10 @@ class KnowledgeGraphService:
         new_file_paths = set([new_attrs.get('file_path', '')] if new_attrs.get('file_path') else [])
         merged['file_path'] = ' ||| '.join(sorted(existing_file_paths | new_file_paths)) if (existing_file_paths | new_file_paths) else ''
         
-        # Accumulate frequency and confidence
+        # Accumulate frequency
         existing_freq = existing_attrs.get('frequency', 1)
         new_freq = new_attrs.get('frequency', 1)
         merged['frequency'] = existing_freq + new_freq
-        
-        existing_conf = existing_attrs.get('confidence', 0.0)
-        new_conf = new_attrs.get('confidence', 0.0)
-        merged['confidence'] = round((existing_conf + new_conf) / 2, 3)  # Average confidence
         
         # Mark as merged
         merged['merged'] = True
@@ -838,10 +1179,23 @@ class KnowledgeGraphService:
         """Merge attributes when an edge appears in multiple graphs"""
         merged = dict(existing_attrs)
         
-        # Merge chunks
-        existing_chunks = set(existing_attrs.get('chunk_index', []))
-        new_chunks = set(new_attrs.get('chunk_index', []))
-        merged['chunk_index'] = sorted(list(existing_chunks | new_chunks))
+        # Merge chunks - handle both old chunk_index and new chunks format
+        existing_chunks = set()
+        new_chunks = set()
+        
+        # Handle existing chunks
+        if 'chunks' in existing_attrs:
+            existing_chunks = set(existing_attrs['chunks'])
+        elif 'chunk_index' in existing_attrs:
+            existing_chunks = set(existing_attrs['chunk_index'])
+        
+        # Handle new chunks
+        if 'chunks' in new_attrs:
+            new_chunks = set(new_attrs['chunks'])
+        elif 'chunk_index' in new_attrs:
+            new_chunks = set(new_attrs['chunk_index'])
+        
+        merged['chunks'] = sorted(list(existing_chunks | new_chunks))
         
         # Merge filenames and file paths
         existing_filenames = set(existing_attrs.get('filename', '').split(' ||| ') if existing_attrs.get('filename') else [])
@@ -852,14 +1206,11 @@ class KnowledgeGraphService:
         new_file_paths = set([new_attrs.get('file_path', '')] if new_attrs.get('file_path') else [])
         merged['file_path'] = ' ||| '.join(sorted(existing_file_paths | new_file_paths)) if (existing_file_paths | new_file_paths) else ''
         
-        # Accumulate weight and confidence
-        existing_weight = existing_attrs.get('weight', 1.0)
-        new_weight = new_attrs.get('weight', 1.0)
-        merged['weight'] = round(existing_weight + new_weight, 3)
-        
-        existing_conf = existing_attrs.get('confidence', 0.0)
-        new_conf = new_attrs.get('confidence', 0.0)
-        merged['confidence'] = round((existing_conf + new_conf) / 2, 3)  # Average confidence
+        # Handle weight if present
+        if 'weight' in existing_attrs and 'weight' in new_attrs:
+            existing_weight = existing_attrs.get('weight', 1.0)
+            new_weight = new_attrs.get('weight', 1.0)
+            merged['weight'] = round((existing_weight + new_weight) / 2, 3)  # Average weight
         
         # Mark as merged
         merged['merged'] = True
@@ -1094,7 +1445,6 @@ class KnowledgeGraphService:
         try:
             entity_count = 0
             total_frequency = 0
-            total_confidence = 0
             entity_types = {}
             source_files = set()
             
@@ -1102,7 +1452,6 @@ class KnowledgeGraphService:
                 if attrs.get("node_type") == "entity":
                     entity_count += 1
                     total_frequency += attrs.get("frequency", 1)
-                    total_confidence += attrs.get("confidence", 0.0)
                     
                     # Entity types
                     entity_type = attrs.get("type", "unknown")
@@ -1117,7 +1466,6 @@ class KnowledgeGraphService:
             return {
                 "count": entity_count,
                 "average_frequency": round(total_frequency / entity_count, 2) if entity_count > 0 else 0,
-                "average_confidence": round(total_confidence / entity_count, 3) if entity_count > 0 else 0,
                 "types": entity_types,
                 "source_files": len(source_files)
             }
@@ -1131,15 +1479,13 @@ class KnowledgeGraphService:
         try:
             relationship_count = 0
             total_weight = 0
-            total_confidence = 0
             relationship_types = {}
             source_files = set()
             
             for source, target, attrs in self.graph.edges(data=True):
-                if attrs.get("edge_type") == "relationship":
+                if attrs.get("edge_type") in ["entity_connection", "relationship"]:
                     relationship_count += 1
                     total_weight += attrs.get("weight", 1.0)
-                    total_confidence += attrs.get("confidence", 0.0)
                     
                     # Relationship types
                     rel_type = attrs.get("relationship_type", "unknown")
@@ -1154,7 +1500,6 @@ class KnowledgeGraphService:
             return {
                 "count": relationship_count,
                 "average_weight": round(total_weight / relationship_count, 3) if relationship_count > 0 else 0,
-                "average_confidence": round(total_confidence / relationship_count, 3) if relationship_count > 0 else 0,
                 "types": relationship_types,
                 "source_files": len(source_files)
             }
@@ -1185,7 +1530,6 @@ class KnowledgeGraphService:
     
     def _get_current_timestamp(self) -> str:
         """Get current timestamp as string"""
-        from datetime import datetime
         return datetime.now().isoformat()
 
     def get_processing_efficiency_status(self) -> dict:

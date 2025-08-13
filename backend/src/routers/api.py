@@ -333,3 +333,103 @@ async def clear_embeddings(client_id: str):
             "success": False,
             "error": str(e)
         }
+
+# Enhanced Graph Query Service endpoints
+class GraphQueryRequest(BaseModel):
+    client_id: str
+    slide_description: str
+    top_k: int = 10
+    similarity_threshold: float = 0.3
+    include_embeddings: bool = False
+    max_tokens: int = 2000
+
+class GraphQueryResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict[str, Any]] = None
+
+@router.post("/graph-query", response_model=GraphQueryResponse)
+async def query_knowledge_graph(request: GraphQueryRequest):
+    """Query the knowledge graph using the enhanced GraphQueryService"""
+    try:
+        logger.info(f"Graph query request for client: {request.client_id}")
+        logger.info(f"Query: {request.slide_description[:100]}...")
+        
+        # Get knowledge graph service
+        kg_service = get_kg_service(request.client_id)
+        
+        # Initialize LLM service
+        from src.services.llm_service import LLMService
+        llm_service = LLMService()
+        
+        # Initialize enhanced graph query service
+        from src.services.graph_query_service import GraphQueryService
+        query_service = GraphQueryService(
+            knowledge_graph_service=kg_service,
+            llm_service=llm_service
+        )
+        
+        # Execute the query
+        result = await query_service.query_graph_for_slide_content(
+            slide_description=request.slide_description,
+            top_k=request.top_k,
+            similarity_threshold=request.similarity_threshold,
+            include_embeddings=request.include_embeddings,
+            max_tokens=request.max_tokens
+        )
+        
+        if "error" in result:
+            return GraphQueryResponse(
+                success=False,
+                message=f"Query failed: {result['error']}"
+            )
+        
+        return GraphQueryResponse(
+            success=True,
+            message="Graph query completed successfully",
+            data=result
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in graph query: {e}")
+        return GraphQueryResponse(
+            success=False,
+            message=f"Internal server error: {str(e)}"
+        )
+
+@router.get("/graph-query/stats/{client_id}")
+async def get_graph_statistics(client_id: str):
+    """Get statistics about the knowledge graph"""
+    try:
+        logger.info(f"Getting graph statistics for client: {client_id}")
+        
+        # Get knowledge graph service
+        kg_service = get_kg_service(client_id)
+        
+        # Initialize enhanced graph query service
+        from src.services.graph_query_service import GraphQueryService
+        query_service = GraphQueryService(
+            knowledge_graph_service=kg_service,
+            llm_service=None  # No LLM needed for statistics
+        )
+        
+        # Get statistics
+        stats = await query_service.get_graph_statistics()
+        
+        if "error" in stats:
+            return {
+                "success": False,
+                "error": stats["error"]
+            }
+        
+        return {
+            "success": True,
+            "data": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting graph statistics: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }

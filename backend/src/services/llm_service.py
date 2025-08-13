@@ -340,6 +340,54 @@ Generate detailed, comprehensive content for each section."""
             logger.error(f"Error generating slide content: {e}")
             return self._generate_fallback_content(content, description, layout)
 
+    async def generate_content(
+        self, 
+        prompt: str, 
+        max_tokens: int = 2000,
+        system_prompt: str = None
+    ) -> str:
+        """
+        Generate content using LLM for general purposes
+        
+        Args:
+            prompt: User prompt for content generation
+            max_tokens: Maximum tokens for the response
+            system_prompt: Optional system prompt to override default
+            
+        Returns:
+            Generated content as string
+        """
+        if not self.client:
+            logger.warning("OpenAI client not available. Cannot generate content.")
+            return ""
+        
+        try:
+            # Use default system prompt if none provided
+            if not system_prompt:
+                system_prompt = """You are a helpful AI assistant that provides clear, concise, and accurate responses. 
+                Follow the user's instructions carefully and format your response appropriately."""
+            
+            # Create the chat completion request
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=0.7
+            )
+            
+            # Extract the generated content
+            generated_content = response.choices[0].message.content.strip()
+            logger.info(f"Successfully generated content with {len(generated_content)} characters")
+            
+            return generated_content
+            
+        except Exception as e:
+            logger.error(f"Error generating content: {e}")
+            return ""
+
     async def extract_knowledge_graph_from_chunk(
         self, 
         content: str, 
@@ -385,7 +433,6 @@ Return ONLY this JSON structure (no other text):
             "name": "entity_name",
             "type": "entity_type",
             "description": "brief_description",
-            "confidence": 0.95
         }
     ],
     "relationships": [
@@ -394,7 +441,6 @@ Return ONLY this JSON structure (no other text):
             "source_entity": "source_entity_id",
             "target_entity": "target_entity_id",
             "relationship_type": "relationship_label",
-            "confidence": 0.9
         }
     ],
     "facts": [
@@ -402,7 +448,6 @@ Return ONLY this JSON structure (no other text):
             "id": "unique_fact_id",
             "content": "factual_statement",
             "source_entities": ["entity_id1", "entity_id2"],
-            "confidence": 0.85
         }
     ]
 }"""
@@ -462,7 +507,7 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
                     "chunk_content": content,
                     "extraction_timestamp": self._get_current_timestamp()
                 }
-                
+
                 logger.info(f"Extraction data: {extraction_data}")
                 
                 logger.info(f"Successfully extracted knowledge graph data from chunk {chunk_index}")
@@ -553,6 +598,7 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
     def _generate_fallback_knowledge_graph_data(self, content: str, chunk_index: int, filename: str, file_path: str) -> Dict[str, Any]:
         """Generate fallback knowledge graph data when LLM extraction fails"""
         # Simple fallback: extract basic entities from text
+        # TODO: Do this using spacy
         entities = []
         relationships = []
         facts = []
@@ -568,7 +614,6 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
                     "name": word,
                     "type": "unknown",
                     "description": f"Extracted from chunk {chunk_index}",
-                    "confidence": 0.5
                 })
         
         return {
