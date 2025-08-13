@@ -457,6 +457,7 @@ class SlideService:
                     f"Calling status callback: Creating slide content with AI... (60%)")
                 await status_callback("Creating slide content with AI...", 60)
             logger.info("Generating slide content using LLM...")
+            
             content = await self.llm_service.generate_slide_content(
                 combined_content,
                 description,
