@@ -307,6 +307,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ## 🔄 Development Workflow
 
 ### Recent Updates
+- Invite acceptance flow: wrapped `useSearchParams` in a Suspense boundary for `/invite/accept` to satisfy Next.js requirements and ensure production builds succeed.
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
 
 - Added reusable card style `card-contrast` in `app/globals.css` for high-emphasis cards with thin white borders on dark backgrounds. Apply it via `className="card-contrast"` alongside `variant="glass"` on `Card` components.
