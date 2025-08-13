@@ -204,6 +204,30 @@ export default function Home() {
     loadUserPresentations();
   }, [user]);
 
+  // Load templates for the templates section
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        // Load templates from the templates API
+        const response = await fetch('/api/templates/list');
+        const data = await response.json();
+        const templatesData = (data.templates || []).map((template: any) => ({
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          theme: template.theme,
+          html: template.html,
+        }));
+        setTemplates(templatesData.slice(0, 8)); // Limit to 8 for homepage display
+      } catch (error) {
+        console.error('Failed to load templates:', error);
+        setTemplates([]);
+      }
+    };
+
+    loadTemplates();
+  }, []);
+
   // If user is authenticated, show dashboard
   // AUTHENTICATED USER DASHBOARD: Show full dashboard interface for logged-in users
   if (user) {
@@ -368,20 +392,11 @@ export default function Home() {
                         <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                           <div className="h-full relative">
                             {/* Template preview */}
-                            {template.slide_json ? (
-                              <div className="absolute inset-0 bg-white flex items-center justify-center">
-                                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center">
-                                  <div className="text-center p-2">
-                                    <div className="text-xs font-medium text-foreground mb-1">{template.name}</div>
-                                    <div className="text-[10px] text-muted-foreground line-clamp-2">{template.description}</div>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : template.html_content ? (
+                            {template.html ? (
                               <div className="absolute inset-0">
                                 <div
                                   className="w-full h-full bg-white"
-                                  dangerouslySetInnerHTML={{ __html: template.html_content }}
+                                  dangerouslySetInnerHTML={{ __html: template.html }}
                                   style={{
                                     transform: 'scale(0.5)',
                                     transformOrigin: 'top left',
@@ -392,7 +407,10 @@ export default function Home() {
                               </div>
                             ) : (
                               <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
-                                <Layers className="h-8 w-8 text-muted-foreground/50" />
+                                <div className="text-center p-2">
+                                  <div className="text-xs font-medium text-foreground mb-1">{template.name}</div>
+                                  <div className="text-[10px] text-muted-foreground line-clamp-2">{template.description}</div>
+                                </div>
                               </div>
                             )}
                             
