@@ -24,6 +24,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { InviteMembersModal } from "@/components/ui/invite-members-modal";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   user?: {

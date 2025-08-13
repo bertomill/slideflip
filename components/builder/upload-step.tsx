@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileText, X, ArrowRight, Type, Sparkles, Mic, Square } from "lucide-react";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles, Mic, Square, Eye, CheckCircle, Clock, XCircle } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 
 // Minimal types to avoid 'any' while supporting browser SpeechRecognition
@@ -29,7 +29,14 @@ type SpeechRecognitionConstructor = new () => MinimalSpeechRecognition;
 
 type BackendMessage = {
   type: string;
-  data: { filename?: string; error?: string };
+  data: {
+    filename?: string;
+    error?: string;
+    file_path?: string;
+    file_size?: number;
+    file_type?: string;
+    content_info?: { text?: string; text_length?: number };
+  };
 };
 
 // Interface defining props for the UploadStep component
@@ -63,6 +70,10 @@ export function UploadStep({
   const [pastedText, setPastedText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isParsing] = useState(false);
+  const [viewingContent, setViewingContent] = useState<string | null>(null);
+  const [parsingFiles, setParsingFiles] = useState<Set<string>>(new Set());
+  const processedMessagesRef = useRef<Set<string>>(new Set());
+  const parsingFilesRef = useRef<Set<string>>(new Set());
   
   // Voice input state
   const [isListening, setIsListening] = useState(false);
@@ -77,13 +88,83 @@ export function UploadStep({
 
   // Handle backend messages
   useEffect(() => {
-    if (lastMessage) {
-      console.log('Received message from backend:', lastMessage);
+    if (!lastMessage) return;
+    
+    // Create a unique message ID to prevent processing the same message multiple times
+    const messageId = `${lastMessage.type}_${Date.now()}_${JSON.stringify(lastMessage.data).slice(0, 50)}`;
+    
+    // Skip if we've already processed this message
+    if (processedMessagesRef.current.has(messageId)) {
+      return;
+    }
+    
+    // Mark message as processed
+    processedMessagesRef.current.add(messageId);
+    
+    // Clean up old message IDs to prevent memory leak (keep only last 10)
+    if (processedMessagesRef.current.size > 10) {
+      const ids = Array.from(processedMessagesRef.current);
+      processedMessagesRef.current = new Set(ids.slice(-10));
+    }
+    
+    console.log('🔄 Processing message:', lastMessage.type, 'for file:', lastMessage.data?.filename);
+    console.log('🔄 Full message:', lastMessage);
+    
+    if (lastMessage.type === 'file_upload_success') {
+      const name = lastMessage.data?.filename || "";
+      console.log('Processing success for file:', name);
       
-      if (lastMessage.type === 'file_upload_success') {
-        setUploadStatus(`Successfully uploaded ${lastMessage.data.filename}`);
-      } else if (lastMessage.type === 'file_upload_error') {
-        setUploadStatus(`Failed to upload: ${lastMessage.data.error}`);
+      // Clear the upload status after showing success briefly
+      setUploadStatus(`Successfully uploaded ${name}`);
+      setTimeout(() => setUploadStatus(""), 3000);
+      
+      // If backend provided a text snippet, store it for preview
+      const text = lastMessage.data.content_info?.text || "";
+      console.log('🔍 Processing file:', name, 'text length:', text.length);
+      console.log('🔍 Text sample:', text.substring(0, 100));
+      
+      if (name) {
+        // Remove from parsing state
+        setParsingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(name);
+          console.log('Removed file from parsing:', name);
+          return next;
+        });
+        
+        const parsedEntry = {
+          filename: name,
+          success: Boolean(text && text.length > 0 && !text.includes("[No extractable text")),
+          content: text && !text.includes("[No extractable text") ? text : "",
+        } as unknown as import("@/app/build/page").ParsedDocument;
+        
+        console.log('🔍 Created parsedEntry:', parsedEntry);
+        console.log('🔍 updateSlideData function:', typeof updateSlideData, updateSlideData);
+        
+        // Update slideData with the parsed document
+        console.log('🔍 About to call updateSlideData...');
+        const existing = (slideData as any).parsedDocuments || [];
+        const updated = Array.isArray(existing) ? [...existing] : [];
+        console.log('🔧 existing parsedDocuments:', existing);
+        console.log('🔧 adding parsedEntry:', parsedEntry);
+        // Replace or push
+        const idx = updated.findIndex((d: any) => d.filename === name);
+        if (idx >= 0) updated[idx] = parsedEntry; else updated.push(parsedEntry);
+        console.log('🔧 updated parsedDocuments:', updated);
+        
+        updateSlideData({ parsedDocuments: updated });
+      }
+    } else if (lastMessage.type === 'file_upload_error') {
+      setUploadStatus(`Failed to upload: ${lastMessage.data.error}`);
+      setTimeout(() => setUploadStatus(""), 5000);
+      // Remove from parsing state on error
+      const name = lastMessage.data.filename || "";
+      if (name) {
+        setParsingFiles(prev => {
+          const next = new Set(prev);
+          next.delete(name);
+          return next;
+        });
       }
     }
   }, [lastMessage]);
@@ -186,10 +267,21 @@ export function UploadStep({
           try {
             console.log('Uploading file to backend:', file.name);
             setUploadStatus(`Uploading ${file.name}...`);
+            setParsingFiles(prev => {
+              const next = new Set(prev);
+              next.add(file.name);
+              console.log('Added file to parsing:', file.name);
+              return next;
+            });
             await sendFileUpload(file);
           } catch (error) {
             console.error('Failed to upload file:', error);
             setUploadStatus(`Failed to upload ${file.name}`);
+            setParsingFiles(prev => {
+              const next = new Set(prev);
+              next.delete(file.name);
+              return next;
+            });
           }
         }
       }
@@ -210,10 +302,21 @@ export function UploadStep({
           try {
             console.log('Uploading file to backend:', file.name);
             setUploadStatus(`Uploading ${file.name}...`);
+            setParsingFiles(prev => {
+              const next = new Set(prev);
+              next.add(file.name);
+              console.log('Added file to parsing:', file.name);
+              return next;
+            });
             await sendFileUpload(file);
           } catch (error) {
             console.error('Failed to upload file:', error);
             setUploadStatus(`Failed to upload ${file.name}`);
+            setParsingFiles(prev => {
+              const next = new Set(prev);
+              next.delete(file.name);
+              return next;
+            });
           }
         }
       }
@@ -237,10 +340,16 @@ export function UploadStep({
         try {
           console.log('Uploading pasted text to backend');
           setUploadStatus('Uploading pasted text...');
+          setParsingFiles(prev => new Set(prev).add(textFile.name));
           await sendFileUpload(textFile);
         } catch (error) {
           console.error('Failed to upload pasted text:', error);
           setUploadStatus('Failed to upload pasted text');
+          setParsingFiles(prev => {
+            const next = new Set(prev);
+            next.delete(textFile.name);
+            return next;
+          });
         }
       }
       
@@ -285,7 +394,32 @@ export function UploadStep({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto px-4">
+    <>
+      {/* Content viewing modal */}
+      {viewingContent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg max-w-4xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h3 className="text-lg font-semibold">Parsed Content</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewingContent(null)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <div className="whitespace-pre-wrap text-sm text-foreground bg-muted/30 p-4 rounded-lg">
+                {viewingContent}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto px-4">
       {/* Connection Status Indicator */}
       {connectionStatus && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
@@ -397,26 +531,82 @@ export function UploadStep({
             <div className="space-y-2">
               <Label>Uploaded Files ({slideData.documents.length})</Label>
               <div className="space-y-2">
-                {slideData.documents.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-4 w-4 text-primary" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{file.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {(file.size / 1024).toFixed(1)} KB
-                        </span>
+                {slideData.documents.map((file, index) => {
+                  const isCurrentlyParsing = parsingFiles.has(file.name);
+                  const parsedDoc = (slideData as any).parsedDocuments?.find((d: any) => d.filename === file.name);
+                  const hasContent = parsedDoc && parsedDoc.success;
+                  const hasFailed = parsedDoc && !parsedDoc.success;
+                  
+                  console.log('🔍 File display debug for:', file.name);
+                  console.log('🔍 isCurrentlyParsing:', isCurrentlyParsing);
+                  console.log('🔍 parsedDoc:', parsedDoc);
+                  console.log('🔍 hasContent:', hasContent);
+                  console.log('🔍 hasFailed:', hasFailed);
+                  console.log('🔍 slideData.parsedDocuments:', (slideData as any).parsedDocuments);
+                  
+                  return (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="relative">
+                          <FileText className="h-4 w-4 text-primary" />
+                          {/* Status indicator overlay */}
+                          {isCurrentlyParsing && (
+                            <div className="absolute -top-1 -right-1">
+                              <Clock className="h-2 w-2 text-blue-500 animate-pulse" />
+                            </div>
+                          )}
+                          {hasContent && (
+                            <div className="absolute -top-1 -right-1">
+                              <CheckCircle className="h-2 w-2 text-green-500" />
+                            </div>
+                          )}
+                          {hasFailed && (
+                            <div className="absolute -top-1 -right-1">
+                              <XCircle className="h-2 w-2 text-red-500" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col flex-1">
+                          <span className="text-sm font-medium">{file.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              {(file.size / 1024).toFixed(1)} KB
+                            </span>
+                            {isCurrentlyParsing && (
+                              <span className="text-xs text-blue-600">Parsing...</span>
+                            )}
+                            {hasContent && (
+                              <span className="text-xs text-green-600">Ready</span>
+                            )}
+                            {hasFailed && (
+                              <span className="text-xs text-red-600">Parse failed</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {hasContent && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewingContent(parsedDoc.content)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -505,6 +695,7 @@ export function UploadStep({
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

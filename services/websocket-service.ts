@@ -239,6 +239,8 @@ class WebSocketService {
             this.callbacks.onMessage = originalOnMessage;
             this.callbacks.onError = originalOnError;
             console.log('File upload successful');
+            // Pass the success message to the original handler too
+            originalOnMessage?.(message);
             resolve(true);
           } else if (message.type === 'file_upload_error') {
             clearTimeout(timeout);
@@ -246,6 +248,8 @@ class WebSocketService {
             this.callbacks.onMessage = originalOnMessage;
             this.callbacks.onError = originalOnError;
             console.error('File upload error:', message.data.error);
+            // Pass the error message to the original handler too
+            originalOnMessage?.(message);
             reject(new Error(message.data.error || 'File upload failed'));
           } else {
             // Pass through to original handler

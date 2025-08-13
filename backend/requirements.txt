@@ -19,5 +19,6 @@ scikit-learn
 numpy
 tiktoken
 pdfminer.six
+PyPDF2
 python-docx
 pydantic-settings

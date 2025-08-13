@@ -545,8 +545,13 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
             }
 
             if content_info:
+                # Include a conservative text snippet to avoid large WS messages
+                text_value = content_info.get('text') or ''
+                max_chars = 10000
+                text_snippet = text_value[:max_chars]
                 success_data["content_info"] = {
-                    "text_length": len(content_info.get('text', '')) if content_info.get('text') else 0,
+                    "text": text_snippet,
+                    "text_length": len(text_value),
                     "images_count": len(content_info.get('images', [])),
                     "images": content_info.get('images', [])
                 }
@@ -612,8 +617,12 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
             }
 
             if content_info:
+                text_value = content_info.get('text') or ''
+                max_chars = 10000
+                text_snippet = text_value[:max_chars]
                 success_data["content_info"] = {
-                    "text_length": len(content_info.get('text', '')) if content_info.get('text') else 0,
+                    "text": text_snippet,
+                    "text_length": len(text_value),
                     "images_count": len(content_info.get('images', [])),
                     "images": content_info.get('images', [])
                 }
@@ -713,8 +722,12 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
 
         # Add content information if available
         if content_info:
+            text_value = content_info.get('text') or ''
+            max_chars = 10000
+            text_snippet = text_value[:max_chars]
             success_data["content_info"] = {
-                "text_length": len(content_info.get('text', '')) if content_info.get('text') else 0,
+                "text": text_snippet,
+                "text_length": len(text_value),
                 "images_count": len(content_info.get('images', [])),
                 "images": content_info.get('images', [])
             }

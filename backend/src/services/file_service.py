@@ -40,10 +40,19 @@ from src.models.message_models import FileInfo
 # Optional PDF and DOCX parsing libraries
 try:
     from pdfminer.high_level import extract_text as pdf_extract_text
+    from pdfminer.layout import LAParams
     PDFMINER_AVAILABLE = True
 except Exception:
     PDFMINER_AVAILABLE = False
     logging.warning("pdfminer.six not available. PDF text extraction will be disabled.")
+
+# Try PyPDF2 as fallback
+try:
+    import PyPDF2
+    PYPDF2_AVAILABLE = True
+except Exception:
+    PYPDF2_AVAILABLE = False
+    logging.info("PyPDF2 not available as fallback PDF parser.")
 
 try:
     import docx  # python-docx
@@ -468,29 +477,85 @@ class FileService:
 
     async def _extract_text_from_pdf(self, path: Path) -> str:
         """
-        Extract text from a PDF file using pdfminer.six.
-
-        This prefers library-based extraction over plain bytes decoding.
-        Returns a safe fallback message if the library is unavailable or fails.
+        Extract text from a PDF file using multiple methods.
+        
+        Tries pdfminer.six first with different settings, then PyPDF2 as fallback.
+        Returns a safe fallback message if all methods fail.
         """
-        try:
-            if not PDFMINER_AVAILABLE:
-                return f"[PDF parsing unavailable] Install pdfminer.six to enable parsing: {path.name}"
-
-            # pdfminer works on file paths; handle large files efficiently
-            text = pdf_extract_text(str(path)) or ""
-
+        extracted_text = ""
+        
+        # Method 1: Try pdfminer with LAParams for better layout analysis
+        if PDFMINER_AVAILABLE:
+            try:
+                # Try with layout analysis parameters for better extraction
+                laparams = LAParams(
+                    line_overlap=0.5,
+                    char_margin=2.0,
+                    word_margin=0.1,
+                    boxes_flow=0.5,
+                    detect_vertical=True,
+                    all_texts=True
+                )
+                text = pdf_extract_text(str(path), laparams=laparams) or ""
+                
+                if text.strip():
+                    logger.info(f"Successfully extracted {len(text)} characters from PDF using pdfminer with LAParams")
+                    extracted_text = text
+            except Exception as e1:
+                logger.debug(f"pdfminer with LAParams failed: {e1}")
+                
+                # Try without LAParams
+                try:
+                    text = pdf_extract_text(str(path)) or ""
+                    if text.strip():
+                        logger.info(f"Successfully extracted {len(text)} characters from PDF using pdfminer")
+                        extracted_text = text
+                except Exception as e2:
+                    logger.debug(f"pdfminer without LAParams failed: {e2}")
+        
+        # Method 2: Try PyPDF2 as fallback if pdfminer failed
+        if not extracted_text and PYPDF2_AVAILABLE:
+            try:
+                with open(path, 'rb') as file:
+                    pdf_reader = PyPDF2.PdfReader(file)
+                    num_pages = len(pdf_reader.pages)
+                    
+                    text_parts = []
+                    for page_num in range(num_pages):
+                        page = pdf_reader.pages[page_num]
+                        page_text = page.extract_text()
+                        if page_text:
+                            text_parts.append(page_text)
+                    
+                    text = "\n".join(text_parts)
+                    if text.strip():
+                        logger.info(f"Successfully extracted {len(text)} characters from PDF using PyPDF2")
+                        extracted_text = text
+            except Exception as e:
+                logger.debug(f"PyPDF2 extraction failed: {e}")
+        
+        # If no library is available
+        if not PDFMINER_AVAILABLE and not PYPDF2_AVAILABLE:
+            return f"[PDF parsing unavailable] Install pdfminer.six or PyPDF2 to enable parsing: {path.name}"
+        
+        # Process extracted text
+        if extracted_text:
             # Normalize whitespace
             normalized = "\n".join(
-                line.strip() for line in text.splitlines() if line.strip()
+                line.strip() for line in extracted_text.splitlines() if line.strip()
             )
-
-            # Provide a minimal fallback if empty
-            return normalized if normalized else f"[No extractable text in PDF: {path.name}]"
-
-        except Exception as e:
-            logger.error(f"Error extracting PDF text from {path}: {e}")
-            return f"[Failed to parse PDF: {path.name}]"
+            
+            # Log sample of extracted text for debugging
+            sample = normalized[:200] + "..." if len(normalized) > 200 else normalized
+            logger.info(f"PDF text sample from {path.name}: {sample}")
+            
+            return normalized
+        else:
+            # Check if it might be a scanned PDF
+            logger.warning(f"No text extracted from {path.name}. This might be a scanned/image PDF that requires OCR.")
+            return f"[No extractable text in PDF: {path.name}] - This appears to be a scanned document or image-based PDF. OCR processing may be required."
+        
+        return extracted_text
 
     async def _extract_text_from_docx(self, path: Path) -> str:
         """
