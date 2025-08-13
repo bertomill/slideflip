@@ -419,7 +419,7 @@ export function UploadStep({
         </div>
       )}
       
-      <div className="space-y-4 sm:space-y-6 max-w-4xl mx-auto px-4">
+      <div className="space-y-3 sm:space-y-4 max-w-4xl mx-auto px-4">
       {/* Upload Status - only show when actively uploading */}
       {uploadStatus && (
         <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
@@ -681,7 +681,7 @@ export function UploadStep({
         <Button
           variant="engineering"
           size="default"
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto bg-gradient-to-b from-[hsl(320,12%,62%)] to-[hsl(320,12%,52%)] hover:from-[hsl(320,12%,57%)] hover:to-[hsl(320,12%,47%)] text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 disabled:from-gray-400 disabled:to-gray-500"
           onClick={handleContinueToThemes}
           disabled={!canProceed}
         >

@@ -11,7 +11,6 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { FileText, Calendar, MoreVertical, Sun, Moon } from "lucide-react";
-import Link from "next/link";
 
 export default function PresentationsPage() {
   const [user, setUser] = useState<{
@@ -50,48 +49,65 @@ export default function PresentationsPage() {
   }, []);
 
   const [items, setItems] = useState<Array<{ id: string; title: string; description: string; createdAt: string; status: string; slideHtml?: string | null }>>([]);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const loadPresentations = async () => {
+    try {
+      const response = await fetch('/api/presentations');
+      if (response.ok) {
+        const data = await response.json();
+        setItems(data.items || []);
+      } else {
+        console.error('Failed to load presentations');
+      }
+    } catch (error) {
+      console.error('Error loading presentations:', error);
+    }
+  };
+
+  const handleCreatePresentation = async () => {
+    if (isCreating) return;
+    
+    setIsCreating(true);
+    try {
+      const response = await fetch('/api/presentations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'New Presentation',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const newPresentation = data.presentation;
+        
+        // Add the new presentation to the list
+        setItems(prev => [{
+          id: newPresentation.id,
+          title: newPresentation.title,
+          description: 'New presentation',
+          createdAt: newPresentation.created_at,
+          status: newPresentation.status,
+          slideHtml: null,
+        }, ...prev]);
+        
+        // Navigate to build page with the presentation ID
+        window.location.href = `/build?presentation_id=${newPresentation.id}`;
+      } else {
+        console.error('Failed to create presentation');
+      }
+    } catch (error) {
+      console.error('Error creating presentation:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      const supabase = createClient();
-      
-      // Seeded flow descriptions to filter out
-      const seededDescriptions = [
-        'Q2 Executive Summary',
-        'Product highlights for launch deck',
-        'Marketing performance snapshot'
-      ];
-      
-      const { data: flows } = await supabase
-        .from('flows')
-        .select('id, description, created_at, status')
-        .not('description', 'in', `(${seededDescriptions.map(d => `"${d}"`).join(',')})`)
-        .order('created_at', { ascending: false })
-        .limit(12);
-
-      if (!flows || flows.length === 0) { setItems([]); return; }
-
-      // For each flow, pull the latest preview (may contain slide_html from AI or be null in seeds)
-      const ids = flows.map(f => f.id);
-      const { data: previews } = await supabase
-        .from('flow_previews')
-        .select('flow_id, slide_html, created_at')
-        .in('flow_id', ids)
-        .order('created_at', { ascending: false });
-
-      const latestHtml: Record<string, string | null> = {};
-      previews?.forEach(p => { if (!(p.flow_id in latestHtml)) latestHtml[p.flow_id] = p.slide_html || null; });
-
-      setItems(flows.map(f => ({
-        id: f.id,
-        title: f.description || 'Untitled',
-        description: f.status === 'completed' ? 'Completed flow' : 'In progress',
-        createdAt: f.created_at,
-        status: f.status,
-        slideHtml: latestHtml[f.id] ?? null,
-      })));
-    };
-    load();
+    loadPresentations();
   }, []);
 
   return (
@@ -142,12 +158,10 @@ export default function PresentationsPage() {
                   Manage and view all your presentation projects
                 </p>
               </div>
-              <Link href="/build">
-                <Button>
-                  <FileText className="h-4 w-4 mr-2" />
-                  New presentation
-                </Button>
-              </Link>
+              <Button onClick={handleCreatePresentation} disabled={isCreating}>
+                <FileText className="h-4 w-4 mr-2" />
+                {isCreating ? 'Creating...' : 'New presentation'}
+              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -214,12 +228,10 @@ export default function PresentationsPage() {
                 <p className="text-muted-foreground mb-4">
                   Create your first presentation project to get started
                 </p>
-                <Link href="/build">
-                  <Button>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Create Project
-                  </Button>
-                </Link>
+                <Button onClick={handleCreatePresentation} disabled={isCreating}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  {isCreating ? 'Creating...' : 'Create Project'}
+                </Button>
               </div>
             )}
           </div>

@@ -216,28 +216,60 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
     
     // Render the Fabric.js canvas with optimal scaling
     useEffect(() => {
-      if (!containerRef.current || !canvasRef.current) return;
+      if (!containerRef.current || !canvasRef.current) {
+        console.warn('Container or canvas ref not available');
+        return;
+      }
       
       const renderCanvas = () => {
-        const containerWidth = containerRef.current!.clientWidth;
-        const containerHeight = containerRef.current!.clientHeight || 300;
-        const s = calculateOptimalScale(containerWidth, containerHeight);
-        
-        // Dispose of existing canvas to prevent memory leaks
-        if (canvasInstanceRef.current) {
-          canvasInstanceRef.current.dispose();
+        try {
+          const containerWidth = containerRef.current!.clientWidth;
+          const containerHeight = containerRef.current!.clientHeight || 300;
+          const s = calculateOptimalScale(containerWidth, containerHeight);
+          
+          console.log('Rendering canvas with dimensions:', {
+            containerWidth,
+            containerHeight,
+            scale: s
+          });
+          
+          // Dispose of existing canvas to prevent memory leaks
+          if (canvasInstanceRef.current) {
+            try {
+              canvasInstanceRef.current.dispose();
+            } catch (error) {
+              console.warn('Error disposing previous canvas:', error);
+            }
+            canvasInstanceRef.current = null;
+          }
+          
+          // Wait a frame to ensure DOM is ready
+          requestAnimationFrame(() => {
+            try {
+              // Create new canvas instance with proper scaling
+              canvasInstanceRef.current = createSlideCanvas(canvasRef.current!, modifiedSlide, s);
+              console.log('Canvas created successfully');
+            } catch (error) {
+              console.error('Error creating canvas:', error);
+            }
+          });
+        } catch (error) {
+          console.error('Error in renderCanvas:', error);
         }
-        
-        // Create new canvas instance with proper scaling
-        canvasInstanceRef.current = createSlideCanvas(canvasRef.current!, modifiedSlide, s);
       };
       
-      renderCanvas();
+      // Use a timeout to ensure DOM is fully ready
+      const timeoutId = setTimeout(renderCanvas, 10);
       
       // Cleanup function to dispose canvas on unmount
       return () => {
+        clearTimeout(timeoutId);
         if (canvasInstanceRef.current) {
-          canvasInstanceRef.current.dispose();
+          try {
+            canvasInstanceRef.current.dispose();
+          } catch (error) {
+            console.warn('Error disposing canvas on cleanup:', error);
+          }
           canvasInstanceRef.current = null;
         }
       };
@@ -1141,7 +1173,13 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Research
         </Button>
-        <Button variant="default" size="lg" onClick={onNext} disabled={!canProceed}>
+        <Button 
+          variant="engineering" 
+          size="lg" 
+          onClick={onNext} 
+          disabled={!canProceed}
+          className="bg-gradient-to-b from-[hsl(320,12%,62%)] to-[hsl(320,12%,52%)] hover:from-[hsl(320,12%,57%)] hover:to-[hsl(320,12%,47%)] text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200 disabled:from-gray-400 disabled:to-gray-500"
+        >
           Continue to Preview
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>

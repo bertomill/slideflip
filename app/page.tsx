@@ -12,10 +12,11 @@ import { SlideoLogo } from "@/components/slideo-logo";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 // Supabase client for authentication
 import { createClient } from "@/lib/supabase/client";
 // Lucide icons for UI elements
-import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Sun, Moon } from "lucide-react";
+import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Sun, Moon, Calendar } from "lucide-react";
 // Next.js Link component for navigation
 import Link from "next/link";
 
@@ -65,7 +66,7 @@ const presentationTemplates = [
   }
 ];
 
-// Demo slides pulled from public/samples/slides
+// Demo slides pulled from public/samples/slides (used in landing page)
 const slideExamples = [
   { id: 1, title: "Uber Problem", image: "/samples/slides/uber_slide_1.png" },
   { id: 2, title: "DoorDash Performance", image: "/samples/slides/doordash_slide_1.png" },
@@ -120,6 +121,12 @@ export default function Home() {
   // Landing page interactive elements
   const [promptText, setPromptText] = useState(""); // User input for demo prompt functionality
 
+  // User presentations state
+  const [userPresentations, setUserPresentations] = useState<Array<{ id: string; title: string; description: string; createdAt: string; status: string; slideHtml?: string | null }>>([]);
+
+  // Templates state
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; description: string; theme: string; html?: string }>>([]);
+
   // Theme management hook from next-themes
   const { setTheme, theme } = useTheme();
 
@@ -143,6 +150,59 @@ export default function Home() {
     // Cleanup subscription on component unmount
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load user presentations when user is authenticated
+  useEffect(() => {
+    const loadUserPresentations = async () => {
+      if (!user) {
+        setUserPresentations([]);
+        return;
+      }
+
+      const supabase = createClient();
+      
+      // Seeded flow descriptions to filter out
+      const seededDescriptions = [
+        'Q2 Executive Summary',
+        'Product highlights for launch deck',
+        'Marketing performance snapshot'
+      ];
+      
+      const { data: flows } = await supabase
+        .from('flows')
+        .select('id, description, created_at, status')
+        .not('description', 'in', `(${seededDescriptions.map(d => `"${d}"`).join(',')})`)
+        .order('created_at', { ascending: false })
+        .limit(6); // Limit to 6 for homepage display
+
+      if (!flows || flows.length === 0) { 
+        setUserPresentations([]);
+        return;
+      }
+
+      // For each flow, pull the latest preview (may contain slide_html from AI or be null in seeds)
+      const ids = flows.map(f => f.id);
+      const { data: previews } = await supabase
+        .from('flow_previews')
+        .select('flow_id, slide_html, created_at')
+        .in('flow_id', ids)
+        .order('created_at', { ascending: false });
+
+      const latestHtml: Record<string, string | null> = {};
+      previews?.forEach(p => { if (!(p.flow_id in latestHtml)) latestHtml[p.flow_id] = p.slide_html || null; });
+
+      setUserPresentations(flows.map(f => ({
+        id: f.id,
+        title: f.description || 'Untitled',
+        description: f.status === 'completed' ? 'Completed presentation' : 'In progress',
+        createdAt: f.created_at,
+        status: f.status,
+        slideHtml: latestHtml[f.id] ?? null,
+      })));
+    };
+
+    loadUserPresentations();
+  }, [user]);
 
   // If user is authenticated, show dashboard
   // AUTHENTICATED USER DASHBOARD: Show full dashboard interface for logged-in users
@@ -201,228 +261,164 @@ export default function Home() {
                       Create, edit, share & track the progress of your presentation decks.
                     </p>
                   </div>
-                  <Button variant="ghost" className="text-primary hover:text-primary/80">
-                    View More
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
+                  <Link href="/presentations">
+                    <Button variant="ghost" className="text-primary hover:text-primary/80">
+                      View More
+                      <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </Link>
                 </div>
 
                 {/* Horizontal Scrollable Gallery */}
                 <div className="overflow-x-auto pb-4">
                   <div className="flex gap-4 min-w-max">
-                    {presentationTemplates.map((template) => (
-                      <div key={template.id} className="flex-shrink-0 w-64">
-                        {template.type === 'create' ? (
-                          /* Create New Card */
-                          <Link href={user ? "/build" : "/auth/sign-up"}>
-                            <Card className="h-48 border-2 border-dashed border-primary/30 hover:border-primary/60 transition-all cursor-pointer group">
-                              <CardContent className="flex flex-col items-center justify-center h-full p-6">
-                                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                  <Plus className="h-6 w-6 text-primary-foreground" />
-                                </div>
-                                <h3 className="font-semibold text-foreground mb-2">{template.title}</h3>
-                                <p className="text-sm text-muted-foreground text-center">{template.description}</p>
-                              </CardContent>
-                            </Card>
-                          </Link>
-                        ) : (
-                          /* Template Preview Card */
+                    {/* Create New Card - Always first */}
+                    <div className="flex-shrink-0 w-64">
+                      <Link href={user ? "/build" : "/auth/sign-up"}>
+                        <Card className="h-48 border-2 border-dashed border-primary/30 hover:border-primary/60 transition-all cursor-pointer group">
+                          <CardContent className="flex flex-col items-center justify-center h-full p-6">
+                            <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                              <Plus className="h-6 w-6 text-primary-foreground" />
+                            </div>
+                            <h3 className="font-semibold text-foreground mb-2">Create New</h3>
+                            <p className="text-sm text-muted-foreground text-center">Start from scratch</p>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    </div>
+
+                    {/* User Presentations */}
+                    {userPresentations.map((presentation) => (
+                      <div key={presentation.id} className="flex-shrink-0 w-64">
+                        <Link href={`/presentations/${presentation.id}`}>
                           <Card className="h-48 overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
                             <div className="h-32 bg-gradient-to-br from-muted to-muted/80 relative overflow-hidden">
-                              {/* Placeholder for template preview */}
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-20 h-16 bg-foreground/10 rounded border border-foreground/20 flex items-center justify-center">
-                                  <div className="text-xs text-muted-foreground">Preview</div>
+                              {/* Presentation preview */}
+                              {presentation.slideHtml ? (
+                                <div className="absolute inset-0">
+                                  <div
+                                    className="w-full h-full bg-white"
+                                    dangerouslySetInnerHTML={{ __html: presentation.slideHtml }}
+                                    style={{
+                                      transform: 'scale(0.6)',
+                                      transformOrigin: 'top left',
+                                      width: '167%',
+                                      height: '167%'
+                                    }}
+                                  />
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-20 h-16 bg-foreground/10 rounded border border-foreground/20 flex items-center justify-center">
+                                    <div className="text-xs text-muted-foreground">Preview</div>
+                                  </div>
+                                </div>
+                              )}
                               <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </div>
+                              <div className="absolute top-2 left-2">
+                                <Badge
+                                  variant={presentation.status === 'completed' ? 'default' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {presentation.status}
+                                </Badge>
+                              </div>
                             </div>
                             <CardContent className="p-4">
-                              <h3 className="font-semibold text-foreground text-sm mb-1">{template.title}</h3>
-                              <p className="text-xs text-muted-foreground">{template.description}</p>
+                              <h3 className="font-semibold text-foreground text-sm mb-1 line-clamp-1">{presentation.title}</h3>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                <span>{new Date(presentation.createdAt).toLocaleDateString()}</span>
+                              </div>
                             </CardContent>
                           </Card>
-                        )}
+                        </Link>
                       </div>
+                    ))}
+
+                  </div>
+                </div>
+              </div>
+
+              {/* Templates Section */}
+              {templates.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold text-foreground mb-2">Templates</h2>
+                      <p className="text-muted-foreground">
+                        Browse our curated collection of professional templates.
+                      </p>
+                    </div>
+                    <Link href="/templates">
+                      <Button variant="ghost" className="text-primary hover:text-primary/80">
+                        View All Templates
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {templates.slice(0, 8).map((template) => (
+                      <Link key={template.id} href={`/templates`}>
+                        <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
+                          <div className="h-full relative">
+                            {/* Template preview */}
+                            {template.slide_json ? (
+                              <div className="absolute inset-0 bg-white flex items-center justify-center">
+                                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center">
+                                  <div className="text-center p-2">
+                                    <div className="text-xs font-medium text-foreground mb-1">{template.name}</div>
+                                    <div className="text-[10px] text-muted-foreground line-clamp-2">{template.description}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : template.html_content ? (
+                              <div className="absolute inset-0">
+                                <div
+                                  className="w-full h-full bg-white"
+                                  dangerouslySetInnerHTML={{ __html: template.html_content }}
+                                  style={{
+                                    transform: 'scale(0.5)',
+                                    transformOrigin: 'top left',
+                                    width: '200%',
+                                    height: '200%'
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
+                                <Layers className="h-8 w-8 text-muted-foreground/50" />
+                              </div>
+                            )}
+                            
+                            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+                            <div className="absolute bottom-2 left-2">
+                              <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
+                                <div className="text-xs font-medium text-foreground line-clamp-1">{template.name}</div>
+                              </div>
+                            </div>
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="absolute top-2 left-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {template.theme}
+                              </Badge>
+                            </div>
+                          </div>
+                        </Card>
+                      </Link>
                     ))}
                   </div>
                 </div>
-              </div>
-
-              {/* Category Sections */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Pitch Decks */}
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-4 text-center">
-                    Pitch Decks
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Uber Slide - First Card */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full relative">
-                        <img
-                          src="/samples/slides/uber_slide_1.png"
-                          alt="Uber Problem Slide"
-                          className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
-                        />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                        <div className="absolute bottom-2 left-2">
-                          <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
-                            <div className="text-xs font-medium text-foreground">Uber Problem</div>
-                          </div>
-                        </div>
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* DoorDash Slide - Second Card */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full relative">
-                        <img
-                          src="/samples/slides/doordash_slide_1.png"
-                          alt="DoorDash Delivery Time Slide"
-                          className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
-                        />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                        <div className="absolute bottom-2 left-2">
-                          <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
-                            <div className="text-xs font-medium text-foreground">DoorDash Performance</div>
-                          </div>
-                        </div>
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* Facebook Slide - Third Card */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full relative">
-                        <img
-                          src="/samples/slides/facebook_slide_1.png"
-                          alt="Facebook Platform Introduction Slide"
-                          className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
-                        />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                        <div className="absolute bottom-2 left-2">
-                          <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
-                            <div className="text-xs font-medium text-foreground">Facebook Platform</div>
-                          </div>
-                        </div>
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* YouTube Slide - Fourth Card */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full relative">
-                        <img
-                          src="/samples/slides/youtube_side_1.png"
-                          alt="YouTube Company Purpose Slide"
-                          className="w-full h-full object-contain bg-gray-100 dark:bg-gray-800"
-                        />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                        <div className="absolute bottom-2 left-2">
-                          <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
-                            <div className="text-xs font-medium text-foreground">YouTube Purpose</div>
-                          </div>
-                        </div>
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-
-                {/* Corporate */}
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-4 text-center">
-                    Corporate
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* JPMorgan Chase Financial Highlights */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img
-                          src="/samples/slides/jpm_slide_1.png"
-                          alt="JPMorgan Chase Financial Highlights"
-                          className="w-full h-full object-contain"
-                        />
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* RBC Client Assets and Activity */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img
-                          src="/samples/slides/rbc_slide_1.png"
-                          alt="RBC Client Assets and Activity"
-                          className="w-full h-full object-contain"
-                        />
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* BMO Performance Metrics */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img
-                          src="/samples/slides/bmo_slide_1.png"
-                          alt="BMO Performance Metrics"
-                          className="w-full h-full object-contain"
-                        />
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-
-                    {/* P&G FY 2025 Results */}
-                    <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                      <div className="h-full bg-gray-100 dark:bg-gray-800 relative">
-                        <img
-                          src="/samples/slides/pg_slide_1.png"
-                          alt="P&G FY 2025 Results"
-                          className="w-full h-full object-contain"
-                        />
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

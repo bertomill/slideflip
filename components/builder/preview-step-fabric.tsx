@@ -95,121 +95,234 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Call API to generate slide JSON
   const generateSlide = async (overrideFeedback?: string) => {
-    if (!slideData.description || isGenerating) return;
+    console.log("🔄 Starting slide generation...");
+    console.log("📝 Slide data:", {
+      description: slideData.description,
+      theme: slideData.selectedTheme,
+      wantsResearch: slideData.wantsResearch,
+      hasDocuments: slideData.documents?.length > 0,
+      hasParsedDocs: slideData.parsedDocuments?.length > 0,
+      overrideFeedback
+    });
+
+    if (!slideData.description) {
+      console.warn("⚠️ No description provided, skipping API call");
+      return;
+    }
+    
+    if (isGenerating) {
+      console.warn("⚠️ Already generating, skipping duplicate call");
+      return;
+    }
+
     setIsGenerating(true);
+    
     try {
+      const payload = buildRequestPayload(overrideFeedback);
+      console.log("📦 Request payload:", payload);
+
+      console.log("🌐 Making API call to /api/generate-slide-json...");
       const response = await fetch("/api/generate-slide-json", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildRequestPayload(overrideFeedback)),
+        body: JSON.stringify(payload),
       });
+
+      console.log("📡 API Response status:", response.status, response.statusText);
 
       if (response.ok) {
         const data = await response.json();
+        console.log("📄 API Response data:", data);
+        
         if (data?.success && data?.slideJson) {
-           updateSlideData({ slideJson: data.slideJson });
+          console.log("✅ Slide generation successful!");
+          console.log("🎨 Generated slide JSON:", data.slideJson);
+          updateSlideData({ slideJson: data.slideJson });
           return;
+        } else {
+          console.error("❌ API returned success=false or no slideJson");
+          console.error("🔍 Response details:", data);
+        }
+      } else {
+        // Try to get error details from response
+        try {
+          const errorData = await response.json();
+          console.error("❌ API request failed with error data:", errorData);
+        } catch (parseErr) {
+          console.error("❌ API request failed and couldn't parse error response");
         }
       }
       
-      // Fallback to a sample slide if API fails
-      const sampleSlide: SlideDefinition = {
-        id: 'generated-slide',
-        background: { color: 'ffffff' },
-        objects: [
-          {
-            type: 'text',
-            text: slideData.description || 'Your Presentation Title',
-            options: {
-              x: 0.5,
-              y: 2.0,
-              w: 9,
-              h: 1.5,
-              fontSize: 44,
-              fontFace: 'Arial',
-              color: '003366',
-              bold: true,
-              align: 'center',
-              valign: 'middle'
-            }
-          },
-          {
-            type: 'text',
-            text: 'Generated from your content',
-            options: {
-              x: 0.5,
-              y: 3.5,
-              w: 9,
-              h: 0.75,
-              fontSize: 24,
-              fontFace: 'Arial',
-              color: '666666',
-              align: 'center'
-            }
-          }
-        ]
-      };
-      updateSlideData({ slideJson: sampleSlide });
+      // If we get here, API didn't return expected data, use fallback
+      console.log("🔄 API response not successful, using fallback slide");
+      createFallbackSlide();
+      
     } catch (err) {
-      console.error("Slide generation error:", err);
-      // Create a basic slide as fallback
-      const fallbackSlide: SlideDefinition = {
-        id: 'fallback-slide',
-        background: { color: 'f5f5f5' },
-        objects: [
-          {
-            type: 'text',
-            text: 'Slide Generation in Progress',
-            options: {
-              x: 1,
-              y: 2,
-              w: 8,
-              h: 1,
-              fontSize: 36,
-              fontFace: 'Arial',
-              color: '333333',
-              align: 'center'
-            }
-          }
-        ]
-      };
-      updateSlideData({ slideJson: fallbackSlide });
+      console.error("💥 Slide generation network/parsing error:", err);
+      console.error("🔍 Error details:", {
+        name: err instanceof Error ? err.name : 'Unknown',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      createFallbackSlide();
     } finally {
       setIsGenerating(false);
+      console.log("🏁 Slide generation process complete");
     }
+  };
+
+  // Create a fallback slide when generation fails
+  const createFallbackSlide = () => {
+    console.log("🔧 Creating fallback slide...");
+    const fallbackSlide: SlideDefinition = {
+      id: 'fallback-slide',
+      background: { color: 'ffffff' },
+      objects: [
+        {
+          type: 'text',
+          text: slideData.description || 'Your Presentation Title',
+          options: {
+            x: 0.5,
+            y: 2.0,
+            w: 9,
+            h: 1.5,
+            fontSize: 44,
+            fontFace: 'Arial',
+            color: '003366',
+            bold: true,
+            align: 'center',
+            valign: 'middle'
+          }
+        },
+        {
+          type: 'text',
+          text: 'Content generated from your documents',
+          options: {
+            x: 0.5,
+            y: 3.5,
+            w: 9,
+            h: 0.75,
+            fontSize: 24,
+            fontFace: 'Arial',
+            color: '666666',
+            align: 'center'
+          }
+        }
+      ]
+    };
+    console.log("📋 Fallback slide created:", fallbackSlide);
+    updateSlideData({ slideJson: fallbackSlide });
+    console.log("✅ Fallback slide updated in state");
   };
 
   // Initialize and update canvas when slide JSON changes
   useEffect(() => {
-    if (!canvasRef.current || !containerRef.current || !extendedSlideData.slideJson) return;
+    if (!canvasRef.current || !containerRef.current || !extendedSlideData.slideJson) {
+      console.log('Canvas initialization prerequisites not met:', {
+        hasCanvasRef: !!canvasRef.current,
+        hasContainerRef: !!containerRef.current,
+        hasSlideJson: !!extendedSlideData.slideJson
+      });
+      return;
+    }
 
     // Calculate scale based on container size
     const containerWidth = containerRef.current.offsetWidth;
     const containerHeight = containerRef.current.offsetHeight || 500;
     const scale = calculateOptimalScale(containerWidth, containerHeight);
 
+    console.log('Initializing canvas with dimensions:', {
+      containerWidth,
+      containerHeight,
+      scale
+    });
+
     // Always dispose of existing canvas before creating/updating
     if (canvas) {
-      canvas.dispose();
-      setCanvas(null);
+      console.log('Disposing existing canvas...');
+      try {
+        canvas.dispose();
+        console.log('Canvas disposed successfully');
+      } catch (error) {
+        console.warn('Error disposing existing canvas:', error);
+      }
     }
     
-    // Create new canvas
-    const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
-    setCanvas(newCanvas);
+    // Clear the canvas element's __fabric property to ensure clean state
+    const canvasEl = canvasRef.current;
+    if (canvasEl && (canvasEl as any).__fabric) {
+      console.log('Clearing canvas element fabric reference...');
+      delete (canvasEl as any).__fabric;
+    }
+    
+    // Add delay to ensure DOM is ready and previous canvas is fully disposed
+    const initCanvas = () => {
+      try {
+        console.log('Creating new canvas...');
+        const newCanvas = createSlideCanvas(canvasRef.current!, extendedSlideData.slideJson!, scale);
+        setCanvas(newCanvas);
+        console.log('Canvas created successfully');
+      } catch (error) {
+        console.error('Error creating canvas:', error);
+        // Clear any potential fabric references and retry
+        if (canvasRef.current && (canvasRef.current as any).__fabric) {
+          delete (canvasRef.current as any).__fabric;
+        }
+        setTimeout(() => {
+          try {
+            console.log('Retrying canvas creation...');
+            const retryCanvas = createSlideCanvas(canvasRef.current!, extendedSlideData.slideJson!, scale);
+            setCanvas(retryCanvas);
+            console.log('Canvas retry successful');
+          } catch (retryError) {
+            console.error('Canvas retry failed:', retryError);
+          }
+        }, 300);
+      }
+    };
+
+    // Use longer delay to ensure previous canvas is fully disposed
+    setTimeout(initCanvas, 100);
 
     // Cleanup function to dispose canvas when component unmounts or dependencies change
     return () => {
-      if (newCanvas) {
-        newCanvas.dispose();
+      if (canvas) {
+        console.log('Cleanup: disposing canvas...');
+        try {
+          canvas.dispose();
+          console.log('Cleanup: canvas disposed');
+        } catch (error) {
+          console.warn('Cleanup: error disposing canvas:', error);
+        }
+      }
+      // Clear fabric reference on cleanup
+      if (canvasRef.current && (canvasRef.current as any).__fabric) {
+        console.log('Cleanup: clearing fabric reference...');
+        delete (canvasRef.current as any).__fabric;
       }
     };
   }, [extendedSlideData.slideJson]); // Remove canvas from dependencies to avoid circular updates
 
   // Auto-generate on first entry if we don't have JSON yet
   useEffect(() => {
-    if (!extendedSlideData.slideJson && slideData.description) {
-      generateSlide();
+    console.log("🎯 Preview step useEffect triggered");
+    console.log("🔍 Current state:", {
+      hasSlideJson: !!extendedSlideData.slideJson,
+      slideJsonId: extendedSlideData.slideJson?.id,
+      description: slideData.description,
+      isGenerating
+    });
+
+    if (!extendedSlideData.slideJson) {
+      if (slideData.description) {
+        console.log("🚀 Triggering slide generation with description");
+        generateSlide();
+      } else {
+        console.log("⚠️ No description available, creating fallback slide");
+        createFallbackSlide();
+      }
+    } else {
+      console.log("✅ Slide JSON already exists, skipping generation");
     }
   }, [extendedSlideData.slideJson, slideData.description]);
 
@@ -373,17 +486,6 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   return (
     <div className="space-y-6">
-      <Card variant="elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5 text-primary" />
-            Preview Your Slide
-          </CardTitle>
-          <CardDescription>
-            Review your AI-generated slide rendered with Fabric.js
-          </CardDescription>
-        </CardHeader>
-      </Card>
 
       <Card variant="glass">
         <CardHeader>
@@ -435,7 +537,6 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                   </Button>
                 </div>
             )}
-            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -517,13 +618,11 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
             <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
               View JSON Structure (Debug)
             </summary>
-            <Card className="mt-2">
-              <CardContent className="pt-4">
-                <pre className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-64 text-xs">
-                  {JSON.stringify(extendedSlideData.slideJson, null, 2)}
-                </pre>
-              </CardContent>
-            </Card>
+            <div className="mt-2">
+              <pre className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground font-mono">
+                {JSON.stringify(extendedSlideData.slideJson, null, 2)}
+              </pre>
+            </div>
           </details>
         </>
       )}

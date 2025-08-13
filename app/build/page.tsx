@@ -462,7 +462,7 @@ export default function Build() {
         </div>
 
         {/* MAIN CONTAINER: Full-width container with responsive padding */}
-        <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">
+        <div className="w-full px-2 sm:px-4 py-2 sm:py-4 min-h-screen">
           {/* ============================================================================
               PRESENTATION TITLE INPUT: Notion-style title field
               ============================================================================

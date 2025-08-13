@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SlideDefinition, SlideObject } from '@/lib/slide-types';
-import pptx2json from 'pptx2json';
+
+// Try to import pptx2json with fallback handling
+let pptx2json: any;
+try {
+  pptx2json = require('pptx2json');
+} catch (error) {
+  console.error('Failed to load pptx2json:', error);
+}
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -41,8 +48,15 @@ export async function POST(request: NextRequest) {
  */
 async function parsePptxToSlideDefinition(buffer: Buffer, filename: string): Promise<SlideDefinition> {
   try {
+    console.log('Starting PPTX parsing for file:', filename, 'Buffer size:', buffer.length);
+    
+    if (!pptx2json) {
+      throw new Error('pptx2json library not available');
+    }
+    
     // Parse PPTX using pptx2json
     const pptxData = await pptx2json.parse(buffer);
+    console.log('PPTX parsed successfully, data:', JSON.stringify(pptxData).substring(0, 500));
     const slideId = `imported-${Date.now()}`;
     const objects: SlideObject[] = [];
     
