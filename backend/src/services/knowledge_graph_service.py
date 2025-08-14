@@ -40,8 +40,8 @@ class KnowledgeGraphService:
         # Initialize tiktoken tokenizer for chunking
         try:
             self.tokenizer = tiktoken.encoding_for_model("gpt-4o")
-            self.chunk_size = 200  # tokens
-            self.chunk_overlap = 20  # tokens (10% overlap)
+            self.chunk_size = 512  # tokens
+            self.chunk_overlap = 50  # tokens (10% overlap)
         except Exception as e:
             logger.warning(f"Failed to load tiktoken tokenizer: {e}. Using fallback chunking.")
             self.tokenizer = None
@@ -96,6 +96,15 @@ class KnowledgeGraphService:
             self.graph = await self._cluster_networkx_graphs(list(self.file_graphs.values()))
             logger.info(f"Successfully clustered {len(self.file_graphs)} graphs into one")
             
+            # Generate embeddings for the clustered graph if they don't exist
+            if not self.node_embeddings and not self.edge_embeddings:
+                logger.info("Generating embeddings for clustered graph...")
+                embedding_result = self.generate_graph_embeddings()
+                if embedding_result.get("success"):
+                    logger.info(f"Generated embeddings: {embedding_result['node_embeddings_count']} nodes, {embedding_result['edge_embeddings_count']} edges")
+                else:
+                    logger.warning(f"Failed to generate embeddings: {embedding_result.get('error', 'Unknown error')}")
+            
             # Save the clustered graph
             await self._save_clustered_graph()
         else:
@@ -136,14 +145,17 @@ class KnowledgeGraphService:
     
     def _chunk_content_with_tokenizer(self, content: str) -> List[str]:
         """Chunk content using tiktoken tokenizer with overlap"""
-        if self.tokenizer is None:
-            # Fallback to character-based chunking
-            return self._chunk_content_fallback(content)
+        logger.info(f"Chunking content with tokenizer: {self.tokenizer}")
+        # if self.tokenizer is None:
+        #     # Fallback to character-based chunking
+        #     return self._chunk_content_fallback(content)
         
         # Tokenize the content
         tokens = self.tokenizer.encode(content)
+        logger.info(f"Tokens: {len(tokens)}")
         
         if len(tokens) <= self.chunk_size:
+            logger.info(f"Content is less than chunk size: {len(tokens)}")
             return [content]
         
         chunks = []
@@ -166,8 +178,18 @@ class KnowledgeGraphService:
             
             # Move to next chunk with overlap
             start = end - self.chunk_overlap
-            if start >= len(tokens):
+            
+            # Ensure we always make forward progress
+            if start >= end:
+                start = end
+            
+            # Safety check to prevent infinite loops
+            if end >= len(tokens):
                 break
+            
+            logger.info(f"Start: {start}")
+            logger.info(f"End: {end}")
+            logger.info(f"Length of tokens: {len(tokens)}")
         
         return chunks
 
@@ -261,16 +283,30 @@ class KnowledgeGraphService:
     
     def _merge_graph_data_with_weights(self, all_chunk_data: List[dict]) -> dict:
         """
-        Merge graph data from multiple chunks into a clustered structure optimized for NetworkX
+        Merge graph data from multiple chunks into a structure compatible with NetworkX
         
         Args:
             all_chunk_data: List of graph data dictionaries from chunks
             Each chunk contains: entities, relationships, facts, and metadata
             
         Returns:
-            Clustered graph data dictionary with entities as the central structure
-            Each entity contains its connections, relationships, facts, and metadata
+            Graph data dictionary with separate entities, relationships, and facts lists
         """
+        # Log the structure of incoming chunk data for debugging
+        logger.info(f"Processing {len(all_chunk_data)} chunks")
+        for i, chunk_data in enumerate(all_chunk_data):
+            logger.info(f"Chunk {i}: entities={len(chunk_data.get('entities', []))}, relationships={len(chunk_data.get('relationships', []))}, facts={len(chunk_data.get('facts', []))}")
+            # Log metadata information to verify chunk_content is present
+            metadata = chunk_data.get('metadata', {})
+            logger.info(f"Chunk {i} metadata: chunk_index={metadata.get('chunk_index')}, filename={metadata.get('filename')}, file_path={metadata.get('file_path')}")
+            logger.info(f"Chunk {i} chunk_content length: {len(metadata.get('chunk_content', ''))}")
+            if chunk_data.get('entities'):
+                logger.debug(f"Sample entity: {chunk_data['entities'][0]}")
+            if chunk_data.get('relationships'):
+                logger.debug(f"Sample relationship: {chunk_data['relationships'][0]}")
+            if chunk_data.get('facts'):
+                logger.debug(f"Sample fact: {chunk_data['facts'][0]}")
+        
         # Track entity frequency and create unified entity mapping
         entity_frequency = defaultdict(int)
         entity_mapping = {}  # Maps entity names to unified IDs
@@ -283,6 +319,10 @@ class KnowledgeGraphService:
                     entity_name = entity.get("name", "").strip()
                     if entity_name:
                         entity_frequency[entity_name.lower()] += 1
+                        
+                        # Log sample entities for debugging
+                        if len(entity_frequency) <= 5:  # Log first 5 entities
+                            logger.debug(f"Sample entity: {entity_name} (type: {entity.get('type', 'unknown')})")
         
         # Second pass: merge entities and collect all their data
         for chunk_data in all_chunk_data:
@@ -292,11 +332,11 @@ class KnowledgeGraphService:
                     if not entity_name:
                         continue
                     
-                    chunk_index = chunk_data.get("chunk_index", 0)
-                    filename = chunk_data.get("filename", "")
-                    file_path = chunk_data.get("file_path", "")
-                    chunk_content = entity.get("chunk_content", "")
-                    extraction_timestamp = entity.get("extraction_timestamp", "")
+                    chunk_index = chunk_data.get("metadata", {}).get("chunk_index", 0)
+                    filename = chunk_data.get("metadata", {}).get("filename", "")
+                    file_path = chunk_data.get("metadata", {}).get("file_path", "")
+                    chunk_content = chunk_data.get("metadata", {}).get("chunk_content", "")
+                    extraction_timestamp = chunk_data.get("metadata", {}).get("extraction_timestamp", "")
                     
                     if entity_name.lower() in entity_mapping:
                         # Entity exists, merge metadata
@@ -333,77 +373,109 @@ class KnowledgeGraphService:
                             "filename": [filename],
                             "file_path": [file_path],
                             "extraction_timestamp": [extraction_timestamp],
-                            "connections": [],  # Will store relationship data
-                            "facts": [],  # Will store facts related to this entity
-                            "metadata": {}  # Will store additional metadata
+                            "confidence": entity.get("confidence", 0.0)
                         }
         
-        # Process relationships and connect entities
+        # Process relationships and create unified relationship list
+        all_relationships = []
         for chunk_data in all_chunk_data:
             if "relationships" in chunk_data:
+                logger.info(f"Processing {len(chunk_data['relationships'])} relationships from chunk {chunk_data.get('metadata', {}).get('chunk_index', 'unknown')}")
                 for rel in chunk_data["relationships"]:
-                    source = rel.get("source", "").strip()
-                    target = rel.get("target", "").strip()
-                    rel_type = rel.get("type", "").strip()
+                    # Handle both field naming conventions from LLM extraction
+                    source = rel.get("source", rel.get("source_entity", "")).strip()
+                    target = rel.get("target", rel.get("target_entity", "")).strip()
+                    rel_type = rel.get("type", rel.get("relationship_type", "")).strip()
+                    
+                    logger.debug(f"Processing relationship: source='{source}', target='{target}', type='{rel_type}'")
+                    
+                    # Log the full relationship data for debugging
+                    logger.debug(f"Full relationship data: {rel}")
+                    
+                    # If we have entity IDs instead of names, try to find the entity names
+                    if source and source.startswith("entity_") and "source_name" in rel:
+                        source = rel.get("source_name", source)
+                    if target and target.startswith("entity_") and "target_name" in rel:
+                        target = rel.get("target_name", target)
                     
                     if not all([source, target, rel_type]):
+                        logger.debug(f"Skipping relationship due to missing fields: {rel}")
                         continue
                     
                     # Find the unified IDs for source and target entities
                     source_id = None
                     target_id = None
                     
+                    # Debug: log available entity names
+                    if logger.isEnabledFor(logging.DEBUG):
+                        available_entities = [entity_info["name"].lower() for entity_info in entity_data.values()]
+                        logger.debug(f"Available entities: {available_entities[:10]}...")  # Show first 10
+                    
                     for entity_id, entity_info in entity_data.items():
                         if entity_info["name"].lower() == source.lower():
                             source_id = entity_id
+                            logger.debug(f"Found source entity: {source} -> {entity_id}")
                         if entity_info["name"].lower() == target.lower():
                             target_id = entity_id
+                            logger.debug(f"Found target entity: {target} -> {entity_id}")
                     
                     if source_id and target_id:
-                        # Add connection to source entity
-                        connection = {
-                            "target_entity": target_id,
+                        # Create relationship data
+                        relationship_data = {
+                            "source": source_id,
+                            "target": target_id,
+                            "source_name": source,
                             "target_name": target,
-                            "relationship_type": rel_type,
-                            "chunks": [chunk_data.get("chunk_index", 0)],
-                            "chunk_content": [rel.get("chunk_content", "")],
-                            "filename": [chunk_data.get("filename", "")],
-                            "file_path": [chunk_data.get("file_path", "")],
-                            "extraction_timestamp": [rel.get("extraction_timestamp", "")]
+                            "type": rel_type,
+                            "weight": 1.0,  # Default weight for NetworkX compatibility
+                            "confidence": rel.get("confidence", 0.0),
+                            "chunks": [chunk_data.get("metadata", {}).get("chunk_index", 0)],
+                            "chunk_content": [chunk_data.get("metadata", {}).get("chunk_content", "")],
+                            "filename": [chunk_data.get("metadata", {}).get("filename", "")],
+                            "file_path": [chunk_data.get("metadata", {}).get("file_path", "")],
+                            "extraction_timestamp": [chunk_data.get("metadata", {}).get("extraction_timestamp", "")]
                         }
                         
-                        # Check if this connection already exists
-                        existing_connection = None
-                        for conn in entity_data[source_id]["connections"]:
-                            if (conn["target_entity"] == target_id and 
-                                conn["relationship_type"] == rel_type):
-                                existing_connection = conn
+                        # Check if this relationship already exists
+                        relationship_exists = False
+                        for existing_rel in all_relationships:
+                            if (existing_rel["source"] == source_id and 
+                                existing_rel["target"] == target_id and 
+                                existing_rel["type"] == rel_type):
+                                # Merge with existing relationship
+                                if chunk_data.get("metadata", {}).get("chunk_index", 0) not in existing_rel["chunks"]:
+                                    existing_rel["chunks"].append(chunk_data.get("metadata", {}).get("chunk_index", 0))
+                                existing_rel["chunk_content"].append(chunk_data.get("metadata", {}).get("chunk_content", ""))
+                                existing_rel["filename"].append(chunk_data.get("metadata", {}).get("filename", ""))
+                                existing_rel["file_path"].append(chunk_data.get("metadata", {}).get("file_path", ""))
+                                existing_rel["extraction_timestamp"].append(chunk_data.get("metadata", {}).get("extraction_timestamp", ""))
+                                relationship_exists = True
                                 break
                         
-                        if existing_connection:
-                            # Merge with existing connection
-                            if chunk_data.get("chunk_index") not in existing_connection["chunks"]:
-                                existing_connection["chunks"].append(chunk_data.get("chunk_index", 0))
-                            existing_connection["chunk_content"].append(rel.get("chunk_content", ""))
-                            existing_connection["filename"].append(chunk_data.get("filename", ""))
-                            existing_connection["file_path"].append(chunk_data.get("file_path", ""))
-                            existing_connection["extraction_timestamp"].append(rel.get("extraction_timestamp", ""))
-                        else:
-                            entity_data[source_id]["connections"].append(connection)
+                        if not relationship_exists:
+                            all_relationships.append(relationship_data)
         
-        # Process facts and associate them with entities
+        # Process facts and create unified facts list
+        all_facts = []
         for chunk_data in all_chunk_data:
             if "facts" in chunk_data:
+                logger.info(f"Processing {len(chunk_data['facts'])} facts from chunk {chunk_data.get('metadata', {}).get('chunk_index', 'unknown')}")
                 for fact in chunk_data["facts"]:
-                    fact_text = fact.get("text", "").strip()
+                    # Handle both field naming conventions
+                    fact_text = fact.get("text", fact.get("content", "")).strip()
                     if not fact_text:
+                        logger.debug(f"Skipping fact due to missing text: {fact}")
                         continue
                     
-                    chunk_index = chunk_data.get("chunk_index", 0)
-                    filename = chunk_data.get("filename", "")
-                    file_path = chunk_data.get("file_path", "")
-                    chunk_content = fact.get("chunk_content", "")
-                    extraction_timestamp = fact.get("extraction_timestamp", "")
+                    # Log sample facts for debugging
+                    if len(all_facts) < 3:  # Log first 3 facts
+                        logger.debug(f"Sample fact: {fact}")
+                    
+                    chunk_index = chunk_data.get("metadata", {}).get("chunk_index", 0)
+                    filename = chunk_data.get("metadata", {}).get("filename", "")
+                    file_path = chunk_data.get("metadata", {}).get("file_path", "")
+                    chunk_content = chunk_data.get("metadata", {}).get("chunk_content", "")
+                    extraction_timestamp = chunk_data.get("metadata", {}).get("extraction_timestamp", "")
                     
                     fact_data = {
                         "text": fact_text,
@@ -411,128 +483,70 @@ class KnowledgeGraphService:
                         "chunk_content": [chunk_content],
                         "filename": [filename],
                         "file_path": [file_path],
-                        "extraction_timestamp": [extraction_timestamp]
+                        "extraction_timestamp": [extraction_timestamp],
+                        "confidence": fact.get("confidence", 0.0)
                     }
                     
-                    # Associate fact with entities mentioned in it
-                    for entity_id, entity_info in entity_data.items():
-                        if entity_info["name"].lower() in fact_text.lower():
-                            # Check if this fact already exists for this entity
-                            fact_exists = False
-                            for existing_fact in entity_info["facts"]:
-                                if existing_fact["text"].lower() == fact_text.lower():
-                                    # Merge with existing fact
-                                    if chunk_index not in existing_fact["chunks"]:
-                                        existing_fact["chunks"].append(chunk_index)
-                                    existing_fact["chunk_content"].append(chunk_content)
-                                    existing_fact["filename"].append(filename)
-                                    existing_fact["file_path"].append(file_path)
-                                    existing_fact["extraction_timestamp"].append(extraction_timestamp)
-                                    fact_exists = True
-                                    break
-                            
-                            if not fact_exists:
-                                entity_info["facts"].append(fact_data)
+                    # Check if this fact already exists
+                    fact_exists = False
+                    for existing_fact in all_facts:
+                        if existing_fact["text"].lower() == fact_text.lower():
+                            # Merge with existing fact
+                            if chunk_index not in existing_fact["chunks"]:
+                                existing_fact["chunks"].append(chunk_index)
+                            existing_fact["chunk_content"].append(chunk_content)
+                            existing_fact["filename"].append(filename)
+                            existing_fact["file_path"].append(file_path)
+                            existing_fact["extraction_timestamp"].append(extraction_timestamp)
+                            fact_exists = True
+                            break
+                    
+                    if not fact_exists:
+                        all_facts.append(fact_data)
         
-        # Calculate weights for connections based on frequency and confidence
-        for entity_id, entity_info in entity_data.items():
-            for connection in entity_info["connections"]:
-                target_entity = entity_data[connection["target_entity"]]
-                source_freq = entity_info["frequency"]
-                target_freq = target_entity["frequency"]
-                rel_freq = len(connection["chunks"])
-                
-                connection["weight"] = self._calculate_connection_weight(
-                    source_freq, target_freq, rel_freq, connection.get("confidence", 0.5)
-                )
-        
-        # Filter to keep only the most important entities and connections
-        # Sort entities by importance score (frequency + total connections + total facts)
-        entity_importance = []
-        for entity_id, entity_info in entity_data.items():
-            importance_score = (
-                entity_info["frequency"] * 2 +  # Frequency has highest weight
-                len(entity_info["connections"]) * 1.5 +  # Connections are important
-                len(entity_info["facts"]) * 1.0  # Facts add value
-            )
-            entity_importance.append((entity_id, importance_score, entity_info))
-        
-        # Sort by importance score (descending) and take top 200 entities
-        entity_importance.sort(key=lambda x: x[1], reverse=True)
-        top_entities = entity_importance[:200]
-        
-        # Create filtered entity data
-        filtered_entity_data = {}
-        for entity_id, _, entity_info in top_entities:
-            filtered_entity_data[entity_id] = entity_info
-        
-        # Now filter connections to keep only those between top entities
-        # and limit total connections to 400
-        all_connections = []
-        for entity_id, entity_info in filtered_entity_data.items():
-            for connection in entity_info["connections"]:
-                target_id = connection["target_entity"]
-                if target_id in filtered_entity_data:  # Only keep connections to top entities
-                    connection_score = (
-                        connection["weight"] * 2 +  # Connection weight
-                        len(connection["chunks"]) * 1.5 +  # Frequency of relationship
-                        (entity_info["frequency"] + filtered_entity_data[target_id]["frequency"]) * 0.5  # Combined entity frequency
-                    )
-                    all_connections.append((entity_id, connection, connection_score))
-        
-        # Sort connections by score and take top 400
-        all_connections.sort(key=lambda x: x[2], reverse=True)
-        top_connections = all_connections[:400]
-        
-        # Rebuild entity data with filtered connections
-        final_entity_data = {}
-        for entity_id, entity_info in filtered_entity_data.items():
-            # Get only the connections that made it to top 400
-            entity_connections = []
-            for conn_entity_id, connection, _ in top_connections:
-                if conn_entity_id == entity_id:
-                    entity_connections.append(connection)
-            
-            # Create final entity with filtered connections
-            final_entity = entity_info.copy()
-            final_entity["connections"] = entity_connections
-            final_entity_data[entity_id] = final_entity
-        
-        # Convert to final structure
-        clustered_data = {
-            "entities": list(final_entity_data.values()),
-            "total_entities": len(final_entity_data),
-            "total_connections": sum(len(entity["connections"]) for entity in final_entity_data.values()),
-            "total_facts": sum(len(entity["facts"]) for entity in final_entity_data.values()),
+        # Convert to final structure - separate lists as expected by NetworkX function
+        merged_data = {
+            "entities": list(entity_data.values()),  # Convert dict values to list
+            "relationships": all_relationships,
+            "facts": all_facts,
+            "total_entities": len(entity_data),
+            "total_relationships": len(all_relationships),
+            "total_facts": len(all_facts),
             "metadata": {
                 "chunk_count": len(all_chunk_data),
                 "extraction_timestamp": datetime.now().isoformat(),
-                "filtering_applied": True,
+                "filtering_applied": False,
                 "original_entities": len(entity_data),
-                "original_connections": sum(len(entity["connections"]) for entity in entity_data.values()),
-                "entity_limit": 200,
-                "connection_limit": 400
+                "original_relationships": len(all_relationships),
+                "original_facts": len(all_facts)
             }
         }
         
         logger.info(f"Merged graph data from {len(all_chunk_data)} chunks")
-        logger.info(f"  Original entities: {len(entity_data)} -> Filtered to: {clustered_data['total_entities']}")
-        logger.info(f"  Original connections: {sum(len(entity['connections']) for entity in entity_data.values())} -> Filtered to: {clustered_data['total_connections']}")
-        logger.info(f"  Total facts: {clustered_data['total_facts']}")
-        logger.info(f"  Filtering limits: 200 entities, 400 connections")
+        logger.info(f"  Total entities: {merged_data['total_entities']}")
+        logger.info(f"  Total relationships: {merged_data['total_relationships']}")
+        logger.info(f"  Total facts: {merged_data['total_facts']}")
         
-        return clustered_data
-    
-    def _calculate_connection_weight(self, source_freq: int, target_freq: int, rel_freq: int, confidence: float = None) -> float:
-        """Calculate normalized weight for entity connections"""
-        # Weight based on entity frequency, relationship frequency, and confidence
-        base_weight = (source_freq + target_freq) / 2.0
-        rel_weight = rel_freq
-        conf_weight = confidence if confidence is not None else 0.5
+        # Log sample data to verify chunk_content is preserved
+        if merged_data['entities']:
+            sample_entity = merged_data['entities'][0]
+            logger.info(f"Sample entity chunk_content count: {len(sample_entity.get('chunk_content', []))}")
+            if sample_entity.get('chunk_content'):
+                logger.info(f"Sample entity first chunk_content length: {len(sample_entity['chunk_content'][0])}")
         
-        # Normalize to 0-1 range
-        normalized_weight = min(1.0, (base_weight + rel_weight + conf_weight) / 15.0)
-        return round(normalized_weight, 3)
+        if merged_data['relationships']:
+            sample_rel = merged_data['relationships'][0]
+            logger.info(f"Sample relationship chunk_content count: {len(sample_rel.get('chunk_content', []))}")
+            if sample_rel.get('chunk_content'):
+                logger.info(f"Sample relationship first chunk_content length: {len(sample_rel['chunk_content'][0])}")
+        
+        if merged_data['facts']:
+            sample_fact = merged_data['facts'][0]
+            logger.info(f"Sample fact chunk_content count: {len(sample_fact.get('chunk_content', []))}")
+            if sample_fact.get('chunk_content'):
+                logger.info(f"Sample fact first chunk_content length: {len(sample_fact['chunk_content'][0])}")
+        
+        return merged_data
     
     def convert_clustered_to_legacy_format(self, clustered_data: dict) -> dict:
         """
@@ -568,40 +582,38 @@ class KnowledgeGraphService:
             }
             legacy_data["entities"].append(legacy_entity)
         
-        # Convert connections to relationships
-        for entity in clustered_data.get("entities", []):
-            for connection in entity.get("connections", []):
-                legacy_relationship = {
-                    "source": entity["name"],
-                    "target": connection["target_name"],
-                    "type": connection["relationship_type"],
-                    "key": f"{entity['name']}::{connection['relationship_type']}::{connection['target_name']}",
-                    "confidence": connection.get("confidence", 0.0),
-                    "frequency": len(connection.get("chunks", [])),
-                    "chunks": connection.get("chunks", []),
-                    "chunk_content": " ||| ".join(connection.get("chunk_content", [])),
-                    "filename": " ||| ".join(connection.get("filename", [])),
-                    "file_path": " ||| ".join(connection.get("file_path", [])),
-                    "extraction_timestamp": " ||| ".join(connection.get("extraction_timestamp", [])),
-                    "weight": connection.get("weight", 1.0)
-                }
-                legacy_data["relationships"].append(legacy_relationship)
+        # Convert relationships
+        for relationship in clustered_data.get("relationships", []):
+            legacy_relationship = {
+                "source": relationship.get("source_name", ""),
+                "target": relationship.get("target_name", ""),
+                "type": relationship.get("type", "related"),
+                "key": f"{relationship.get('source_name', '')}::{relationship.get('type', '')}::{relationship.get('target_name', '')}",
+                "confidence": relationship.get("confidence", 0.0),
+                "frequency": len(relationship.get("chunks", [])),
+                "chunks": relationship.get("chunks", []),
+                "chunk_content": " ||| ".join(relationship.get("chunk_content", [])),
+                "filename": " ||| ".join(relationship.get("filename", [])),
+                "file_path": " ||| ".join(relationship.get("file_path", [])),
+                "extraction_timestamp": " ||| ".join(relationship.get("extraction_timestamp", [])),
+                "weight": relationship.get("weight", 1.0)
+            }
+            legacy_data["relationships"].append(legacy_relationship)
         
         # Convert facts
-        for entity in clustered_data.get("entities", []):
-            for fact in entity.get("facts", []):
-                legacy_fact = {
-                    "text": fact["text"],
-                    "key": fact["text"].lower(),
-                    "confidence": fact.get("confidence", 0.0),
-                    "frequency": len(fact.get("chunks", [])),
-                    "chunks": fact.get("chunks", []),
-                    "chunk_content": " ||| ".join(fact.get("chunk_content", [])),
-                    "filename": " ||| ".join(fact.get("filename", [])),
-                    "file_path": " ||| ".join(fact.get("file_path", [])),
-                    "extraction_timestamp": " ||| ".join(fact.get("extraction_timestamp", []))
-                }
-                legacy_data["facts"].append(legacy_fact)
+        for fact in clustered_data.get("facts", []):
+            legacy_fact = {
+                "text": fact["text"],
+                "key": fact["text"].lower(),
+                "confidence": fact.get("confidence", 0.0),
+                "frequency": len(fact.get("chunks", [])),
+                "chunks": fact.get("chunks", []),
+                "chunk_content": " ||| ".join(fact.get("chunk_content", [])),
+                "filename": " ||| ".join(fact.get("filename", [])),
+                "file_path": " ||| ".join(fact.get("file_path", [])),
+                "extraction_timestamp": " ||| ".join(fact.get("extraction_timestamp", []))
+            }
+            legacy_data["facts"].append(legacy_fact)
         
         return legacy_data
     
@@ -616,6 +628,8 @@ class KnowledgeGraphService:
             Summary dictionary with key statistics and insights
         """
         entities = clustered_data.get("entities", [])
+        relationships = clustered_data.get("relationships", [])
+        facts = clustered_data.get("facts", [])
         
         # Entity type distribution
         type_distribution = {}
@@ -626,21 +640,24 @@ class KnowledgeGraphService:
         # Connection type distribution
         connection_type_distribution = {}
         total_connections = 0
-        for entity in entities:
-            for connection in entity.get("connections", []):
-                rel_type = connection.get("relationship_type", "unknown")
-                connection_type_distribution[rel_type] = connection_type_distribution.get(rel_type, 0) + 1
-                total_connections += 1
+        for relationship in relationships:
+            rel_type = relationship.get("type", "unknown")
+            connection_type_distribution[rel_type] = connection_type_distribution.get(rel_type, 0) + 1
+            total_connections += 1
         
         # Entity connectivity analysis
         connectivity_stats = []
         for entity in entities:
-            connections = len(entity.get("connections", []))
-            facts = len(entity.get("facts", []))
+            entity_id = entity["id"]
+            # Count relationships where this entity is source or target
+            connections = sum(1 for rel in relationships if rel["source"] == entity_id or rel["target"] == entity_id)
+            # Count facts that mention this entity
+            entity_facts = sum(1 for fact in facts if entity["name"].lower() in fact["text"].lower())
+            
             connectivity_stats.append({
                 "entity_name": entity["name"],
                 "connections": connections,
-                "facts": facts,
+                "facts": entity_facts,
                 "frequency": entity.get("frequency", 1)
             })
         
@@ -650,7 +667,7 @@ class KnowledgeGraphService:
         summary = {
             "total_entities": len(entities),
             "total_connections": total_connections,
-            "total_facts": sum(len(entity.get("facts", [])) for entity in entities),
+            "total_facts": len(facts),
             "entity_type_distribution": type_distribution,
             "connection_type_distribution": connection_type_distribution,
             "most_connected_entities": connectivity_stats[:10],  # Top 10
@@ -666,11 +683,11 @@ class KnowledgeGraphService:
             summary["filtering_info"] = {
                 "filtering_applied": True,
                 "original_entities": clustered_data["metadata"].get("original_entities", 0),
-                "original_connections": clustered_data["metadata"].get("original_connections", 0),
+                "original_connections": clustered_data["metadata"].get("original_relationships", 0),
                 "entity_limit": clustered_data["metadata"].get("entity_limit", 200),
                 "connection_limit": clustered_data["metadata"].get("connection_limit", 400),
                 "entities_filtered": clustered_data["metadata"].get("original_entities", 0) - len(entities),
-                "connections_filtered": clustered_data["metadata"].get("original_connections", 0) - total_connections
+                "connections_filtered": clustered_data["metadata"].get("original_relationships", 0) - total_connections
             }
         
         return summary
@@ -761,7 +778,7 @@ class KnowledgeGraphService:
             },
             "filtered_results": {
                 "output_entities": filtered_data["total_entities"],
-                "output_connections": filtered_data["total_connections"],
+                "output_relationships": filtered_data["total_relationships"],
                 "output_facts": filtered_data["total_facts"]
             },
             "filtering_summary": summary,
@@ -792,64 +809,109 @@ class KnowledgeGraphService:
             return ""
     
     def _generate_networkx_graph_from_graph_data(self, graph_data: dict, filename: str, file_path: str) -> nx.DiGraph:
-        """Generate a NetworkX graph from clustered graph data with metadata"""
+        """Generate a NetworkX graph from graph data with separate entities, relationships, and facts lists"""
         graph = nx.DiGraph()
+        
+        logger.info(f"Generating NetworkX graph from data with {len(graph_data.get('entities', []))} entities, {len(graph_data.get('relationships', []))} relationships, {len(graph_data.get('facts', []))} facts")
         
         # Add entities as nodes with metadata
         if "entities" in graph_data:
-            for entity_data in graph_data["entities"]:
-                node_id = entity_data["id"]
-                
-                # Prepare node attributes
-                node_attrs = {
-                    "name": entity_data["name"],
-                    "type": entity_data.get("type", ["unknown"])[0] if entity_data.get("type") else "unknown",
-                    "description": entity_data.get("description", [""])[0] if entity_data.get("description") else "",
-                    "frequency": entity_data.get("frequency", 1),
-                    "chunks": entity_data.get("chunks", []),
-                    "filename": filename,
-                    "file_path": file_path,
-                    "node_type": "entity",
-                    "total_connections": len(entity_data.get("connections", [])),
-                    "total_facts": len(entity_data.get("facts", []))
-                }
-                
-                # Add all types and descriptions as lists
-                if entity_data.get("type"):
-                    node_attrs["all_types"] = entity_data["type"]
-                if entity_data.get("description"):
-                    node_attrs["all_descriptions"] = entity_data["description"]
-                
-                graph.add_node(node_id, **node_attrs)
+            logger.info(f"Processing {len(graph_data['entities'])} entities...")
+            for i, entity_data in enumerate(graph_data["entities"]):
+                try:
+                    node_id = entity_data["id"]
+                    
+                    # Prepare node attributes - handle both list and string types safely
+                    entity_type = entity_data.get("type", [])
+                    entity_description = entity_data.get("description", [])
+                    
+                    # Ensure type and description are lists and get first value safely
+                    if isinstance(entity_type, list) and entity_type:
+                        node_type = entity_type[0] if entity_type[0] else "unknown"
+                    elif isinstance(entity_type, str):
+                        node_type = entity_type if entity_type else "unknown"
+                    else:
+                        node_type = "unknown"
+                    
+                    if isinstance(entity_description, list) and entity_description:
+                        node_description = entity_description[0] if entity_description[0] else ""
+                    elif isinstance(entity_description, str):
+                        node_description = entity_description if entity_description else ""
+                    else:
+                        node_description = ""
+                    
+                    node_attrs = {
+                        "name": entity_data["name"],
+                        "type": node_type,
+                        "description": node_description,
+                        "frequency": entity_data.get("frequency", 1),
+                        "chunks": entity_data.get("chunks", []),
+                        "filename": filename,
+                        "file_path": file_path,
+                        "node_type": "entity",
+                        "confidence": entity_data.get("confidence", 0.0)
+                    }
+                    
+                    # Add all types and descriptions as lists - ensure they are lists
+                    if entity_data.get("type"):
+                        if isinstance(entity_data["type"], list):
+                            node_attrs["all_types"] = entity_data["type"]
+                        else:
+                            node_attrs["all_types"] = [entity_data["type"]]
+                    if entity_data.get("description"):
+                        if isinstance(entity_data["description"], list):
+                            node_attrs["all_descriptions"] = entity_data["description"]
+                        else:
+                            node_attrs["all_descriptions"] = [entity_data["description"]]
+                    
+                    graph.add_node(node_id, **node_attrs)
+                    
+                    if i < 5:  # Log first few entities for debugging
+                        logger.debug(f"Added entity {i+1}: {node_id} - {entity_data['name']}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing entity {i}: {e}")
+                    logger.error(f"Entity data: {entity_data}")
+                    continue
         
-        # Add connections as edges with metadata
-        if "entities" in graph_data:
-            for entity_data in graph_data["entities"]:
-                source_id = entity_data["id"]
-                
-                for connection in entity_data.get("connections", []):
-                    target_id = connection["target_entity"]
+        # Add relationships as edges with metadata
+        if "relationships" in graph_data:
+            logger.info(f"Processing {len(graph_data['relationships'])} relationships...")
+            for i, relationship in enumerate(graph_data["relationships"]):
+                try:
+                    source_id = relationship["source"]
+                    target_id = relationship["target"]
                     
                     if source_id in graph.nodes and target_id in graph.nodes:
                         edge_attrs = {
-                            "relationship_type": connection.get("relationship_type", "related"),
-                            "weight": connection.get("weight", 1.0),
-                            "confidence": connection.get("confidence", 0.0),
-                            "chunks": connection.get("chunks", []),
+                            "relationship_type": relationship.get("type", "related"),
+                            "weight": relationship.get("weight", 1.0),
+                            "confidence": relationship.get("confidence", 0.0),
+                            "chunks": relationship.get("chunks", []),
                             "filename": filename,
                             "file_path": file_path,
                             "edge_type": "entity_connection",
-                            "target_name": connection.get("target_name", "")
+                            "source_name": relationship.get("source_name", ""),
+                            "target_name": relationship.get("target_name", "")
                         }
                         
                         graph.add_edge(source_id, target_id, **edge_attrs)
+                        
+                        if i < 5:  # Log first few relationships for debugging
+                            logger.debug(f"Added relationship {i+1}: {source_id} -> {target_id}")
+                    else:
+                        logger.warning(f"Relationship {i}: source or target node not found - source: {source_id}, target: {target_id}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing relationship {i}: {e}")
+                    logger.error(f"Relationship data: {relationship}")
+                    continue
         
         # Add facts as special nodes connected to entities
-        if "entities" in graph_data:
-            for entity_data in graph_data["entities"]:
-                entity_id = entity_data["id"]
-                
-                for fact in entity_data.get("facts", []):
+        if "facts" in graph_data:
+            logger.info(f"Processing {len(graph_data['facts'])} facts...")
+            for i, fact in enumerate(graph_data["facts"]):
+                try:
                     fact_id = f"fact_{hash(fact['text'])}"
                     
                     # Check if fact node already exists
@@ -863,16 +925,29 @@ class KnowledgeGraphService:
                             "node_type": "fact"
                         }
                         graph.add_node(fact_id, **fact_attrs)
+                        
+                        if i < 5:  # Log first few facts for debugging
+                            logger.debug(f"Added fact {i+1}: {fact_id} - {fact['text'][:50]}...")
                     
-                    # Connect fact to entity
-                    graph.add_edge(fact_id, entity_id,
-                                 relationship_type="mentions",
-                                 weight=0.3,
-                                 confidence=fact.get("confidence", 0.0),
-                                 chunks=fact.get("chunks", []),
-                                 filename=filename,
-                                 file_path=file_path,
-                                 edge_type="fact_entity")
+                    # Connect fact to entities mentioned in it
+                    for entity_id, entity_info in graph.nodes(data=True):
+                        if entity_info.get("node_type") == "entity":
+                            entity_name = entity_info.get("name", "").lower()
+                            if entity_name and entity_name in fact["text"].lower():
+                                # Connect fact to entity
+                                graph.add_edge(fact_id, entity_id,
+                                             relationship_type="mentions",
+                                             weight=0.3,
+                                             confidence=fact.get("confidence", 0.0),
+                                             chunks=fact.get("chunks", []),
+                                             filename=filename,
+                                             file_path=file_path,
+                                             edge_type="fact_entity")
+                                
+                except Exception as e:
+                    logger.error(f"Error processing fact {i}: {e}")
+                    logger.error(f"Fact data: {fact}")
+                    continue
         
         logger.info(f"Generated NetworkX graph with {len(graph.nodes)} nodes and {len(graph.edges)} edges")
         return graph
@@ -1042,21 +1117,18 @@ class KnowledgeGraphService:
         logger.info(f"Clustered {len(entity_mapping)} entities into {len(unified_entities)} unified entities")
         
         # Generate embeddings for the clustered graph
-        if self.openai_client:
-            logger.info("Generating embeddings for clustered graph...")
-            # Temporarily set the graph to generate embeddings
-            temp_graph = self.graph
-            self.graph = clustered_graph
-            
-            # Generate embeddings
-            embedding_result = self.generate_graph_embeddings()
-            if embedding_result.get("success"):
-                logger.info(f"Generated embeddings: {embedding_result['node_embeddings_count']} nodes, {embedding_result['edge_embeddings_count']} edges")
-            else:
-                logger.warning(f"Failed to generate embeddings: {embedding_result.get('error', 'Unknown error')}")
-            
-            # Restore the original graph
-            self.graph = temp_graph
+        logger.info("Generating embeddings for clustered graph...")
+        # Set the graph to generate embeddings (this will be the main graph)
+        self.graph = clustered_graph
+        
+        # Generate embeddings
+        embedding_result = self.generate_graph_embeddings()
+        if embedding_result.get("success"):
+            logger.info(f"Generated embeddings: {embedding_result['node_embeddings_count']} nodes, {embedding_result['edge_embeddings_count']} edges")
+        else:
+            logger.warning(f"Failed to generate embeddings: {embedding_result.get('error', 'Unknown error')}")
+        
+        # Note: Don't restore the original graph - the clustered graph should be the main graph
         
         return clustered_graph
     
@@ -1572,6 +1644,7 @@ class KnowledgeGraphService:
         """Initialize the OpenAI client for generating embeddings"""
         try:
             if self.settings.OPENAI_API_KEY:
+                logger.info(f"Initializing OpenAI client with API key: {self.settings.OPENAI_API_KEY[:20]}...")
                 self.openai_client = openai.OpenAI(api_key=self.settings.OPENAI_API_KEY)
                 logger.info("OpenAI client initialized successfully")
             else:
@@ -1585,6 +1658,7 @@ class KnowledgeGraphService:
     def _generate_node_embedding(self, node_id: str, node_attrs: dict) -> Optional[np.ndarray]:
         """Generate embedding for a node using OpenAI API"""
         if not self.openai_client:
+            logger.warning("No OpenAI client found")
             return None
         
         try:
@@ -1606,6 +1680,8 @@ class KnowledgeGraphService:
             # Combine all text parts
             node_text = " | ".join(text_parts)
             
+            logger.debug(f"Generating embedding for node {node_id} with text: {node_text[:100]}...")
+            
             # Generate embedding using OpenAI API
             response = self.openai_client.embeddings.create(
                 model="text-embedding-3-small",
@@ -1614,6 +1690,7 @@ class KnowledgeGraphService:
             
             # Extract embedding from response
             embedding = np.array(response.data[0].embedding)
+            logger.debug(f"Successfully generated embedding for node {node_id}: {len(embedding)} dimensions")
             return embedding
             
         except Exception as e:
@@ -1658,33 +1735,42 @@ class KnowledgeGraphService:
         """Generate embeddings for all nodes and edges in the current graph"""
         if not self.graph or not self.openai_client:
             logger.warning("No graph available or OpenAI client not initialized")
+            logger.warning(f"Graph exists: {self.graph is not None}, OpenAI client exists: {self.openai_client is not None}")
             return {"error": "No graph available or OpenAI client not initialized"}
         
         try:
-            logger.info("Generating embeddings for graph nodes and edges...")
+            logger.info(f"Generating embeddings for graph with {len(self.graph.nodes)} nodes and {len(self.graph.edges)} edges...")
             
             # Clear existing embeddings
             self.node_embeddings.clear()
             self.edge_embeddings.clear()
             
             # Generate node embeddings
+            node_count = 0
             for node_id, node_attrs in self.graph.nodes(data=True):
                 embedding = self._generate_node_embedding(node_id, node_attrs)
                 if embedding is not None:
                     self.node_embeddings[node_id] = embedding
+                    node_count += 1
+                else:
+                    logger.warning(f"Failed to generate embedding for node {node_id}")
             
             # Generate edge embeddings
+            edge_count = 0
             for source, target, edge_attrs in self.graph.edges(data=True):
                 embedding = self._generate_edge_embedding(source, target, edge_attrs)
                 if embedding is not None:
                     self.edge_embeddings[(source, target)] = embedding
+                    edge_count += 1
+                else:
+                    logger.warning(f"Failed to generate embedding for edge ({source}, {target})")
             
-            logger.info(f"Generated embeddings for {len(self.node_embeddings)} nodes and {len(self.edge_embeddings)} edges")
+            logger.info(f"Generated embeddings for {node_count} nodes and {edge_count} edges")
             
             return {
                 "success": True,
-                "node_embeddings_count": len(self.node_embeddings),
-                "edge_embeddings_count": len(self.edge_embeddings),
+                "node_embeddings_count": node_count,
+                "edge_embeddings_count": edge_count,
                 "total_nodes": len(self.graph.nodes),
                 "total_edges": len(self.graph.edges)
             }
@@ -1973,3 +2059,96 @@ class KnowledgeGraphService:
         except Exception as e:
             logger.error(f"Error regenerating embeddings: {e}")
             return {"error": str(e)}
+
+    def get_chunk_content(self, chunk_index: int, filename: str = None) -> str:
+        """
+        Get the content of a specific chunk by index
+        
+        Args:
+            chunk_index: The chunk index to retrieve
+            filename: Optional filename to limit search to specific file
+            
+        Returns:
+            The chunk content as string, or empty string if not found
+        """
+        try:
+            # Search in file graph data
+            search_files = [filename] if filename else self.file_graph_data.keys()
+            
+            for file_key in search_files:
+                if file_key in self.file_graph_data:
+                    graph_data = self.file_graph_data[file_key]
+                    
+                    # Check entities for this chunk
+                    if "entities" in graph_data:
+                        for entity_info in graph_data["entities"]:
+                            if chunk_index in entity_info.get("chunks", []):
+                                # Find the content for this specific chunk index
+                                chunk_contents = entity_info.get("chunk_content", [])
+                                chunk_indices = entity_info.get("chunks", [])
+                                
+                                for i, content in enumerate(chunk_contents):
+                                    if i < len(chunk_indices) and chunk_indices[i] == chunk_index:
+                                        if content and content.strip():
+                                            return content.strip()
+                    
+                    # Check facts for this chunk
+                    if "facts" in graph_data:
+                        for fact in graph_data["facts"]:
+                            if chunk_index in fact.get("chunks", []):
+                                chunk_contents = fact.get("chunk_content", [])
+                                chunk_indices = fact.get("chunks", [])
+                                
+                                for i, content in enumerate(chunk_contents):
+                                    if i < len(chunk_indices) and chunk_indices[i] == chunk_index:
+                                        if content and content.strip():
+                                            return content.strip()
+            
+            # If not found in file graph data, try to find in the main graph
+            if self.graph:
+                for node, attrs in self.graph.nodes(data=True):
+                    if chunk_index in attrs.get("chunks", []):
+                        # Try to get content from node attributes
+                        if attrs.get("node_type") == "fact":
+                            return attrs.get("content", "")
+                        elif attrs.get("node_type") == "entity":
+                            return attrs.get("description", "")
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error retrieving chunk content for index {chunk_index}: {e}")
+            return ""
+
+    def get_chunk_content_by_entity(self, entity_name: str, chunk_index: int) -> str:
+        """
+        Get chunk content for a specific entity and chunk index
+        
+        Args:
+            entity_name: Name of the entity
+            chunk_index: The chunk index to retrieve
+            
+        Returns:
+            The chunk content as string, or empty string if not found
+        """
+        try:
+            # Search in file graph data
+            for filename, graph_data in self.file_graph_data.items():
+                if "entities" in graph_data:
+                    for entity_info in graph_data["entities"]:
+                        if entity_info.get("name", "").lower() == entity_name.lower():
+                            if chunk_index in entity_info.get("chunks", []):
+                                # Find the content for this specific chunk index
+                                chunk_contents = entity_info.get("chunk_content", [])
+                                chunk_indices = entity_info.get("chunks", [])
+
+                                for i, content in enumerate(chunk_contents):
+                                    if i < len(chunk_indices) and chunk_indices[i] == chunk_index:
+                                        if content and content.strip():
+                                            return content.strip()
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error retrieving chunk content for entity {entity_name} at index {chunk_index}: {e}")
+            return ""

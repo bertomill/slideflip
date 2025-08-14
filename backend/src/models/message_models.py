@@ -96,7 +96,7 @@ class FileInfo(BaseModel):
     file_path: str
     file_size: int
     file_type: str
-    upload_time: str
+    upload_time: Optional[str] = None
 
 class SlideData(BaseModel):
     """Model for slide data"""
