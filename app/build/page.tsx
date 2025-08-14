@@ -270,7 +270,8 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-             onPrev={prevStep}
+            onPrev={prevStep}
+            sendGenerateSlide={sendGenerateSlide}
           />
         );
       case 4:

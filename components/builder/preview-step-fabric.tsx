@@ -60,6 +60,8 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const [feedback, setFeedback] = useState("");
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [canvasKey, setCanvasKey] = useState(0); // Add this line
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false); // ← ADD THIS LINE
+  const [templateSaved, setTemplateSaved] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,14 +83,13 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       : undefined;
 
     return {
-      description: slideData.description,
-      theme: slideData.selectedTheme || "Professional",
-      researchData: slideData.wantsResearch ? slideData.researchData : undefined,
-      contentPlan: slideData.contentPlan,
-      userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
-      documents: simplifiedDocs,
-      format: "json" // Request JSON format instead of HTML
-      , model: modelAwareSlideData.selectedModel || undefined
+      client_id: `frontend_${Date.now()}`,
+      slide_description: overrideFeedback || slideData.description,
+      documents: simplifiedDocs,  // ← ADD THIS LINE!
+      top_k: 10,
+      similarity_threshold: 0.3,
+      include_embeddings: false,
+      max_tokens: 2000
     };
   };
 
@@ -96,22 +97,50 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const generateSlide = async (overrideFeedback?: string) => {
     if (!slideData.description || isGenerating) return;
     setIsGenerating(true);
+
     try {
-      const response = await fetch("/api/generate-slide-json", {
+      const payload = buildRequestPayload(overrideFeedback);
+    
+      // 🔍 DEBUG: Log what's being sent to backend
+      console.log("🔍 FULL PAYLOAD TO BACKEND:", JSON.stringify(payload, null, 2));
+      console.log("🔍 DOCUMENTS ARRAY:", payload.documents);
+      console.log("🔍 SLIDE DESCRIPTION:", payload.slide_description);
+
+      const response = await fetch("http://localhost:8000/api/graph-query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildRequestPayload(overrideFeedback)),
+        body: JSON.stringify(payload),
       });
 
+      // ADD THIS DEBUG LOG:
+      console.log("🔍 BACKEND RESPONSE STATUS:", response.status);
+      console.log("🔍 RESPONSE HEADERS:", [...response.headers.entries()]);
+      const responseText = await response.text(); // Get raw response
+      console.log("🔍 RAW BACKEND RESPONSE:", responseText);
+
+      // Then try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("🔍 PARSED BACKEND DATA:", data);
+      } catch (e) {
+        console.error("❌ Backend returned non-JSON:", responseText.substring(0, 200));
+        return;
+      }
+
       if (response.ok) {
-        const data = await response.json();
-        if (data?.success && data?.slideJson) {
-           updateSlideData({ slideJson: data.slideJson });
+        // Look for slideJson in the data object
+        if (data?.success && data?.data?.slideJson) {
+          console.log("✅ Found slideJson:", data.data.slideJson);
+          updateSlideData({ slideJson: data.data.slideJson });
           return;
+        } else {
+          console.log("⚠️ No slideJson found in response:", data);
         }
       }
-      
+
       // Fallback to a sample slide if API fails
+      console.log("🔄 Using fallback slide");
       const sampleSlide: SlideDefinition = {
         id: 'generated-slide',
         background: { color: 'ffffff' },

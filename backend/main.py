@@ -125,6 +125,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# ADD THIS ROOT ROUTE:
+@app.get("/")
+async def root():
+    return {
+        "message": "SlideFlip Backend is running successfully! 🚀",
+        "status": "healthy",
+        "version": "1.0.0",
+        "docs": "Visit /docs for API documentation",
+        "endpoints": {
+            "health": "/api/health",
+            "generate_slide": "/api/generate-slide-json",
+            "upload": "/api/upload"
+        }
+    }
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -135,7 +150,7 @@ app.add_middleware(
 )
 
 # Include all routers
-app.include_router(root_router)
+# app.include_router(root_router)
 app.include_router(api_router)
 app.include_router(debug_router)
 

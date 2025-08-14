@@ -22,3 +22,4 @@ pdfminer.six
 PyPDF2
 python-docx
 pydantic-settings
+
