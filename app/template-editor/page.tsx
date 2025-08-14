@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { convertFabricToSlideJson, exportCanvasFormats } from '../../lib/fabric-to-slide';
+import { convertFabricToSlideJson, exportCanvasFormats } from '@/lib/fabric-to-slide.ts';
 import { renderSlideOnCanvas } from '@/lib/slide-to-fabric';
 import { SlideDefinition } from '@/lib/slide-types';
 import { useRouter, useSearchParams } from 'next/navigation';
