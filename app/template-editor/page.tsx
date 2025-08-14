@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { convertFabricToSlideJson, exportCanvasFormats } from '@/lib/fabric-to-slide.ts';
+import { convertFabricToSlideJson, exportCanvasFormats } from '@/lib';
 import { renderSlideOnCanvas } from '@/lib/slide-to-fabric';
 import { SlideDefinition } from '@/lib/slide-types';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -75,8 +75,22 @@ function TemplateEditorInner() {
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
-    // Calculate canvas size based on container
+    // Wait for container to be properly sized
     const containerRect = containerRef.current.getBoundingClientRect();
+    if (containerRect.width === 0 || containerRect.height === 0) {
+      // Container not yet sized, retry after a short delay
+      const timeout = setTimeout(() => {
+        if (containerRef.current) {
+          const newRect = containerRef.current.getBoundingClientRect();
+          if (newRect.width > 0 && newRect.height > 0) {
+            // Trigger re-initialization
+            setCanvas(null);
+          }
+        }
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+
     const aspectRatio = 16 / 9;
     
     let canvasWidth = Math.min(containerRect.width - 40, CANVAS_WIDTH);
@@ -88,135 +102,162 @@ function TemplateEditorInner() {
       canvasWidth = canvasHeight * aspectRatio;
     }
 
-    const fabricCanvas = new Canvas(canvasRef.current, {
-      width: canvasWidth,
-      height: canvasHeight,
-      backgroundColor: '#ffffff',
-      preserveObjectStacking: true,
-    });
-
-    // Ensure white background is always visible
-    fabricCanvas.backgroundColor = '#ffffff';
-    fabricCanvas.renderAll();
-
-    // Handle object selection
-    fabricCanvas.on('selection:created', (e) => {
-      setSelectedObject(e.selected?.[0]);
-    });
-
-    fabricCanvas.on('selection:updated', (e) => {
-      setSelectedObject(e.selected?.[0]);
-    });
-
-    fabricCanvas.on('selection:cleared', () => {
-      setSelectedObject(null);
-    });
-
-    // Add mouse wheel zoom support
-    fabricCanvas.on('mouse:wheel', (opt) => {
-      const delta = opt.e.deltaY;
-      let zoom = fabricCanvas.getZoom();
-      zoom *= 0.999 ** delta;
-      if (zoom > 3) zoom = 3;
-      if (zoom < 0.3) zoom = 0.3;
-      
-      fabricCanvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-      setZoomLevel(zoom);
-      opt.e.preventDefault();
-      opt.e.stopPropagation();
-    });
-
-    // Add pan functionality
-    fabricCanvas.on('mouse:down', (opt) => {
-      const evt = opt.e;
-      if (evt.altKey === true || (evt.shiftKey === true && fabricCanvas.getZoom() > 1)) {
-        setIsPanning(true);
-        (fabricCanvas as any).isDragging = true;
-        fabricCanvas.selection = false;
-        setLastPanPoint({ x: evt.clientX, y: evt.clientY });
-      }
-    });
-
-    fabricCanvas.on('mouse:move', (opt) => {
-      if ((fabricCanvas as any).isDragging) {
-        const e = opt.e;
-        const vpt = fabricCanvas.viewportTransform;
-        if (vpt) {
-          vpt[4] += e.clientX - lastPanPoint.x;
-          vpt[5] += e.clientY - lastPanPoint.y;
-          fabricCanvas.requestRenderAll();
-          setLastPanPoint({ x: e.clientX, y: e.clientY });
-        }
-      }
-    });
-
-    fabricCanvas.on('mouse:up', () => {
-      if (fabricCanvas.viewportTransform) {
-        fabricCanvas.setViewportTransform(fabricCanvas.viewportTransform);
-      }
-      (fabricCanvas as any).isDragging = false;
-      fabricCanvas.selection = true;
-      setIsPanning(false);
-    });
-
-    setCanvas(fabricCanvas);
-
-    // Load template if editing existing one
-    if (templateId) {
-      loadTemplate(templateId, fabricCanvas);
-    }
-
-    // Handle window resize
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const aspectRatio = 16 / 9;
-      
-      let newCanvasWidth = Math.min(containerRect.width - 40, CANVAS_WIDTH);
-      let newCanvasHeight = newCanvasWidth / aspectRatio;
-      
-      if (newCanvasHeight > containerRect.height - 40) {
-        newCanvasHeight = containerRect.height - 40;
-        newCanvasWidth = newCanvasHeight * aspectRatio;
-      }
-      
-      fabricCanvas.setDimensions({
-        width: newCanvasWidth,
-        height: newCanvasHeight
+    try {
+      const fabricCanvas = new Canvas(canvasRef.current, {
+        width: canvasWidth,
+        height: canvasHeight,
+        backgroundColor: '#ffffff',
+        preserveObjectStacking: true,
       });
+
+      // Verify canvas is properly initialized before proceeding
+      if (!fabricCanvas.lowerCanvasEl || !fabricCanvas.getContext) {
+        console.error('Canvas not properly initialized');
+        return;
+      }
+
+      // Ensure white background is always visible
+      fabricCanvas.backgroundColor = '#ffffff';
       fabricCanvas.renderAll();
-    };
 
-    window.addEventListener('resize', handleResize);
+      // Handle object selection
+      fabricCanvas.on('selection:created', (e) => {
+        setSelectedObject(e.selected?.[0]);
+      });
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      fabricCanvas.dispose();
-    };
+      fabricCanvas.on('selection:updated', (e) => {
+        setSelectedObject(e.selected?.[0]);
+      });
+
+      fabricCanvas.on('selection:cleared', () => {
+        setSelectedObject(null);
+      });
+
+      // Add mouse wheel zoom support
+      fabricCanvas.on('mouse:wheel', (opt) => {
+        const delta = opt.e.deltaY;
+        let zoom = fabricCanvas.getZoom();
+        zoom *= 0.999 ** delta;
+        if (zoom > 3) zoom = 3;
+        if (zoom < 0.3) zoom = 0.3;
+        
+        fabricCanvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        setZoomLevel(zoom);
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+      });
+
+      // Add pan functionality
+      fabricCanvas.on('mouse:down', (opt) => {
+        const evt = opt.e;
+        if (evt.altKey === true || (evt.shiftKey === true && fabricCanvas.getZoom() > 1)) {
+          setIsPanning(true);
+          (fabricCanvas as any).isDragging = true;
+          fabricCanvas.selection = false;
+          setLastPanPoint({ x: evt.clientX, y: evt.clientY });
+        }
+      });
+
+      fabricCanvas.on('mouse:move', (opt) => {
+        if ((fabricCanvas as any).isDragging) {
+          const e = opt.e;
+          const vpt = fabricCanvas.viewportTransform;
+          if (vpt) {
+            vpt[4] += e.clientX - lastPanPoint.x;
+            vpt[5] += e.clientY - lastPanPoint.y;
+            fabricCanvas.requestRenderAll();
+            setLastPanPoint({ x: e.clientX, y: e.clientY });
+          }
+        }
+      });
+
+      fabricCanvas.on('mouse:up', () => {
+        if (fabricCanvas.viewportTransform) {
+          fabricCanvas.setViewportTransform(fabricCanvas.viewportTransform);
+        }
+        (fabricCanvas as any).isDragging = false;
+        fabricCanvas.selection = true;
+        setIsPanning(false);
+      });
+
+      setCanvas(fabricCanvas);
+
+      // Load template if editing existing one
+      if (templateId) {
+        loadTemplate(templateId, fabricCanvas);
+      }
+
+      // Handle window resize
+      const handleResize = () => {
+        if (!containerRef.current || !fabricCanvas) return;
+        
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const aspectRatio = 16 / 9;
+        
+        let newCanvasWidth = Math.min(containerRect.width - 40, CANVAS_WIDTH);
+        let newCanvasHeight = newCanvasWidth / aspectRatio;
+        
+        if (newCanvasHeight > containerRect.height - 40) {
+          newCanvasHeight = containerRect.height - 40;
+          newCanvasWidth = newCanvasHeight * aspectRatio;
+        }
+        
+        fabricCanvas.setDimensions({
+          width: newCanvasWidth,
+          height: newCanvasHeight
+        });
+        fabricCanvas.renderAll();
+      };
+
+      window.addEventListener('resize', handleResize);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        fabricCanvas.dispose();
+      };
+    } catch (error) {
+      console.error('Error initializing canvas:', error);
+      return;
+    }
   }, [templateId]);
 
   // Load existing template
   const loadTemplate = async (id: string, fabricCanvas: Canvas) => {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('slide_templates')
-      .select('*')
-      .eq('id', id)
-      .single();
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('slide_templates')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (data) {
-      setTemplateName(data.name);
-      setTemplateDescription(data.description || '');
-      
-      // Load from Fabric JSON if available, otherwise convert from PptxGenJS JSON
-      if (data.fabric_json) {
-        fabricCanvas.loadFromJSON(data.fabric_json, () => {
-          fabricCanvas.renderAll();
-        });
-      } else if (data.slide_json) {
-        renderSlideOnCanvas(fabricCanvas, data.slide_json, 1);
+      if (error) {
+        console.error('Error loading template:', error);
+        return;
       }
+
+      if (data) {
+        setTemplateName(data.name);
+        setTemplateDescription(data.description || '');
+        
+        // Load from Fabric JSON if available, otherwise convert from PptxGenJS JSON
+        if (data.fabric_json) {
+          fabricCanvas.loadFromJSON(data.fabric_json, () => {
+            fabricCanvas.renderAll();
+          });
+        } else if (data.slide_json) {
+          // Add delay to ensure canvas is fully ready
+          setTimeout(() => {
+            try {
+              renderSlideOnCanvas(fabricCanvas, data.slide_json, 1);
+            } catch (renderError) {
+              console.error('Error rendering slide on canvas:', renderError);
+            }
+          }, 100);
+        }
+      }
+    } catch (error) {
+      console.error('Error in loadTemplate:', error);
     }
   };
 
@@ -580,17 +621,19 @@ function TemplateEditorInner() {
                 <div 
                   ref={containerRef}
                   className={cn(
-                    "absolute inset-0 bg-muted/30 flex items-center justify-center",
+                    "absolute inset-0 bg-muted/30 flex items-center justify-center p-4",
                     isPanning && "cursor-grabbing"
                   )}
                 >
-                  <canvas 
-                    ref={canvasRef} 
-                    className={cn(
-                      "shadow-lg",
-                      zoomLevel > 1 && !isPanning && "cursor-grab"
-                    )} 
-                  />
+                  <div className="relative flex items-center justify-center">
+                    <canvas 
+                      ref={canvasRef} 
+                      className={cn(
+                        "shadow-lg rounded-lg border border-border/20",
+                        zoomLevel > 1 && !isPanning && "cursor-grab"
+                      )} 
+                    />
+                  </div>
                 </div>
               </div>
 
