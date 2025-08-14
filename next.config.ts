@@ -20,10 +20,13 @@ const nextConfig: NextConfig = {
   },
 
   // Webpack Configuration: Only used when Turbopack is disabled
-  // This provides fallback configuration for production builds
-  webpack: (config, { isServer, dev }) => {
-    // Only apply webpack config when NOT using Turbopack (production builds or webpack dev)
-    if (!isServer && !dev) {
+  // This provides fallback configuration for production builds and webpack dev mode
+  webpack: (config, { dev }) => {
+    // Only apply webpack config when NOT using Turbopack
+    // Check if we're in webpack mode (either production build or explicit webpack dev)
+    const isWebpackMode = !dev || process.env.USE_WEBPACK === 'true';
+    
+    if (isWebpackMode) {
       config.resolve = config.resolve || ({} as any);
       
       // Handle Node.js modules that shouldn't be bundled in client code
@@ -58,9 +61,6 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Additional optimizations for better performance
-  swcMinify: true, // Use SWC for minification (faster than Terser)
-  
   // Image optimization settings
   images: {
     formats: ['image/webp', 'image/avif'],

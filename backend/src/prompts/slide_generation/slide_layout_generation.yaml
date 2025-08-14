@@ -23,10 +23,10 @@ user_prompt_template: |
   Create an optimal slide layout based on content analysis.
 
   CONTENT TO ANALYZE:
-  {content}
+  {{ content }}
 
   USER REQUIREMENTS:
-  - Description: {description}
+  - Description: {{ description }}
   - Available Media: {%- if has_images %}Images available{%- else %}Text content only{%- endif %}
 
   LAYOUT DESIGN REQUIREMENTS:

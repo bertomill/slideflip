@@ -22,13 +22,13 @@ user_prompt_template: |
   CONTENT ANALYSIS TASK:
   Create a comprehensive content plan based on the following inputs:
 
-  USER DESCRIPTION: {description}
+  USER DESCRIPTION: {{ description }}
 
   UPLOADED FILES CONTENT:
   {%- if uploaded_files %}
   {%- for file in uploaded_files %}
-  --- {file.filename} ---
-  Content: {file.content[:1000]}...
+  --- {{ file.filename }} ---
+  Content: {{ file.full_text or file.content or "No content available" }}
   {%- endfor %}
   {%- else %}
   No uploaded files provided
@@ -36,12 +36,12 @@ user_prompt_template: |
 
   {%- if research_data %}
   ADDITIONAL RESEARCH DATA:
-  {research_data}
+  {{ research_data }}
   {%- endif %}
 
   {%- if user_feedback %}
   USER FEEDBACK:
-  {user_feedback}
+  {{ user_feedback }}
   {%- endif %}
 
   CONTENT PLANNING REQUIREMENTS:

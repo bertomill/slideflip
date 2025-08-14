@@ -14,23 +14,23 @@ system_prompt: |
 user_prompt_template: |
   Conduct comprehensive web research on the following topic and provide structured insights:
 
-  RESEARCH TOPIC: {query}
+  RESEARCH TOPIC: {{ query }}
 
-  CONTEXT: {context}
+  CONTEXT: {{ context }}
 
   {%- if slide_description %}
-  SLIDE CONTEXT: This research will be used for a presentation slide about: {slide_description}
+  SLIDE CONTEXT: This research will be used for a presentation slide about: {{ slide_description }}
   {%- endif %}
 
   {%- if search_results %}
   SEARCH RESULTS TO ANALYZE:
   {%- for result in search_results %}
 
-  Source: {result.url}
-  Title: {result.title}
-  Content: {result.content}
-  Score: {result.score}
-  Published: {result.published_date}
+  Source: {{ result.url }}
+  Title: {{ result.title }}
+  Content: {{ result.content }}
+  Score: {{ result.score }}
+  Published: {{ result.published_date }}
 
   {%- endfor %}
   {%- endif %}

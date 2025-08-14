@@ -23,16 +23,16 @@ user_prompt_template: |
   Create a beautiful HTML slide by applying theme styling to the provided content.
 
   CONTENT TO DISPLAY:
-  - Layout Structure: {layout}
-  - Slide Content: {content}
-  - Theme: {theme}
-  - Research Enabled: {wants_research}
+  - Layout Structure: {{ layout }}
+  - Slide Content: {{ content }}
+  - Theme: {{ theme }}
+  - Research Enabled: {{ wants_research }}
 
   {%- if theme_info %}
   THEME STYLING INFORMATION:
-  - Color Palette: {theme_info.color_palette|join(', ')}
-  - Font Family: {theme_info.font_family}
-  - Layout Style: {theme_info.layout_style}
+  - Color Palette: {{ theme_info.color_palette|join(', ') }}
+  - Font Family: {{ theme_info.font_family }}
+  - Layout Style: {{ theme_info.layout_style }}
   {%- endif %}
 
   HTML GENERATION REQUIREMENTS:

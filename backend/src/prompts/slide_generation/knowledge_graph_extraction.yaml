@@ -24,11 +24,11 @@ user_prompt_template: |
   Extract structured knowledge from the following text content:
 
   CONTENT TO ANALYZE:
-  {content}
+  {{ content }}
 
   {%- if context %}
   ADDITIONAL CONTEXT:
-  {context}
+  {{ context }}
   {%- endif %}
 
   Return ONLY a JSON object with this exact structure:

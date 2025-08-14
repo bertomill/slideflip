@@ -68,6 +68,10 @@ class SlideGenerationMessage(BaseModel):
         None, description="Detailed theme information")
     wants_research: Optional[bool] = Field(
         False, description="Whether to include research")
+    use_ai_agent: Optional[bool] = Field(
+        False, description="Whether to use AI agent for content creation")
+    content_style: Optional[str] = Field(
+        "professional", description="Content style for AI agent generation")
     client_id: Optional[str] = Field(None, description="Client identifier")
 
 

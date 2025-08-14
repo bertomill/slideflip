@@ -5,8 +5,10 @@ Rewritten with proper AI agentic approach and clear service boundaries
 
 import asyncio
 import logging
+import time
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+from pathlib import Path
 import json
 import re
 
@@ -17,6 +19,7 @@ from src.services.ppt_service import PPTService
 from src.services.ai_service import AIService
 from src.services.research_service import ResearchService
 from src.services.theme_service import ThemeService
+from src.agents.content_creator_agent import ContentCreatorAgent
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,7 @@ class SlideService:
         self.ai_service = AIService()
         self.research_service = ResearchService()
         self.theme_service = ThemeService()
+        self.content_creator_agent = ContentCreatorAgent()
 
         # Client data storage with clear separation
         self.client_descriptions: Dict[str, str] = {}
@@ -175,6 +179,8 @@ class SlideService:
         description: str,
         theme: str,
         wants_research: bool = False,
+        use_ai_agent: bool = False,
+        content_style: str = "professional",
         status_callback=None
     ) -> Dict[str, Any]:
         """
@@ -239,13 +245,39 @@ class SlideService:
             if status_callback:
                 await status_callback("Creating slide content with AI...", 60)
 
-            # Generate slide content using AI (content-based, not theme-based)
-            content = await self.llm_service.generate_slide_content(
-                content=combined_content,
-                description=description,
-                layout=layout,
-                theme_info=None  # Don't pass theme info to content generation
-            )
+            # Generate slide content using appropriate method
+            if use_ai_agent:
+                # Use content creator agent for enhanced content generation
+                if status_callback:
+                    await status_callback("Using AI agent for enhanced content creation...", 65)
+
+                content = await self.content_creator_agent.create_content(
+                    uploaded_content=combined_content,
+                    user_description=description,
+                    theme_info=None,  # Theme is for styling only
+                    research_data=None,  # No external research in this flow
+                    use_ai_agent=True,
+                    content_style=content_style
+                )
+
+                # Validate content quality
+                quality_result = await self.content_creator_agent.validate_content_quality(
+                    content, description
+                )
+
+                if not quality_result["is_acceptable"]:
+                    logger.warning(
+                        f"Content quality below threshold: {quality_result['feedback']}")
+                    if status_callback:
+                        await status_callback("Content quality validation completed with warnings", 67)
+            else:
+                # Use basic LLM service for content generation
+                content = await self.llm_service.generate_slide_content(
+                    content=combined_content,
+                    description=description,
+                    layout=layout,
+                    theme_info=None  # Don't pass theme info to content generation
+                )
 
             if status_callback:
                 await status_callback("Creating PowerPoint presentation...", 75)
@@ -286,6 +318,8 @@ class SlideService:
                 "processing_time": processing_time,
                 "theme": theme,
                 "wants_research": wants_research,
+                "use_ai_agent": use_ai_agent,
+                "content_style": content_style,
                 "status": "success"
             }
 
@@ -359,12 +393,17 @@ class SlideService:
         """Generate PPT file using the PPT service"""
         try:
             # Create PPT with content and theme styling
-            ppt_file_path = await self.ppt_service.create_presentation(
-                client_id=client_id,
+            # Generate output path for the PPT file
+            output_dir = Path(f"outputs/client_{client_id}")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / f"slide_{int(time.time())}.pptx"
+
+            ppt_file_path = await self.ppt_service.generate_ppt_from_layout(
                 layout=layout,
                 content=content,
-                theme_info=theme_info,
-                description=description
+                output_path=str(output_path),
+                theme=theme_info.get(
+                    "name", "default") if theme_info else "default"
             )
 
             logger.info(f"PPT file generated: {ppt_file_path}")

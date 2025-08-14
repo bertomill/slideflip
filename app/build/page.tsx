@@ -80,6 +80,8 @@ export type SlideData = {
     message: string;
     stepData?: any;
   };
+  useAIAgent?: boolean;     // Whether to use AI agent for enhanced content generation
+  contentStyle?: string;    // Content style preference for AI agent (professional, creative, etc.)
 };
 
 // Configuration for the multi-step slide builder process

@@ -23,7 +23,7 @@ interface ResearchStepProps {
   isConnected?: boolean;                                   // WebSocket connection status
   connectionStatus?: string;                               // Connection status string
   sendResearchRequest?: (description: string, researchOptions: any, wantsResearch: boolean) => boolean; // WebSocket function to send research request
-  sendGenerateSlide?: (description: string, theme: string, wantsResearch: boolean) => boolean; // WebSocket function to send slide generation request
+  sendGenerateSlide?: (description: string, theme: string, wantsResearch: boolean, useAIAgent?: boolean, contentStyle?: string) => boolean; // WebSocket function to send slide generation request
   lastMessage?: any;                                       // Last message from backend
 }
 
@@ -47,6 +47,18 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, isCon
     timeRange: 'month',         // Recent data is most relevant for current presentations
     excludeSocial: true,        // Professional sources are preferred for business presentations
   });
+
+  // AI Agent Configuration
+  const [useAIAgent, setUseAIAgent] = useState(false);
+  const [contentStyle, setContentStyle] = useState("professional");
+
+  // Update slide data when AI agent settings change
+  useEffect(() => {
+    updateSlideData({ 
+      useAIAgent, 
+      contentStyle 
+    });
+  }, [useAIAgent, contentStyle]); // Remove updateSlideData from dependencies
 
   /**
    * Updates research configuration options and syncs with parent component
@@ -168,7 +180,9 @@ Your slide will be created using the uploaded documents and description provided
         const success = sendGenerateSlide(
           slideData.description,
           slideData.selectedTheme || "default",
-          slideData.wantsResearch || false
+          slideData.wantsResearch || false,
+          useAIAgent,
+          contentStyle
         );
         
         if (!success) {
@@ -329,6 +343,85 @@ Your slide will be created using the uploaded documents and description provided
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Agent Configuration */}
+      <Card variant="glass">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Brain className="h-5 w-5 text-primary" />
+            AI Content Creator Agent
+          </CardTitle>
+          <CardDescription>
+            Enable AI agent capabilities to generate enhanced content beyond your uploaded documents.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* AI Agent Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-base font-medium">Use AI Agent for Content Creation</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, the AI agent will analyze your content and generate additional insights, examples, and recommendations.
+              </p>
+            </div>
+            <Switch
+              checked={useAIAgent}
+              onCheckedChange={setUseAIAgent}
+            />
+          </div>
+
+          {/* Content Style Selection */}
+          {useAIAgent && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Content Style
+              </Label>
+              <Select
+                value={contentStyle}
+                onValueChange={(value: string) => setContentStyle(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="professional">Professional</SelectItem>
+                  <SelectItem value="creative">Creative</SelectItem>
+                  <SelectItem value="technical">Technical</SelectItem>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="academic">Academic</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Choose the tone and style for AI-generated content.
+              </p>
+            </div>
+          )}
+
+          {/* AI Agent Benefits */}
+          <Accordion type="single" collapsible>
+            <AccordionItem value="ai-agent-benefits">
+              <AccordionTrigger className="text-sm">Learn about AI Agent benefits</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Brain className="h-4 w-4 text-primary" />
+                    Enhanced content with AI-generated insights
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lightbulb className="h-4 w-4 text-primary" />
+                    Fills content gaps intelligently
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Maintains accuracy and relevance
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </CardContent>
+      </Card>
 
       {/* Advanced Research Options */}
       {slideData.wantsResearch === true && !isResearching && !researchComplete && (

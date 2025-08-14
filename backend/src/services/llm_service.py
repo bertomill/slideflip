@@ -35,7 +35,8 @@ class LLMService:
                 self.client = OpenAI(api_key=api_key)
                 logger.info("OpenAI client initialized successfully")
             else:
-                logger.warning("OpenAI API key not found. LLM features will be disabled.")
+                logger.warning(
+                    "OpenAI API key not found. LLM features will be disabled.")
                 logger.info("Please check:")
                 logger.info("1. .env file exists in backend directory")
                 logger.info("2. OPENAI_API_KEY is set in .env file")
@@ -60,7 +61,7 @@ class LLMService:
         """
         Generate slide layout using LLM
         Content-focused generation based on uploaded files and user description
-        
+
         Args:
             content: Extracted text content from uploaded files
             description: User's slide description
@@ -93,7 +94,8 @@ class LLMService:
             response = self.client.chat.completions.create(
                 **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "system",
+                        "content": prompt_data["system_prompt"]},
                     {"role": "user", "content": prompt_data["user_prompt"]}
                 ]
             )
@@ -101,7 +103,8 @@ class LLMService:
             layout_text = response.choices[0].message.content.strip()
 
             # Log the raw response for debugging
-            logger.info(f"LLM Layout Response (first 500 chars): {layout_text[:500]}...")
+            logger.info(
+                f"LLM Layout Response (first 500 chars): {layout_text[:500]}...")
 
             # Clean up markdown code blocks if present
             if layout_text.startswith("```json"):
@@ -114,13 +117,37 @@ class LLMService:
             # Parse JSON response with better error handling
             try:
                 layout_data = json.loads(layout_text.strip())
-                logger.info(f"✅ Successfully parsed layout JSON: {layout_data.get('layout_type', 'unknown')}")
-                logger.info(f"   Sections: {len(layout_data.get('sections', []))}")
-                logger.info(f"   Title: {layout_data.get('title', 'No title')}")
+                logger.info(
+                    f"✅ Successfully parsed layout JSON: {layout_data.get('layout_type', 'unknown')}")
+                logger.info(
+                    f"   Sections: {len(layout_data.get('sections', []))}")
+                logger.info(
+                    f"   Title: {layout_data.get('title', 'No title')}")
                 return layout_data
             except json.JSONDecodeError as e:
-                logger.warning(f"❌ Failed to parse/validate layout response: {e}")
+                logger.warning(
+                    f"❌ Failed to parse/validate layout response: {e}")
                 logger.warning(f"Raw response: {layout_text}")
+                logger.warning(f"Response length: {len(layout_text)}")
+                logger.warning(f"First 100 chars: {layout_text[:100]}")
+                logger.warning(f"Last 100 chars: {layout_text[-100:]}")
+
+                # Try to extract JSON from the response if it's embedded in text
+                try:
+                    # Look for JSON-like content between curly braces
+                    import re
+                    json_match = re.search(r'\{.*\}', layout_text, re.DOTALL)
+                    if json_match:
+                        json_content = json_match.group(0)
+                        logger.info(
+                            f"Attempting to parse extracted JSON: {json_content[:200]}...")
+                        layout_data = json.loads(json_content)
+                        logger.info(f"✅ Successfully parsed extracted JSON")
+                        return layout_data
+                except Exception as extract_error:
+                    logger.warning(
+                        f"Failed to extract JSON from response: {extract_error}")
+
                 return self._generate_fallback_layout(content, description, theme)
 
         except Exception as e:
@@ -137,7 +164,7 @@ class LLMService:
         """
         Generate slide content using LLM
         Content-focused generation based on uploaded files and user description
-        
+
         Args:
             content: Extracted text content from uploaded files
             description: User's slide description
@@ -168,7 +195,8 @@ class LLMService:
             response = self.client.chat.completions.create(
                 **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "system",
+                        "content": prompt_data["system_prompt"]},
                     {"role": "user", "content": prompt_data["user_prompt"]}
                 ]
             )
@@ -176,7 +204,8 @@ class LLMService:
             content_text = response.choices[0].message.content.strip()
 
             # Log the raw response for debugging
-            logger.info(f"LLM Content Response (first 500 chars): {content_text[:500]}...")
+            logger.info(
+                f"LLM Content Response (first 500 chars): {content_text[:500]}...")
 
             # Clean up markdown code blocks if present
             if content_text.startswith("```json"):
@@ -190,10 +219,12 @@ class LLMService:
             try:
                 content_data = json.loads(content_text.strip())
                 logger.info(f"✅ Successfully parsed content JSON")
-                logger.info(f"   Sections: {len([k for k in content_data.keys() if k.startswith('section_')])}")
+                logger.info(
+                    f"   Sections: {len([k for k in content_data.keys() if k.startswith('section_')])}")
                 return content_data
             except json.JSONDecodeError as e:
-                logger.warning(f"❌ Failed to parse/validate content response: {e}")
+                logger.warning(
+                    f"❌ Failed to parse/validate content response: {e}")
                 logger.warning(f"Raw response: {content_text}")
                 return self._generate_fallback_content(content, description, layout)
 
@@ -212,7 +243,7 @@ class LLMService:
         """
         Generate HTML slide using LLM
         Content-focused generation with theme styling applied separately
-        
+
         Args:
             layout: Generated layout structure
             content: Generated content for each section
@@ -245,7 +276,8 @@ class LLMService:
             response = self.client.chat.completions.create(
                 **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "system",
+                        "content": prompt_data["system_prompt"]},
                     {"role": "user", "content": prompt_data["user_prompt"]}
                 ]
             )
@@ -253,7 +285,8 @@ class LLMService:
             html_text = response.choices[0].message.content.strip()
 
             # Log the raw response for debugging
-            logger.info(f"LLM HTML Response (first 500 chars): {html_text[:500]}...")
+            logger.info(
+                f"LLM HTML Response (first 500 chars): {html_text[:500]}...")
             logger.info(f"HTML content size: {len(html_text)} characters")
 
             # Clean up markdown code blocks if present
@@ -266,7 +299,8 @@ class LLMService:
 
             # Validate HTML content
             if len(html_text) > 50000:  # 50KB limit
-                logger.warning(f"HTML content too large ({len(html_text)} chars), truncating")
+                logger.warning(
+                    f"HTML content too large ({len(html_text)} chars), truncating")
                 html_text = html_text[:50000]
 
             # Basic HTML validation
@@ -279,9 +313,12 @@ class LLMService:
                 return self._generate_error_html()
 
             # Sanitize HTML content to prevent issues
-            html_text = re.sub(r'<script[^>]*>.*?</script>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
-            html_text = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html_text, flags=re.IGNORECASE)
-            html_text = re.sub(r'javascript:', '', html_text, flags=re.IGNORECASE)
+            html_text = re.sub(
+                r'<script[^>]*>.*?</script>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
+            html_text = re.sub(
+                r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html_text, flags=re.IGNORECASE)
+            html_text = re.sub(r'javascript:', '',
+                               html_text, flags=re.IGNORECASE)
 
             logger.info("✅ Generated HTML using LLM successfully")
             return html_text
@@ -289,6 +326,49 @@ class LLMService:
         except Exception as e:
             logger.error(f"Error generating HTML with LLM: {e}")
             return self._generate_fallback_html(layout, content, theme_info, wants_research)
+
+    async def generate_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        **model_config
+    ) -> str:
+        """
+        Generate completion using LLM with custom prompts
+
+        Args:
+            system_prompt: System prompt for the LLM
+            user_prompt: User prompt for the LLM
+            **model_config: Model configuration parameters
+
+        Returns:
+            Generated text response
+        """
+        if not self.client:
+            return "Error: LLM client not available"
+
+        try:
+            # Use default model config if none provided
+            if not model_config:
+                model_config = {
+                    "model": "gpt-4o-mini",
+                    "temperature": 0.7,
+                    "max_tokens": 2000
+                }
+
+            response = self.client.chat.completions.create(
+                **model_config,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
+            )
+
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.error(f"Error generating completion: {e}")
+            return f"Error: {str(e)}"
 
     async def generate_content_plan(
         self,
@@ -301,7 +381,7 @@ class LLMService:
         """
         Generate content plan using LLM
         Content-focused generation based on uploaded files and user description
-        
+
         Args:
             description: User's slide description
             research_data: Optional research data
@@ -332,10 +412,21 @@ class LLMService:
                 template_variables
             )
 
+            # Log the rendered prompts for debugging
+            logger.debug(
+                f"Content planning system prompt length: {len(prompt_data['system_prompt'])}")
+            logger.debug(
+                f"Content planning user prompt length: {len(prompt_data['user_prompt'])}")
+            logger.debug(
+                f"Template variables: {list(template_variables.keys())}")
+            logger.debug(
+                f"Uploaded files count: {len(template_variables.get('uploaded_files', []))}")
+
             response = self.client.chat.completions.create(
                 **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "system",
+                        "content": prompt_data["system_prompt"]},
                     {"role": "user", "content": prompt_data["user_prompt"]}
                 ]
             )
@@ -343,7 +434,8 @@ class LLMService:
             plan_text = response.choices[0].message.content.strip()
 
             # Log the raw response for debugging
-            logger.info(f"LLM Content Plan Response (first 500 chars): {plan_text[:500]}...")
+            logger.info(
+                f"LLM Content Plan Response (first 500 chars): {plan_text[:500]}...")
 
             # Clean up markdown code blocks if present
             if plan_text.startswith("```json"):
@@ -359,8 +451,29 @@ class LLMService:
                 logger.info(f"✅ Successfully parsed content plan JSON")
                 return plan_data
             except json.JSONDecodeError as e:
-                logger.warning(f"❌ Failed to parse/validate content plan response: {e}")
+                logger.warning(
+                    f"❌ Failed to parse/validate content plan response: {e}")
                 logger.warning(f"Raw response: {plan_text}")
+                logger.warning(f"Response length: {len(plan_text)}")
+                logger.warning(f"First 100 chars: {plan_text[:100]}")
+                logger.warning(f"Last 100 chars: {plan_text[-100:]}")
+
+                # Try to extract JSON from the response if it's embedded in text
+                try:
+                    # Look for JSON-like content between curly braces
+                    import re
+                    json_match = re.search(r'\{.*\}', plan_text, re.DOTALL)
+                    if json_match:
+                        json_content = json_match.group(0)
+                        logger.info(
+                            f"Attempting to parse extracted JSON: {json_content[:200]}...")
+                        plan_data = json.loads(json_content)
+                        logger.info(f"✅ Successfully parsed extracted JSON")
+                        return plan_data
+                except Exception as extract_error:
+                    logger.warning(
+                        f"Failed to extract JSON from response: {extract_error}")
+
                 return self._generate_fallback_content_plan(description, uploaded_files)
 
         except Exception as e:
@@ -372,7 +485,8 @@ class LLMService:
         try:
             # Extract key information from content
             content_lines = content.split('\n')
-            content_summary = content[:200] + "..." if len(content) > 200 else content
+            content_summary = content[:200] + \
+                "..." if len(content) > 200 else content
 
             # Create basic layout structure
             layout = {
@@ -410,7 +524,8 @@ class LLMService:
         try:
             # Extract key information from content
             content_lines = content.split('\n')
-            content_summary = content[:300] + "..." if len(content) > 300 else content
+            content_summary = content[:300] + \
+                "..." if len(content) > 300 else content
 
             # Create basic content structure
             content_data = {
@@ -453,7 +568,8 @@ class LLMService:
 
             for i, section in enumerate(sections):
                 section_content = content.get(f"section_{i}", {})
-                section_text = section_content.get("content", "Content not available")
+                section_text = section_content.get(
+                    "content", "Content not available")
 
                 if section.get("type") == "bullet_list":
                     # Convert to bullet points
@@ -579,8 +695,10 @@ class LLMService:
         color_palette = theme_info.get('color_palette', [])
         if color_palette:
             primary_color = color_palette[0]
-            secondary_color = color_palette[1] if len(color_palette) > 1 else primary_color
-            accent_color = color_palette[2] if len(color_palette) > 2 else secondary_color
+            secondary_color = color_palette[1] if len(
+                color_palette) > 1 else primary_color
+            accent_color = color_palette[2] if len(
+                color_palette) > 2 else secondary_color
 
             return {
                 'background': f'background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);',
@@ -589,7 +707,7 @@ class LLMService:
                 'content_bg': 'rgba(255,255,255,0.15)',
                 'title_style': f'color: {primary_color};'
             }
-        
+
         return {
             'background': 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);',
             'text_color': 'white',
@@ -623,7 +741,8 @@ class LLMService:
         try:
             # This method is kept for backward compatibility
             # Knowledge graph extraction is now handled by the dedicated service
-            logger.info("Knowledge graph extraction requested (handled by dedicated service)")
+            logger.info(
+                "Knowledge graph extraction requested (handled by dedicated service)")
             return {"message": "Knowledge graph extraction handled by dedicated service"}
 
         except Exception as e:
@@ -643,7 +762,8 @@ class LLMService:
         try:
             # This method is kept for backward compatibility
             # Knowledge graph querying is now handled by the dedicated service
-            logger.info("Knowledge graph query requested (handled by dedicated service)")
+            logger.info(
+                "Knowledge graph query requested (handled by dedicated service)")
             return {"message": "Knowledge graph querying handled by dedicated service"}
 
         except Exception as e:

@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "dev:webpack": "next dev",
+    "dev:webpack": "USE_WEBPACK=true next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "start": "next start",

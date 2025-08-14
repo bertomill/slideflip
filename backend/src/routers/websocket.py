@@ -94,7 +94,7 @@ class WorkflowStateManager:
             logger.info(
                 f"Attempting state transition for client {client_id}: {self.client_states.get(client_id, WorkflowState.IDLE)} -> {target_state}")
 
-            if self.can_transition_to(client_id, target_state):
+            if await self.can_transition_to(client_id, target_state):
                 self.client_states[client_id] = target_state
                 if target_state in [WorkflowState.UPLOADING, WorkflowState.CONTENT_PLANNING, WorkflowState.SLIDE_GENERATING]:
                     self.processing_clients.add(client_id)
@@ -235,10 +235,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "message": "Existing knowledge graphs loaded successfully"
                     }
                 )
-                await asyncio.wait_for(
-                    websocket.send_text(status_message.model_dump_json()),
-                    timeout=10.0
-                )
+                await safe_send_message(websocket, status_message.model_dump_json())
             except Exception as e:
                 logger.warning(
                     f"Could not send status update to client {client_id}: {e}")
@@ -296,7 +293,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     }
                 )
                 try:
-                    await websocket.send_text(timeout_message.model_dump_json())
+                    await safe_send_message(websocket, timeout_message.model_dump_json())
                 except Exception as send_error:
                     logger.error(
                         f"Error sending timeout message: {send_error}")
@@ -312,10 +309,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             "error_code": ERROR_CODES["VALIDATION_ERROR"]
                         }
                     )
-                    await asyncio.wait_for(
-                        websocket.send_text(error_message.model_dump_json()),
-                        timeout=10.0
-                    )
+                    await safe_send_message(websocket, error_message.model_dump_json())
                 except Exception as send_error:
                     logger.error(f"Error sending error message: {send_error}")
                     break
@@ -371,15 +365,37 @@ async def initialize_client_session(websocket: WebSocket, client_id: str):
                 "message": "Session initialized successfully"
             }
         )
-        await asyncio.wait_for(
-            websocket.send_text(session_message.model_dump_json()),
-            timeout=10.0
-        )
+        await safe_send_message(websocket, session_message.model_dump_json())
 
         logger.info(f"Session initialized for client {client_id}")
 
     except Exception as e:
         logger.error(f"Error initializing session for client {client_id}: {e}")
+
+
+async def is_websocket_open(websocket: WebSocket) -> bool:
+    """Check if WebSocket connection is still open"""
+    try:
+        return websocket.client_state.value <= 2  # WebSocket is open
+    except Exception:
+        return False
+
+
+async def safe_send_message(websocket: WebSocket, message: str, timeout: float = 10.0) -> bool:
+    """Safely send a message to WebSocket with connection state checking"""
+    try:
+        if not await is_websocket_open(websocket):
+            logger.warning("WebSocket is closed, cannot send message")
+            return False
+
+        await asyncio.wait_for(
+            websocket.send_text(message),
+            timeout=timeout
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+        return False
 
 
 async def send_enhanced_progress_update(
@@ -657,7 +673,7 @@ async def handle_client_message(websocket: WebSocket, client_id: str, message: C
                     "error_code": ERROR_CODES["SERVICE_ERROR"]
                 }
             )
-            await websocket.send_text(error_message.model_dump_json())
+            await safe_send_message(websocket, error_message.model_dump_json())
         except Exception as send_error:
             logger.error(f"Error sending error message: {send_error}")
             raise
@@ -733,10 +749,7 @@ async def handle_session_status_request(websocket: WebSocket, client_id: str):
             }
         )
 
-        await asyncio.wait_for(
-            websocket.send_text(status_message.model_dump_json()),
-            timeout=10.0
-        )
+        await safe_send_message(websocket, status_message.model_dump_json())
 
         logger.info(f"Session status sent to client {client_id}")
 
@@ -1551,8 +1564,10 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
                 description = generation_data.description
                 theme = generation_data.theme
                 wants_research = generation_data.wants_research
+                use_ai_agent = generation_data.use_ai_agent or False
+                content_style = generation_data.content_style or "professional"
                 logger.info(
-                    f"Using parameterized request - description: {description[:50]}..., theme: {theme}, research: {wants_research}")
+                    f"Using parameterized request - description: {description[:50]}..., theme: {theme}, research: {wants_research}, ai_agent: {use_ai_agent}, style: {content_style}")
             except Exception as e:
                 logger.error(f"Error parsing generation data: {e}")
                 error_message = ServerMessage(
@@ -1570,6 +1585,8 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             description = await slide_service.get_slide_description(client_id)
             theme = "default"
             wants_research = False
+            use_ai_agent = False
+            content_style = "professional"
             logger.info(
                 f"Using basic request - description: {description[:50] if description else 'None'}...")
 
@@ -1693,6 +1710,8 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             "description": description,
             "theme": theme,
             "wants_research": wants_research,
+            "use_ai_agent": use_ai_agent,
+            "content_style": content_style,
             "status_callback": send_status_update
         }
 

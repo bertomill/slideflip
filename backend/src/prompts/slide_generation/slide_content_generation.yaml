@@ -24,11 +24,11 @@ user_prompt_template: |
   Transform the uploaded content into compelling slide content based on the layout structure.
 
   SOURCE CONTENT:
-  {content}
+  {{ content }}
 
   USER REQUIREMENTS:
-  - Description: {description}
-  - Layout Structure: {layout}
+  - Description: {{ description }}
+  - Layout Structure: {{ layout }}
 
   CONTENT GENERATION REQUIREMENTS:
   1. Extract the most important insights and key messages from the uploaded content

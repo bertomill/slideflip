@@ -14,14 +14,14 @@ system_prompt: |
 user_prompt_template: |
   Transform the following user query into optimized search queries for comprehensive research:
 
-  ORIGINAL QUERY: {original_query}
+  ORIGINAL QUERY: {{ original_query }}
 
   {%- if context %}
-  CONTEXT: {context}
+  CONTEXT: {{ context }}
   {%- endif %}
 
   {%- if slide_description %}
-  SLIDE CONTEXT: This is for a presentation about: {slide_description}
+  SLIDE CONTEXT: This is for a presentation about: {{ slide_description }}
   {%- endif %}
 
   OPTIMIZATION REQUIREMENTS:

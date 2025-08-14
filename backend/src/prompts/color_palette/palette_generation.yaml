@@ -19,7 +19,7 @@ system_prompt: |
   - Ensure accessibility compliance (WCAG AA standards)
 
 user_prompt_template: |
-  Brief: {prompt}
+  Brief: {{ prompt }}
 
   Create a professional 5-color brand palette that captures this style. 
   Consider accessibility, readability, and visual hierarchy.

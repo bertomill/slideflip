@@ -310,13 +310,15 @@ class WebSocketService {
     });
   }
 
-  sendGenerateSlide(description: string, theme: string = "default", wantsResearch: boolean = false): boolean {
+  sendGenerateSlide(description: string, theme: string = "default", wantsResearch: boolean = false, useAIAgent: boolean = false, contentStyle: string = "professional"): boolean {
     return this.sendMessage({
       type: 'generate_slide',
       data: {
         description,
         theme,
-        wants_research: wantsResearch
+        wants_research: wantsResearch,
+        use_ai_agent: useAIAgent,
+        content_style: contentStyle
       }
     });
   }

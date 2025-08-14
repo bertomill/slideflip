@@ -148,6 +148,24 @@ The backend now supports server-side text extraction from PDF and DOCX uploads u
 
 ## 🔧 Configuration
 
+### Build System & Webpack Fallback
+
+The project uses **Turbopack** for development (faster builds) with **webpack fallback** for production builds and compatibility. This hybrid approach ensures:
+
+- **Development**: Fast builds with Turbopack (`npm run dev`)
+- **Production**: Reliable builds with webpack fallback (`npm run build`)
+- **Webpack Mode**: Explicit webpack development when needed (`npm run dev:webpack`)
+
+The webpack configuration automatically handles Node.js module polyfills and fallbacks that are essential for production builds, while staying out of the way during Turbopack development.
+
+#### Available Scripts
+```bash
+npm run dev          # Development with Turbopack (recommended)
+npm run dev:webpack  # Development with webpack (for debugging)
+npm run dev:turbo    # Explicit Turbopack development
+npm run build        # Production build (uses webpack)
+```
+
 ### Environment Variables
 
 All variables are demonstrated in `.env.example` at the repo root. Copy it to `.env` (root) for the frontend and to `backend/.env` for the Python backend.

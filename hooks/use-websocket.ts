@@ -161,8 +161,8 @@ export function useWebSocket({
     return websocketService.sendSlideDescription(description);
   }, []);
 
-  const sendGenerateSlide = useCallback((description: string, theme: string = "default", wantsResearch: boolean = false) => {
-    return websocketService.sendGenerateSlide(description, theme, wantsResearch);
+  const sendGenerateSlide = useCallback((description: string, theme: string = "default", wantsResearch: boolean = false, useAIAgent: boolean = false, contentStyle: string = "professional") => {
+    return websocketService.sendGenerateSlide(description, theme, wantsResearch, useAIAgent, contentStyle);
   }, []);
 
   const sendThemeSelection = useCallback((themeData: any) => {

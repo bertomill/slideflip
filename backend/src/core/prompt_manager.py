@@ -93,6 +93,12 @@ class PromptTemplate:
             system_prompt = self.system_template.render(**render_vars).strip()
             user_prompt = self.user_template.render(**render_vars).strip()
 
+            # Add debug logging for template rendering
+            logger.debug(f"Template '{self.name}' rendered successfully")
+            logger.debug(f"Variables provided: {list(render_vars.keys())}")
+            logger.debug(f"System prompt length: {len(system_prompt)}")
+            logger.debug(f"User prompt length: {len(user_prompt)}")
+
             return {
                 'system_prompt': system_prompt,
                 'user_prompt': user_prompt,
@@ -100,6 +106,8 @@ class PromptTemplate:
             }
         except Exception as e:
             logger.error(f"Error rendering template {self.name}: {e}")
+            logger.error(f"Variables provided: {render_vars}")
+            logger.error(f"Template path: {self.template_path}")
             raise ValueError(f"Template rendering failed: {e}")
 
 
@@ -141,23 +149,48 @@ class PromptManager:
             with open(template_path, 'r', encoding='utf-8') as f:
                 template_data = yaml.safe_load(f)
 
-            if not template_data or 'name' not in template_data:
-                logger.warning(f"Invalid template format in {template_path}")
+            if not template_data:
+                logger.error(f"Empty template file: {template_path}")
                 return
 
+            template_name = template_data.get('name')
+            if not template_name:
+                logger.error(f"Template missing name: {template_path}")
+                return
+
+            # Validate template structure
+            if 'system_prompt' not in template_data or 'user_prompt_template' not in template_data:
+                logger.error(
+                    f"Template missing required fields: {template_path}")
+                return
+
+            # Create template object
             template = PromptTemplate(template_data, str(template_path))
-            self.templates[template.name] = template
+
+            # Test template rendering with dummy variables to catch syntax errors
+            try:
+                dummy_vars = {var['name']: f"test_{var['name']}" for var in template_data.get(
+                    'variables', [])}
+                template.render(dummy_vars)
+                logger.debug(f"Template validation passed: {template_name}")
+            except Exception as validation_error:
+                logger.error(
+                    f"Template validation failed for {template_name}: {validation_error}")
+                logger.error(f"Template path: {template_path}")
+                return
+
+            self.templates[template_name] = template
 
             # Initialize metrics
-            self.metrics[template.name] = PromptMetrics(
-                prompt_name=template.name)
+            self.metrics[template_name] = PromptMetrics(
+                prompt_name=template_name)
 
-            logger.info(
-                f"Loaded template: {template.name} from {template_path}")
+            logger.info(f"Loaded template: {template_name}")
 
         except Exception as e:
-            logger.error(f"Error loading template from {template_path}: {e}")
-            raise
+            logger.error(f"Failed to load template {template_path}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
     def reload_templates(self):
         """Reload all templates from disk"""

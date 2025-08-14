@@ -48,6 +48,7 @@ from src.core.prompt_manager import get_prompt_manager
 from src.core.monitoring import get_monitoring_service
 from src.services.llm_service import LLMService
 from src.services.file_service import FileService
+from src.agents.content_creator_agent import ContentCreatorAgent
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,10 @@ class SlideGenerationState(TypedDict):
     # Research data
     research_data: Optional[str]
     research_enabled: bool
+
+    # AI Agent capabilities
+    use_ai_agent: bool
+    content_style: str
 
     # Content planning
     content_plan: Optional[Dict[str, Any]]
@@ -104,6 +109,7 @@ class SlideGenerationWorkflow:
         self.websocket_manager = websocket_manager
         self.file_service = file_service or FileService()
         self.llm_service = LLMService()
+        self.content_creator_agent = ContentCreatorAgent()
         self.prompt_manager = get_prompt_manager()
         self.monitoring_service = get_monitoring_service()
         self.workflow = self._create_workflow()
@@ -117,6 +123,8 @@ class SlideGenerationWorkflow:
             workflow.add_node("content_planner", self._plan_content)
             workflow.add_node("file_processor", self._process_files)
             workflow.add_node("research_integrator", self._integrate_research)
+            workflow.add_node("content_creator",
+                              self._create_content_with_agent)
             workflow.add_node("slide_generator", self._generate_slide)
             workflow.add_node("quality_validator", self._validate_quality)
 
@@ -155,9 +163,12 @@ class SlideGenerationWorkflow:
                 "research_integrator",
                 self._route_after_research,
                 {
+                    "content_creation": "content_creator",
                     "slide_generation": "slide_generator"
                 }
             )
+
+            workflow.add_edge("content_creator", "slide_generator")
 
             workflow.add_edge("slide_generator", "quality_validator")
             workflow.add_edge("quality_validator", "__end__")
@@ -205,6 +216,8 @@ class SlideGenerationWorkflow:
             user_feedback=user_feedback,
             research_data=research_data,
             research_enabled=research_enabled,
+            use_ai_agent=False,  # Default to basic mode
+            content_style="professional",  # Default content style
             uploaded_files=None,
             processed_files=None,
             file_content_summary=None,
@@ -478,6 +491,71 @@ class SlideGenerationWorkflow:
 
         finally:
             state["step_timings"]["research_integration"] = (
+                datetime.now() - step_start).total_seconds()
+
+        return state
+
+    async def _create_content_with_agent(self, state: SlideGenerationState) -> SlideGenerationState:
+        """Content creation step using AI agent capabilities"""
+        step_start = datetime.now()
+        state["current_step"] = "content_creation"
+
+        try:
+            await self._update_progress(state, "Creating content with AI agent...", 70)
+
+            # Get combined content from uploaded files
+            combined_content = state.get("file_content_summary", "")
+            if not combined_content and state.get("processed_files"):
+                # Fallback: combine content from processed files
+                content_parts = []
+                for file_info in state["processed_files"]:
+                    if file_info.get("content"):
+                        content_parts.append(file_info["content"])
+                combined_content = "\n\n".join(content_parts)
+
+            if not combined_content:
+                logger.warning("No content available for AI agent processing")
+                state["warnings"].append(
+                    "No content available for AI agent processing")
+                state["completed_steps"].append("content_creation")
+                return state
+
+            # Use content creator agent to generate enhanced content
+            enhanced_content = await self.content_creator_agent.create_content(
+                uploaded_content=combined_content,
+                user_description=state["description"],
+                theme_info=None,  # Theme is for styling only
+                research_data=state.get("research_data"),
+                use_ai_agent=state.get("use_ai_agent", False),
+                content_style=state.get("content_style", "professional")
+            )
+
+            # Store the enhanced content
+            state["enhanced_content"] = enhanced_content
+
+            # Validate content quality
+            quality_result = await self.content_creator_agent.validate_content_quality(
+                enhanced_content, state["description"]
+            )
+            state["content_quality"] = quality_result
+
+            if quality_result["is_acceptable"]:
+                logger.info(
+                    f"✅ Content created successfully with quality score: {quality_result['quality_score']:.2f}")
+            else:
+                logger.warning(
+                    f"⚠️ Content quality below threshold: {quality_result['feedback']}")
+                state["warnings"].append(
+                    f"Content quality issues: {', '.join(quality_result['feedback'])}")
+
+            state["completed_steps"].append("content_creation")
+
+        except Exception as e:
+            logger.error(f"Content creation with AI agent failed: {e}")
+            state["errors"].append(f"Content creation error: {e}")
+
+        finally:
+            state["step_timings"]["content_creation"] = (
                 datetime.now() - step_start).total_seconds()
 
         return state
