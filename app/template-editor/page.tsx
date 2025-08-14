@@ -215,7 +215,7 @@ function TemplateEditorInner() {
       console.error('Error initializing canvas:', error);
       return;
     }
-  }, [templateId, lastPanPoint.x, lastPanPoint.y, updateCanvasSize, zoomLevel]);
+  }, [templateId]);
 
   // Load existing template
   const loadTemplate = async (id: string, fabricCanvas: Canvas) => {
@@ -433,7 +433,7 @@ function TemplateEditorInner() {
   React.useEffect(() => {
     zoomLevelRef.current = zoomLevel;
     updateCanvasSizeRef.current = updateCanvasSize;
-  }, [zoomLevel, canvas]);
+  }, [zoomLevel, updateCanvasSize]);
 
   // Touch gesture handling
   React.useEffect(() => {
@@ -496,7 +496,7 @@ function TemplateEditorInner() {
       containerElement.removeEventListener('touchmove', handleTouchMove);
       containerElement.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [canvas, updateCanvasSize]);
+  }, [canvas]);
 
   const zoomIn = () => {
     if (!canvas) return;
@@ -864,64 +864,86 @@ function TemplateEditorInner() {
                 </Card>
               )}
 
-              {/* Text Formatting */}
-              {selectedObject?.type === 'textbox' && (
-                <Card variant="glass">
-                  <CardHeader className="p-3 sm:p-4">
-                    <CardTitle className="text-base sm:text-lg font-semibold tracking-tight">
-                      Text Formatting
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3">
-                    <div className="flex gap-1">
-                      <Button
-                        variant={selectedObject.fontWeight === 'bold' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={toggleBold}
-                      >
-                        <Bold className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={selectedObject.fontStyle === 'italic' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={toggleItalic}
-                      >
-                        <Italic className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={selectedObject.underline ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={toggleUnderline}
-                      >
-                        <Underline className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant={selectedObject.textAlign === 'left' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setTextAlign('left')}
-                      >
-                        <AlignLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={selectedObject.textAlign === 'center' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setTextAlign('center')}
-                      >
-                        <AlignCenter className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant={selectedObject.textAlign === 'right' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setTextAlign('right')}
-                      >
-                        <AlignRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Text Formatting - Always Visible */}
+              <Card variant="glass">
+                <CardHeader className="p-3 sm:p-4">
+                  <CardTitle className="text-base sm:text-lg font-semibold tracking-tight">
+                    Text Formatting
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3">
+                  <div className="flex gap-1">
+                    <Button
+                      variant={selectedObject?.type === 'textbox' && selectedObject.fontWeight === 'bold' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={toggleBold}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                      className={cn(
+                        !selectedObject || selectedObject.type !== 'textbox' && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <Bold className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={selectedObject?.type === 'textbox' && selectedObject.fontStyle === 'italic' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={toggleItalic}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                      className={cn(
+                        !selectedObject || selectedObject.type !== 'textbox' && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <Italic className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={selectedObject?.type === 'textbox' && selectedObject.underline ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={toggleUnderline}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                      className={cn(
+                        !selectedObject || selectedObject.type !== 'textbox' && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <Underline className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={selectedObject?.type === 'textbox' && selectedObject.textAlign === 'left' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTextAlign('left')}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                      className={cn(
+                        !selectedObject || selectedObject.type !== 'textbox' && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <AlignLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={selectedObject?.type === 'textbox' && selectedObject.textAlign === 'center' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTextAlign('center')}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                      className={cn(
+                        !selectedObject || selectedObject.type !== 'textbox' && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <AlignCenter className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={selectedObject?.type === 'textbox' && selectedObject.textAlign === 'right' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTextAlign('right')}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                      className={cn(
+                        !selectedObject || selectedObject.type !== 'textbox' && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <AlignRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Properties */}
               {selectedObject && (

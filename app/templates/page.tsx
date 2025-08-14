@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { Layers, Sun, Moon, Plus, Edit2, Upload, FileText, MoreVertical, Trash2 } from "lucide-react";
@@ -139,6 +140,17 @@ export default function TemplatesPage() {
   
   // Template deletion state
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    templateId: string;
+    templateName: string;
+  }>({
+    open: false,
+    templateId: "",
+    templateName: ""
+  });
 
   // Load both Slideo curated templates and user templates on mount
   useEffect(() => {
@@ -271,12 +283,18 @@ export default function TemplatesPage() {
     }
   };
 
-  // Handle template deletion
-  const handleDeleteTemplate = async (templateId: string, templateName: string) => {
-    if (!confirm(`Are you sure you want to delete "${templateName}"? This action cannot be undone.`)) {
-      return;
-    }
+  // Handle template deletion confirmation
+  const handleDeleteTemplate = (templateId: string, templateName: string) => {
+    setConfirmDialog({
+      open: true,
+      templateId,
+      templateName
+    });
+  };
 
+  // Perform actual deletion
+  const performDeleteTemplate = async () => {
+    const { templateId, templateName } = confirmDialog;
     setDeletingTemplateId(templateId);
 
     try {

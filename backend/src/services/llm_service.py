@@ -465,17 +465,17 @@ Extract ONLY:
 
 Return the JSON structure as specified in the system prompt. Be thorough but accurate."""
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
-                temperature=0.1  # Low temperature for more consistent extraction
+                temperature=0.1,  # Low temperature for more consistent extraction
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ]
             )
             
-            extraction_text = response.choices[0].message.content.strip()
+            extraction_text = response.content[0].text.strip()
             
             # Clean up markdown code blocks if present
             if extraction_text.startswith("```json"):

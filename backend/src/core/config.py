@@ -63,5 +63,5 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"                      # JWT algorithm
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30         # Token expiry time
     
-    # OpenAI settings - Required for AI-powered slide generation
-    OPENAI_API_KEY: Optional[str] = None          # Set this in .env.local or .env
+    # Anthropic settings - Required for AI-powered slide generation
+    ANTHROPIC_API_KEY: Optional[str] = None       # Set this in .env.local or .env
