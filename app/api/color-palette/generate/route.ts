@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
- * Generate a brand color palette (5 colors) from a short style prompt using OpenAI.
+ * Generate a brand color palette (5 colors) from a short style prompt using Anthropic Claude.
  * Returns array of hex strings. No images produced.
- * Requires OPENAI_API_KEY env var.
+ * Requires ANTHROPIC_API_KEY env var.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -17,36 +17,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing prompt' }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    console.log('OpenAI API key exists:', !!apiKey);
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    console.log('Anthropic API key exists:', !!apiKey);
     
     if (!apiKey) {
-      console.error('No OpenAI API key found');
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+      console.error('No Anthropic API key found');
+      return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 });
     }
 
-    const openai = new OpenAI({ apiKey });
+    const anthropic = new Anthropic({ apiKey });
 
     const system = `You are a senior brand designer. Given a short brief, output a JSON array of exactly 5 accessible brand colors in hex (uppercase, with leading #). Each color should have strong contrast when paired appropriately.
 Rules:
 - Return ONLY valid JSON array of 5 hex strings, e.g. ["#0F172A", "#3B82F6", "#22D3EE", "#E2E8F0", "#FFFFFF"]
 - No prose. No keys. No markdown.`;
 
-    console.log('Making OpenAI API call...');
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    console.log('Making Anthropic API call...');
+    const completion = await anthropic.messages.create({
+      model: 'claude-3-haiku-20240307',
+      max_tokens: 150,
+      temperature: 0.5,
+      system: system,
       messages: [
-        { role: 'system', content: system },
         { role: 'user', content: `Brief: ${prompt}` },
       ],
-      temperature: 0.5,
-      max_tokens: 150,
     });
     
-    console.log('OpenAI API call successful');
+    console.log('Anthropic API call successful');
 
-    const raw = completion.choices[0]?.message?.content?.trim() || '[]';
-    console.log('Raw OpenAI response:', raw);
+    const raw = completion.content[0]?.text?.trim() || '[]';
+    console.log('Raw Anthropic response:', raw);
     
     // Attempt to parse, fallback to filtering hex-like strings
     let colors: string[] = [];

@@ -16,9 +16,14 @@ import { Badge } from "@/components/ui/badge";
 // Supabase client for authentication
 import { createClient } from "@/lib/supabase/client";
 // Lucide icons for UI elements
-import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Sun, Moon, Calendar } from "lucide-react";
+import { Plus, Eye, ChevronRight, Sparkles, Zap, Star, ArrowRight, Play, FileText, Sun, Moon, Calendar, Layers, Edit2 } from "lucide-react";
 // Next.js Link component for navigation
 import Link from "next/link";
+// Fabric.js and slide types for template previews
+import { useRef } from "react";
+import type { SlideDefinition } from "@/lib/slide-types";
+import { Canvas } from "fabric";
+import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
 
 // Mock data for presentation templates
 const presentationTemplates = [
@@ -82,6 +87,55 @@ const slideExamples = [
   { id: 12, title: "Cat Slide", image: "/samples/slides/cat_slide_1.png" },
 ];
 
+// Small Fabric.js preview for a template's slide_json
+function FabricThumb({ slide }: { slide: SlideDefinition }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (!containerRef.current || !canvasRef.current) return;
+    
+    // Clean up any existing canvas first
+    if (canvas) {
+      canvas.dispose();
+      setCanvas(null);
+      initializedRef.current = false;
+    }
+    
+    const width = containerRef.current.clientWidth;
+    const height = (width * 9) / 16; // keep 16:9
+    const scale = calculateOptimalScale(width, height);
+    
+    // Create new canvas
+    let c: Canvas | null = null;
+    try {
+      c = createSlideCanvas(canvasRef.current, slide, scale);
+      setCanvas(c);
+      initializedRef.current = true;
+    } catch (error) {
+      console.error('Error creating canvas:', error);
+    }
+    
+    return () => {
+      if (c) {
+        c.dispose();
+      }
+      setCanvas(null);
+      initializedRef.current = false;
+    };
+  }, [slide]);
+
+  return (
+    <div ref={containerRef} className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+      <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <canvas ref={canvasRef} />
+      </div>
+    </div>
+  );
+}
+
 // Example prompts for quick-start
 const examplePrompts: string[] = [
   "Executive summary for quarterly results with KPIs",
@@ -125,7 +179,7 @@ export default function Home() {
   const [userPresentations, setUserPresentations] = useState<Array<{ id: string; title: string; description: string; createdAt: string; status: string; slideHtml?: string | null }>>([]);
 
   // Templates state
-  const [templates, setTemplates] = useState<Array<{ id: string; name: string; description: string; theme: string; html?: string }>>([]);
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; description: string; theme: string; html?: string; slide_json?: any }>>([]);
 
   // Theme management hook from next-themes
   const { setTheme, theme } = useTheme();
@@ -159,46 +213,20 @@ export default function Home() {
         return;
       }
 
-      const supabase = createClient();
-      
-      // Seeded flow descriptions to filter out
-      const seededDescriptions = [
-        'Q2 Executive Summary',
-        'Product highlights for launch deck',
-        'Marketing performance snapshot'
-      ];
-      
-      const { data: flows } = await supabase
-        .from('flows')
-        .select('id, description, created_at, status')
-        .not('description', 'in', `(${seededDescriptions.map(d => `"${d}"`).join(',')})`)
-        .order('created_at', { ascending: false })
-        .limit(6); // Limit to 6 for homepage display
-
-      if (!flows || flows.length === 0) { 
+      try {
+        const response = await fetch('/api/presentations');
+        if (response.ok) {
+          const data = await response.json();
+          const presentations = (data.items || []).slice(0, 6); // Limit to 6 for homepage display
+          setUserPresentations(presentations);
+        } else {
+          console.error('Failed to load presentations');
+          setUserPresentations([]);
+        }
+      } catch (error) {
+        console.error('Error loading presentations:', error);
         setUserPresentations([]);
-        return;
       }
-
-      // For each flow, pull the latest preview (may contain slide_html from AI or be null in seeds)
-      const ids = flows.map(f => f.id);
-      const { data: previews } = await supabase
-        .from('flow_previews')
-        .select('flow_id, slide_html, created_at')
-        .in('flow_id', ids)
-        .order('created_at', { ascending: false });
-
-      const latestHtml: Record<string, string | null> = {};
-      previews?.forEach(p => { if (!(p.flow_id in latestHtml)) latestHtml[p.flow_id] = p.slide_html || null; });
-
-      setUserPresentations(flows.map(f => ({
-        id: f.id,
-        title: f.description || 'Untitled',
-        description: f.status === 'completed' ? 'Completed presentation' : 'In progress',
-        createdAt: f.created_at,
-        status: f.status,
-        slideHtml: latestHtml[f.id] ?? null,
-      })));
     };
 
     loadUserPresentations();
@@ -208,8 +236,8 @@ export default function Home() {
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        // Load templates from the templates API
-        const response = await fetch('/api/templates/list');
+        // Load templates from the database
+        const response = await fetch('/api/templates/all');
         const data = await response.json();
         const templatesData = (data.templates || []).map((template: any) => ({
           id: template.id,
@@ -217,6 +245,7 @@ export default function Home() {
           description: template.description,
           theme: template.theme,
           html: template.html,
+          slide_json: template.slide_json,
         }));
         setTemplates(templatesData.slice(0, 8)); // Limit to 8 for homepage display
       } catch (error) {
@@ -386,16 +415,18 @@ export default function Home() {
                     </Link>
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {templates.slice(0, 8).map((template) => (
-                      <Link key={template.id} href={`/templates`}>
-                        <Card className="aspect-[16/10] overflow-hidden hover:shadow-lg transition-all cursor-pointer group">
-                          <div className="h-full relative">
-                            {/* Template preview */}
-                            {template.html ? (
-                              <div className="absolute inset-0">
+                      <Card key={template.id} className="group hover:shadow-md transition-all duration-200 border-0 shadow-sm bg-card/50 backdrop-blur-sm">
+                        <div className="p-0">
+                          {/* Image Preview on Top */}
+                          <div className="relative overflow-hidden rounded-t-lg">
+                            {template.slide_json ? (
+                              <FabricThumb slide={template.slide_json as SlideDefinition} />
+                            ) : template.html ? (
+                              <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
                                 <div
-                                  className="w-full h-full bg-white"
+                                  className="absolute inset-0 bg-white"
                                   dangerouslySetInnerHTML={{ __html: template.html }}
                                   style={{
                                     transform: 'scale(0.5)',
@@ -406,33 +437,34 @@ export default function Home() {
                                 />
                               </div>
                             ) : (
-                              <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
-                                <div className="text-center p-2">
-                                  <div className="text-xs font-medium text-foreground mb-1">{template.name}</div>
-                                  <div className="text-[10px] text-muted-foreground line-clamp-2">{template.description}</div>
+                              <div className="relative w-full bg-muted/30 flex items-center justify-center text-muted-foreground/50" style={{ paddingBottom: "56.25%" }}>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <Layers className="h-8 w-8" />
                                 </div>
                               </div>
                             )}
-                            
-                            <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                            <div className="absolute bottom-2 left-2">
-                              <div className="bg-background/90 backdrop-blur-sm rounded px-2 py-1">
-                                <div className="text-xs font-medium text-foreground line-clamp-1">{template.name}</div>
+                            {/* Actions overlay */}
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex gap-1">
+                                <Link href={`/templates`}>
+                                  <Button variant="secondary" size="sm" className="h-8 w-8 p-0 bg-background/80 backdrop-blur-sm border-0 shadow-sm hover:bg-background/90" title="Use Template">
+                                    <Edit2 className="h-3 w-3" />
+                                  </Button>
+                                </Link>
                               </div>
                             </div>
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <div className="absolute top-2 left-2">
-                              <Badge variant="secondary" className="text-xs">
-                                {template.theme}
-                              </Badge>
-                            </div>
                           </div>
-                        </Card>
-                      </Link>
+                          
+                          {/* Content Section */}
+                          <div className="p-3">
+                            <div className="flex items-start justify-between mb-1.5">
+                              <h3 className="font-medium text-foreground/90 text-xs truncate flex-1">{template.name}</h3>
+                              <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0.5 border-primary/30 text-primary/80 hidden sm:inline-flex">{template.theme}</Badge>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/60 line-clamp-2 leading-tight mb-2">{template.description}</p>
+                          </div>
+                        </div>
+                      </Card>
                     ))}
                   </div>
                 </div>

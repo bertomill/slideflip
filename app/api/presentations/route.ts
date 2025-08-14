@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const { title } = await request.json();
 
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -16,14 +16,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new presentation
+    // Create new presentation - start with minimal required fields
+    const insertData: any = {
+      user_id: user.id,
+      title: title || "Untitled Presentation"
+      // Don't set status - let it use table default
+    };
+
+    // Add builder fields if they exist
+    if (true) { // We'll try to add these
+      insertData.current_step = 1;
+      insertData.builder_status = "draft";  
+      insertData.documents = [];
+      insertData.step_timestamps = { step_1: new Date().toISOString() };
+    }
+
     const { data: presentation, error: createError } = await supabase
       .from("presentations")
-      .insert({
-        user_id: user.id,
-        title: title || "Untitled Presentation",
-        status: "draft"
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -51,7 +61,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -62,22 +72,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's presentations with latest flow status
+    // Get user's presentations with all builder data (now stored directly in presentations table)
     const { data: presentations, error: fetchError } = await supabase
       .from("presentations")
-      .select(`
-        *,
-        flows (
-          id,
-          status,
-          current_step,
-          created_at,
-          flow_previews (
-            slide_html,
-            created_at
-          )
-        )
-      `)
+      .select("*")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
 
@@ -89,23 +87,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Transform the data to match the expected format
-    const items = presentations?.map(presentation => {
-      // Get the latest flow for this presentation
-      const latestFlow = presentation.flows?.[0];
-      
-      // Get the latest preview HTML if available
-      const latestPreview = latestFlow?.flow_previews?.[0];
+    // Transform the data to match the expected format for the UI
+    const items = presentations?.map((presentation: any) => {
+      // Determine description based on builder progress
+      let description = presentation.description || 'New presentation';
+      if (presentation.builder_status === 'completed') {
+        description = 'Completed presentation';
+      } else if (presentation.current_step > 1) {
+        description = `In progress - Step ${presentation.current_step}`;
+      }
       
       return {
         id: presentation.id,
         title: presentation.title,
-        description: presentation.description || (latestFlow?.status === 'completed' ? 'Completed presentation' : 'In progress'),
+        description: description,
         createdAt: presentation.created_at,
         status: presentation.status,
-        slideHtml: latestPreview?.slide_html || null,
-        flowId: latestFlow?.id || null,
-        currentStep: latestFlow?.current_step || null
+        slideHtml: presentation.slide_html || null, // HTML from builder step 4
+        builderStatus: presentation.builder_status || 'draft',
+        currentStep: presentation.current_step || 1,
+        hasGeneratedContent: !!(presentation.slide_json || presentation.slide_html)
       };
     }) || [];
 
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error in presentations GET API:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to fetch presentations" },
       { status: 500 }
     );
   }
@@ -131,7 +132,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -178,6 +179,67 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     console.error("Error in presentations PUT API:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Presentation ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    // Delete presentation (will cascade to related flows and their data)
+    const { data: presentation, error: deleteError } = await supabase
+      .from("presentations")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id) // Ensure user owns this presentation
+      .select()
+      .single();
+
+    if (deleteError) {
+      console.error("Error deleting presentation:", deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete presentation" },
+        { status: 500 }
+      );
+    }
+
+    if (!presentation) {
+      return NextResponse.json(
+        { error: "Presentation not found or access denied" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Presentation deleted successfully"
+    });
+
+  } catch (error) {
+    console.error("Error in presentations DELETE API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

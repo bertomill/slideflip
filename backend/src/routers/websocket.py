@@ -6,6 +6,7 @@ Handles WebSocket connections and message processing
 import asyncio
 import json
 import logging
+import os
 from fastapi import WebSocket, WebSocketDisconnect
 from typing import Dict, Any
 
@@ -660,57 +661,80 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
         if client_id:
             await slide_service.store_file_content(client_id, str(file_path), file_data.filename)
 
-        # Phase 2: Update progress
-        await send_enhanced_progress_update(
-            websocket, client_id, "file_processing", 90,
-            "Starting knowledge graph extraction..."
-        )
-
-        # Start knowledge graph extraction process
-        try:
-            # Get or create knowledge graph service for this client
-            kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
-
-            # Get file info for knowledge graph processing
-            file_info = FileInfo(
-                filename=file_data.filename,
-                file_path=str(file_path),
-                file_size=len(file_data.content),
-                file_type=file_data.file_type,
-                upload_time=get_current_timestamp()
+        # Check if we should skip knowledge graph processing for faster uploads
+        skip_kg = os.getenv("SKIP_KNOWLEDGE_GRAPH", "false").lower() == "true"
+        
+        if skip_kg:
+            # Phase 2: Update progress and complete quickly
+            await send_enhanced_progress_update(
+                websocket, client_id, "file_processing", 100,
+                "File processing completed successfully (knowledge graph processing skipped for faster upload)",
+                {
+                    "filename": file_data.filename,
+                    "file_path": str(file_path),
+                    "file_size": len(file_data.content),
+                    "file_type": file_data.file_type,
+                    "note": "Knowledge graph processing skipped for faster upload"
+                }
+            )
+        else:
+            # Phase 2: Update progress
+            await send_enhanced_progress_update(
+                websocket, client_id, "file_processing", 90,
+                "Starting knowledge graph extraction..."
             )
 
-            # Use the already extracted content for knowledge graph
-            content_text = content_info.get('text', '') if content_info else ''
+        # Start knowledge graph extraction process (only if not skipped)
+        if not skip_kg:
+            try:
+                # Get or create knowledge graph service for this client
+                kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
 
-            # Create and track the processing task
-            processing_task = asyncio.create_task(process_file_for_knowledge_graph(
-                kg_service, file_info, content_text, client_id, kg_task_manager
-            ))
+                # Get file info for knowledge graph processing
+                file_info = FileInfo(
+                    filename=file_data.filename,
+                    file_path=str(file_path),
+                    file_size=len(file_data.content),
+                    file_type=file_data.file_type,
+                    upload_time=get_current_timestamp()
+                )
 
-            # Add task to manager for tracking
-            await kg_task_manager.add_processing_task(client_id, file_data.filename, processing_task)
+                # Use the already extracted content for knowledge graph
+                content_text = content_info.get('text', '') if content_info else ''
 
-            # Mark that clustering will be needed
-            await kg_task_manager.mark_clustering_needed(client_id)
+                # Create and track the processing task
+                processing_task = asyncio.create_task(process_file_for_knowledge_graph(
+                    kg_service, file_info, content_text, client_id, kg_task_manager
+                ))
 
-            logger.info(
-                f"Started knowledge graph extraction for file: {file_data.filename}")
+                # Add task to manager for tracking
+                await kg_task_manager.add_processing_task(client_id, file_data.filename, processing_task)
 
-        except Exception as e:
-            logger.error(f"Error starting knowledge graph extraction: {e}")
+                # Mark that clustering will be needed
+                await kg_task_manager.mark_clustering_needed(client_id)
 
-        # Phase 2: Update progress and mark step as completed
-        await send_enhanced_progress_update(
-            websocket, client_id, "file_processing", 100,
-            "File processing completed successfully",
-            {
-                "filename": file_data.filename,
-                "file_path": str(file_path),
-                "file_size": len(file_data.content),
-                "file_type": file_data.file_type
-            }
-        )
+                logger.info(
+                    f"Started knowledge graph extraction for file: {file_data.filename}")
+
+            except Exception as e:
+                logger.error(f"Error starting knowledge graph extraction: {e}")
+
+        # Phase 2: Update progress and mark step as completed (only if KG was skipped)
+        if skip_kg:
+            # Already sent progress update above for skipped case
+            pass
+        else:
+            # Send standard completion message for knowledge graph processing
+            await send_enhanced_progress_update(
+                websocket, client_id, "file_processing", 100,
+                "File processing completed successfully",
+                {
+                    "filename": file_data.filename,
+                    "file_path": str(file_path),
+                    "file_size": len(file_data.content),
+                    "file_type": file_data.file_type
+                }
+            )
 
         # Prepare success data
         success_data = {

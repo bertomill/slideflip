@@ -209,9 +209,21 @@ export function renderSlideOnCanvas(
   
   console.log('✅ Canvas is properly initialized');
   
-  // Clear existing content
-  canvas.clear();
-  console.log('🧹 Canvas cleared');
+  // Clear existing content safely
+  try {
+    canvas.clear();
+    console.log('🧹 Canvas cleared');
+  } catch (error) {
+    console.error('❌ Error clearing canvas:', error);
+    // Try to manually clear by removing all objects
+    try {
+      canvas.remove(...canvas.getObjects());
+      console.log('🧹 Canvas manually cleared');
+    } catch (manualError) {
+      console.error('❌ Manual clear also failed:', manualError);
+      return;
+    }
+  }
   
   // Set canvas dimensions (scaled for display)
   canvas.setWidth(SLIDE_WIDTH_PX * scale);

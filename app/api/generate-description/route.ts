@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
- * API endpoint to generate slide descriptions using OpenAI GPT-3.5-turbo
+ * API endpoint to generate slide descriptions using Anthropic Claude
  * 
  * This endpoint processes uploaded document metadata and generates AI-powered
  * slide descriptions for the Slideo presentation builder. The descriptions
@@ -13,10 +13,10 @@ import OpenAI from 'openai';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Initialize OpenAI client with API key from environment variables
-    // Requires OPENAI_API_KEY to be set in .env.local
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    // Initialize Anthropic client with API key from environment variables
+    // Requires ANTHROPIC_API_KEY to be set in .env.local
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
     });
 
     // Parse request body to extract document information
@@ -37,21 +37,21 @@ export async function POST(request: NextRequest) {
     // Combines document information with specific instructions for slide generation
     const userPrompt = `${documentContext}Generate a slide description for a professional presentation. Make it specific and actionable, mentioning visual elements like charts, bullet points, or graphics where appropriate.`;
 
-    // Make API call to OpenAI's chat completion endpoint
-    // Using GPT-3.5-turbo for cost-effective, fast responses
-    const completion = await openai.chat.completions.create({
-      model: requestedModel || "gpt-3.5-turbo",           // Cost-effective model for text generation
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: userPrompt }
-      ],
+    // Make API call to Anthropic's message endpoint
+    // Using Claude Haiku for cost-effective, fast responses
+    const completion = await anthropic.messages.create({
+      model: requestedModel || "claude-3-haiku-20240307",           // Cost-effective model for text generation
       max_tokens: 100,                  // Limit response length for concise descriptions
       temperature: 0.7,                 // Balance creativity with consistency
+      system: systemMessage,
+      messages: [
+        { role: "user", content: userPrompt }
+      ],
     });
 
-    // Extract the generated text from OpenAI's response structure
+    // Extract the generated text from Anthropic's response structure
     // Uses optional chaining to safely access nested response properties
-    const description = completion.choices[0]?.message?.content?.trim();
+    const description = completion.content[0]?.text?.trim();
     
     // Validate that OpenAI returned a valid description
     // Prevents returning empty or null responses to the client
@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ description });
     
   } catch (error) {
-    // Handle any errors during the OpenAI API call or processing
+    // Handle any errors during the Anthropic API call or processing
     // Log detailed error for server debugging while returning user-friendly message
-    console.error('OpenAI API error:', error);
+    console.error('Anthropic API error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate description. Please check your OpenAI API key configuration.' }, 
+      { error: 'Failed to generate description. Please check your Anthropic API key configuration.' }, 
       { status: 500 }
     );
   }

@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: slideflip-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - PYTHONPATH=/app
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./temp:/app/temp
+      - ./output:/app/output
+      - ./kg:/app/kg
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - slideflip-network
+
+networks:
+  slideflip-network:
+    driver: bridge

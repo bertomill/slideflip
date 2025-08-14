@@ -18,50 +18,56 @@ export default function Page() {
         {/* subtle vignette */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.06),transparent_60%)]" />
 
-        {/* slide A */}
-        <div className="absolute top-24 left-16 rotate-[-6deg] float-slow">
+        {/* slide A - Top */}
+        <div className="absolute top-16 left-1/2 transform -translate-x-[170px] rotate-[-2deg]">
           <div className="relative">
             <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-3xl opacity-20" aria-hidden />
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[400px] h-[240px]">
               <Image
                 src="/samples/slides/product-infographic.png"
                 alt="Product Infographic slide"
-                width={640}
-                height={360}
+                width={400}
+                height={240}
                 priority
-                className="object-cover"
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQABAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSorjUdEABVDMqZlGWUE+8HeBtWN2EEZpkSq1cADh4ANnYKx5jfxYgFgBQSIyc87GhVMl8KbJmGLdMZQILbDWoSgFEA+8BePOmYa4BZO/YXA3CjrMWxvvbr8xHTrSdKVRF7BQOQV9qc5fQo6kWEbsKCCUgIJaHdWqoNrBHJEKBACgUAEB6YKA2WPrQLzTnJqXXN4YNh3BFE+xBOC6qgaABBEOBnLCqPWjNOOyFpzUUe5ATgbIxVNJQHrjD8GHMlFDqQg=="
+                className="object-cover w-full h-full"
               />
             </div>
           </div>
         </div>
 
-        {/* slide B */}
-        <div className="absolute top-44 right-16 rotate-[5deg] float-medium">
+        {/* slide B - Top right */}
+        <div className="absolute top-20 left-1/2 transform -translate-x-[70px] rotate-[2deg]">
           <div className="relative">
             <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-3xl opacity-15" aria-hidden />
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[520px]">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[380px] h-[230px]">
               <Image
                 src="/samples/slides/mckinsey-example-1.png"
                 alt="Consulting slide example"
-                width={520}
-                height={320}
-                className="object-cover"
+                width={380}
+                height={230}
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSorjUdEABVDMqZlGWUE+8HeBtWN2EEZpkSq1cADh4ANnYKx5jfxYgFgBQSIyc87GhVMl8KbJmGLdMZQILbDWoSgFEA+8BePOmYa4BZO/YXA3CjrMWxvvbr8xHTrSdKVRF7BQOQV9qc5fQo6kWEbsKCCUgIJaHdWqoNrBHJEKBACgUAEB6YKA2WPrQLzTnJqXXN4YNh3BFE+xBOC6qgaABBEOBnLCqPWjNOOyFpzUUe5ATgbIxVNJQHrjD8GHMlFDqQg=="
+                className="object-cover w-full h-full"
               />
             </div>
           </div>
         </div>
 
-        {/* slide C */}
-        <div className="absolute bottom-24 left-1/3 -translate-x-1/2 rotate-[2deg] float-delayed">
+        {/* slide C - Bottom center */}
+        <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 rotate-[0deg]">
           <div className="relative">
             <div className="absolute -inset-6 bg-white/10 blur-2xl rounded-3xl opacity-15" aria-hidden />
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[560px]">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10 w-[420px] h-[250px]">
               <Image
                 src="/samples/slides/jpm_slide_1.png"
                 alt="Financial highlights slide"
-                width={560}
-                height={330}
-                className="object-cover"
+                width={420}
+                height={250}
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQABAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSorjUdEABVDMqZlGWUE+8HeBtWN2EEZpkSq1cADh4ANnYKx5jfxYgFgBQSIyc87GhVMl8KbJmGLdMZQILbDWoSgFEA+8BePOmYa4BZO/YXA3CjrMWxvvbr8xHTrSdKVRF7BQOQV9qc5fQo6kWEbsKCCUgIJaHdWqoNrBHJEKBACgUAEB6YKA2WPrQLzTnJqXXN4YNh3BFE+xBOC6qgaABBEOBnLCqPWjNOOyFpzUUe5ATgbIxVNJQHrjD8GHMlFDqQg=="
+                className="object-cover w-full h-full"
               />
             </div>
           </div>
@@ -73,16 +79,6 @@ export default function Page() {
         <div className="absolute bottom-1/3 left-1/3 w-2 h-2 bg-white/40 rounded-full animate-pulse delay-500" />
         <div className="absolute bottom-1/4 right-1/4 w-4 h-4 bg-white/25 rounded-full animate-pulse delay-1500" />
 
-        {/* floating animations */}
-        <style jsx>{`
-          @keyframes floatY {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-          }
-          .float-slow { animation: floatY 10s ease-in-out infinite; }
-          .float-medium { animation: floatY 8s ease-in-out infinite; }
-          .float-delayed { animation: floatY 12s ease-in-out infinite; animation-delay: 1.5s; }
-        `}</style>
       </div>
     </div>
   );

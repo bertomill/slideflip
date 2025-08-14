@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect, Suspense } from 'react';
-import { Canvas, Textbox, Rect, Circle, Line, Triangle } from 'fabric';
+import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import { Canvas, Textbox, Rect, Circle, Line, Triangle, FabricObject } from 'fabric';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Sidebar } from '@/components/ui/sidebar';
 import { 
   Type, Square, Circle as CircleIcon, Minus, Triangle as TriangleIcon,
-  Save, Download, Trash2, Copy, Palette, Bold, Italic, Underline,
-  AlignLeft, AlignCenter, AlignRight, Layers, Eye, EyeOff, Menu,
-  ZoomIn, ZoomOut, RotateCcw
+  Save, Download, Trash2, Copy, Bold, Italic, Underline,
+  AlignLeft, AlignCenter, AlignRight, Eye, EyeOff, Menu,
+  ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -24,7 +23,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 // Canvas dimensions for 16:9 aspect ratio
 const CANVAS_WIDTH = 960;
-const CANVAS_HEIGHT = 540;
 
 function TemplateEditorInner() {
   const router = useRouter();
@@ -32,7 +30,7 @@ function TemplateEditorInner() {
   const templateId = searchParams.get('id');
   
   const [canvas, setCanvas] = useState<Canvas | null>(null);
-  const [selectedObject, setSelectedObject] = useState<any>(null);
+  const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [templateName, setTemplateName] = useState('New Template');
   const [templateDescription, setTemplateDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -40,6 +38,7 @@ function TemplateEditorInner() {
   const [previewJson, setPreviewJson] = useState<SlideDefinition | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
   const [user, setUser] = useState<{
     email?: string;
     user_metadata?: {
@@ -53,6 +52,8 @@ function TemplateEditorInner() {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const zoomLevelRef = useRef(1);
+  const updateCanvasSizeRef = useRef<(zoom: number) => void>();
 
   // Load user authentication
   useEffect(() => {
@@ -92,13 +93,14 @@ function TemplateEditorInner() {
     }
 
     const aspectRatio = 16 / 9;
+    const padding = 60; // Account for container padding and margins
     
-    let canvasWidth = Math.min(containerRect.width - 40, CANVAS_WIDTH);
+    let canvasWidth = Math.min(containerRect.width - padding, CANVAS_WIDTH);
     let canvasHeight = canvasWidth / aspectRatio;
     
     // Ensure canvas fits vertically too
-    if (canvasHeight > containerRect.height - 40) {
-      canvasHeight = containerRect.height - 40;
+    if (canvasHeight > containerRect.height - padding) {
+      canvasHeight = containerRect.height - padding;
       canvasWidth = canvasHeight * aspectRatio;
     }
 
@@ -133,34 +135,39 @@ function TemplateEditorInner() {
         setSelectedObject(null);
       });
 
-      // Add mouse wheel zoom support
+      // Add mouse wheel zoom support - scale canvas dimensions  
       fabricCanvas.on('mouse:wheel', (opt) => {
         const delta = opt.e.deltaY;
-        let zoom = fabricCanvas.getZoom();
-        zoom *= 0.999 ** delta;
-        if (zoom > 3) zoom = 3;
-        if (zoom < 0.3) zoom = 0.3;
+        let newZoom = zoomLevel;
+        newZoom *= 0.999 ** delta;
+        if (newZoom > 3) newZoom = 3;
+        if (newZoom < 0.3) newZoom = 0.3;
         
-        fabricCanvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-        setZoomLevel(zoom);
+        setZoomLevel(newZoom);
+        
+        // Use timeout to ensure state is updated before calling updateCanvasSize
+        setTimeout(() => {
+          updateCanvasSize(newZoom);
+        }, 0);
+        
         opt.e.preventDefault();
         opt.e.stopPropagation();
       });
 
       // Add pan functionality
       fabricCanvas.on('mouse:down', (opt) => {
-        const evt = opt.e;
+        const evt = opt.e as MouseEvent;
         if (evt.altKey === true || (evt.shiftKey === true && fabricCanvas.getZoom() > 1)) {
           setIsPanning(true);
-          (fabricCanvas as any).isDragging = true;
+          (fabricCanvas as Canvas & { isDragging: boolean }).isDragging = true;
           fabricCanvas.selection = false;
           setLastPanPoint({ x: evt.clientX, y: evt.clientY });
         }
       });
 
       fabricCanvas.on('mouse:move', (opt) => {
-        if ((fabricCanvas as any).isDragging) {
-          const e = opt.e;
+        if ((fabricCanvas as Canvas & { isDragging: boolean }).isDragging) {
+          const e = opt.e as MouseEvent;
           const vpt = fabricCanvas.viewportTransform;
           if (vpt) {
             vpt[4] += e.clientX - lastPanPoint.x;
@@ -175,10 +182,11 @@ function TemplateEditorInner() {
         if (fabricCanvas.viewportTransform) {
           fabricCanvas.setViewportTransform(fabricCanvas.viewportTransform);
         }
-        (fabricCanvas as any).isDragging = false;
+        (fabricCanvas as Canvas & { isDragging: boolean }).isDragging = false;
         fabricCanvas.selection = true;
         setIsPanning(false);
       });
+
 
       setCanvas(fabricCanvas);
 
@@ -187,26 +195,14 @@ function TemplateEditorInner() {
         loadTemplate(templateId, fabricCanvas);
       }
 
-      // Handle window resize
+      // Handle window resize - maintain current zoom level
       const handleResize = () => {
         if (!containerRef.current || !fabricCanvas) return;
         
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const aspectRatio = 16 / 9;
-        
-        let newCanvasWidth = Math.min(containerRect.width - 40, CANVAS_WIDTH);
-        let newCanvasHeight = newCanvasWidth / aspectRatio;
-        
-        if (newCanvasHeight > containerRect.height - 40) {
-          newCanvasHeight = containerRect.height - 40;
-          newCanvasWidth = newCanvasHeight * aspectRatio;
-        }
-        
-        fabricCanvas.setDimensions({
-          width: newCanvasWidth,
-          height: newCanvasHeight
-        });
-        fabricCanvas.renderAll();
+        // Use the updateCanvasSize function to maintain zoom level
+        setTimeout(() => {
+          updateCanvasSize(zoomLevel);
+        }, 0);
       };
 
       window.addEventListener('resize', handleResize);
@@ -219,7 +215,7 @@ function TemplateEditorInner() {
       console.error('Error initializing canvas:', error);
       return;
     }
-  }, [templateId]);
+  }, [templateId, lastPanPoint.x, lastPanPoint.y, updateCanvasSize, zoomLevel]);
 
   // Load existing template
   const loadTemplate = async (id: string, fabricCanvas: Canvas) => {
@@ -361,7 +357,7 @@ function TemplateEditorInner() {
   const duplicateSelected = () => {
     if (!canvas || !selectedObject) return;
     
-    selectedObject.clone((cloned: any) => {
+    selectedObject.clone((cloned: FabricObject) => {
       cloned.left += 20;
       cloned.top += 20;
       canvas.add(cloned);
@@ -371,7 +367,7 @@ function TemplateEditorInner() {
   };
 
   // Update selected object properties
-  const updateSelectedProperty = (property: string, value: any) => {
+  const updateSelectedProperty = (property: string, value: string | number | boolean) => {
     if (!canvas || !selectedObject) return;
     
     selectedObject.set(property, value);
@@ -402,28 +398,124 @@ function TemplateEditorInner() {
     updateSelectedProperty('textAlign', align);
   };
 
-  // Zoom functions
+  // Zoom functions - scale the canvas dimensions themselves
+  const updateCanvasSize = useCallback((zoom: number) => {
+    if (!canvas || !containerRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const aspectRatio = 16 / 9;
+    const padding = 60;
+    
+    // Calculate base canvas size
+    let baseCanvasWidth = Math.min(containerRect.width - padding, CANVAS_WIDTH);
+    let baseCanvasHeight = baseCanvasWidth / aspectRatio;
+    
+    if (baseCanvasHeight > containerRect.height - padding) {
+      baseCanvasHeight = containerRect.height - padding;
+      baseCanvasWidth = baseCanvasHeight * aspectRatio;
+    }
+    
+    // Apply zoom to canvas dimensions
+    const scaledWidth = baseCanvasWidth * zoom;
+    const scaledHeight = baseCanvasHeight * zoom;
+    
+    canvas.setDimensions({
+      width: scaledWidth,
+      height: scaledHeight
+    });
+    
+    // Reset zoom on canvas (since we're scaling dimensions instead)
+    canvas.setZoom(1);
+    canvas.renderAll();
+  }, [canvas]);
+
+  // Update refs when values change
+  React.useEffect(() => {
+    zoomLevelRef.current = zoomLevel;
+    updateCanvasSizeRef.current = updateCanvasSize;
+  }, [zoomLevel, canvas]);
+
+  // Touch gesture handling
+  React.useEffect(() => {
+    if (!canvas || !containerRef.current) return;
+
+    const getDistance = (touches: TouchList) => {
+      if (touches.length < 2) return 0;
+      const touch1 = touches[0];
+      const touch2 = touches[1];
+      return Math.sqrt(
+        Math.pow(touch2.clientX - touch1.clientX, 2) + 
+        Math.pow(touch2.clientY - touch1.clientY, 2)
+      );
+    };
+
+    let touchDistance = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        touchDistance = getDistance(e.touches);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const distance = getDistance(e.touches);
+        
+        if (touchDistance > 0) {
+          const scale = distance / touchDistance;
+          const currentZoom = zoomLevelRef.current;
+          const newZoom = Math.min(Math.max(currentZoom * scale, 0.3), 3);
+          
+          if (Math.abs(newZoom - currentZoom) > 0.01) {
+            setZoomLevel(newZoom);
+            if (updateCanvasSizeRef.current) {
+              updateCanvasSizeRef.current(newZoom);
+            }
+          }
+        }
+        
+        touchDistance = distance;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        touchDistance = 0;
+      }
+    };
+
+    const containerElement = containerRef.current;
+    containerElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+    containerElement.addEventListener('touchmove', handleTouchMove, { passive: false });
+    containerElement.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      containerElement.removeEventListener('touchstart', handleTouchStart);
+      containerElement.removeEventListener('touchmove', handleTouchMove);
+      containerElement.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [canvas, updateCanvasSize]);
+
   const zoomIn = () => {
     if (!canvas) return;
     const newZoom = Math.min(zoomLevel * 1.2, 3);
     setZoomLevel(newZoom);
-    canvas.setZoom(newZoom);
-    canvas.renderAll();
+    updateCanvasSize(newZoom);
   };
 
   const zoomOut = () => {
     if (!canvas) return;
     const newZoom = Math.max(zoomLevel / 1.2, 0.3);
     setZoomLevel(newZoom);
-    canvas.setZoom(newZoom);
-    canvas.renderAll();
+    updateCanvasSize(newZoom);
   };
 
   const resetZoom = () => {
     if (!canvas) return;
     setZoomLevel(1);
-    canvas.setZoom(1);
-    canvas.renderAll();
+    updateCanvasSize(1);
   };
 
   // Preview as PptxGenJS JSON
@@ -500,7 +592,8 @@ function TemplateEditorInner() {
     document.head.appendChild(script);
     
     script.onload = () => {
-      const PptxGenJS = (window as any).PptxGenJS;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const PptxGenJS = (window as typeof window & { PptxGenJS?: any }).PptxGenJS;
       if (!PptxGenJS) return;
       
       const pptx = new PptxGenJS();
@@ -516,7 +609,8 @@ function TemplateEditorInner() {
       }
       
       // Add objects
-      slideJson.objects.forEach((obj: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      slideJson.objects.forEach((obj: { type: string; text?: string; shape?: string; options: any }) => {
         if (obj.type === 'text') {
           slide.addText(obj.text, obj.options);
         } else if (obj.type === 'shape') {
@@ -553,8 +647,9 @@ function TemplateEditorInner() {
 
         {/* Main Content Area */}
         <div className={cn(
-          "transition-all duration-300 lg:mr-80 h-screen flex flex-col",
-          sidebarCollapsed ? "md:ml-16" : "md:ml-60"
+          "transition-all duration-300 h-screen flex flex-col",
+          sidebarCollapsed ? "md:ml-16" : "md:ml-60",
+          rightSidebarCollapsed ? "lg:mr-16 lg:ml-72" : "lg:mr-80 lg:ml-72"
         )}>
           {/* Header */}
           <div className="flex-shrink-0 p-4 sm:p-6 border-b border-border">
@@ -621,7 +716,7 @@ function TemplateEditorInner() {
                 <div 
                   ref={containerRef}
                   className={cn(
-                    "absolute inset-0 bg-muted/30 flex items-center justify-center p-4",
+                    "absolute inset-0 flex items-center justify-center p-4",
                     isPanning && "cursor-grabbing"
                   )}
                 >
@@ -664,9 +759,61 @@ function TemplateEditorInner() {
         </div>
 
         {/* Right Sidebar - Tools */}
-        <div className="hidden lg:block fixed right-0 top-0 z-30 h-screen w-80 transform bg-background border-l border-border">
-          <div className="h-full overflow-y-auto">
-            <div className="p-4 space-y-4 sm:space-y-6">
+        <div className={cn(
+          "hidden lg:block fixed right-0 top-0 z-30 h-screen transform bg-background border-l border-border transition-all duration-300",
+          rightSidebarCollapsed ? "w-16" : "w-80"
+        )}>
+          {/* Toggle Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+            className={cn(
+              "absolute z-10 h-8 w-8 p-0",
+              rightSidebarCollapsed ? "left-2 top-4" : "left-2 top-4"
+            )}
+          >
+            {rightSidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+          
+          {/* Collapsed Icons */}
+          {rightSidebarCollapsed && (
+            <div className="flex flex-col items-center pt-16 space-y-3">
+              <Button variant="ghost" size="sm" onClick={addText} className="h-10 w-10 p-0" title="Add Text">
+                <Type className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={addRectangle} className="h-10 w-10 p-0" title="Add Rectangle">
+                <Square className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={addCircle} className="h-10 w-10 p-0" title="Add Circle">
+                <CircleIcon className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={addLine} className="h-10 w-10 p-0" title="Add Line">
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={addTriangle} className="h-10 w-10 p-0" title="Add Triangle">
+                <TriangleIcon className="h-4 w-4" />
+              </Button>
+              {selectedObject && (
+                <>
+                  <div className="w-8 h-px bg-border my-2" />
+                  <Button variant="ghost" size="sm" onClick={duplicateSelected} className="h-10 w-10 p-0" title="Duplicate">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={deleteSelected} className="h-10 w-10 p-0" title="Delete">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+          
+          {/* Expanded Content */}
+          <div className={cn(
+            "h-full overflow-y-auto",
+            rightSidebarCollapsed && "hidden"
+          )}>
+            <div className="p-4 space-y-4 sm:space-y-6 pt-14">
               {/* Add Elements */}
               <Card variant="glass" className="card-contrast">
                 <CardHeader className="p-3 sm:p-4">

@@ -1,11 +1,11 @@
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/slideflip-backend:$COMMIT_SHA', '.']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/slideflip-backend:latest', '.']
   
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/slideflip-backend:$COMMIT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/slideflip-backend:latest']
   
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -15,7 +15,7 @@ steps:
     - 'deploy'
     - 'slideflip-backend'
     - '--image'
-    - 'gcr.io/$PROJECT_ID/slideflip-backend:$COMMIT_SHA'
+    - 'gcr.io/$PROJECT_ID/slideflip-backend:latest'
     - '--region'
     - 'us-central1'
     - '--platform'
@@ -26,17 +26,19 @@ steps:
     - '--memory'
     - '2Gi'
     - '--cpu'
-    - '2'
+    - '4'
     - '--timeout'
     - '900'
     - '--concurrency'
     - '1000'
     - '--max-instances'
-    - '10'
+    - '2'
+    - '--min-instances'
+    - '1'
     - '--set-env-vars'
-    - 'DEBUG=false,HOST=0.0.0.0,PORT=8080'
+    - 'DEBUG=false,HOST=0.0.0.0,SKIP_KNOWLEDGE_GRAPH=true'
     - '--set-secrets'
     - 'OPENAI_API_KEY=openai-api-key:latest'
 
 images:
-  - gcr.io/$PROJECT_ID/slideflip-backend:$COMMIT_SHA
+  - gcr.io/$PROJECT_ID/slideflip-backend:latest

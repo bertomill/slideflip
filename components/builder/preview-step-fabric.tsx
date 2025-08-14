@@ -61,6 +61,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
+  const [lastPrompt, setLastPrompt] = useState<string>("");
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,6 +85,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     return {
       description: slideData.description,
       theme: slideData.selectedTheme || "Professional",
+      customColors: slideData.selectedPalette, // Include custom color palette
       researchData: slideData.wantsResearch ? slideData.researchData : undefined,
       contentPlan: slideData.contentPlan,
       userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
@@ -137,6 +139,13 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
         if (data?.success && data?.slideJson) {
           console.log("✅ Slide generation successful!");
           console.log("🎨 Generated slide JSON:", data.slideJson);
+          
+          // Capture the prompt for debugging
+          if (data.debugInfo?.prompt) {
+            setLastPrompt(data.debugInfo.prompt);
+            console.log("📝 Prompt used:", data.debugInfo.prompt);
+          }
+          
           updateSlideData({ slideJson: data.slideJson });
           return;
         } else {
@@ -372,70 +381,147 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Export to PowerPoint
   const exportToPowerPoint = async () => {
-    if (!extendedSlideData.slideJson) return;
-    const PptxGenJSImport = await ensurePptx();
-    if (!PptxGenJSImport) return;
-    const PptxCtor = PptxGenJSImport as unknown as new () => {
-      layout: string;
-      author: string;
-      title: string;
-      addSlide: () => unknown;
-      writeFile: (opts: { fileName: string }) => Promise<unknown>;
-    };
-    const pptx = new PptxCtor();
-    pptx.layout = 'LAYOUT_16x9';
-    pptx.author = 'SlideFlip';
-    pptx.title = slideData.description || 'Presentation';
-    
-    const slide = pptx.addSlide() as unknown as {
-      background?: { color?: string };
-      addText: (text: string, opts: Record<string, unknown>) => void;
-      addShape: (shape: string, opts: Record<string, unknown>) => void;
-    };
-    
-    // Set background
-    if (extendedSlideData.slideJson.background?.color) {
-      const bgColor = extendedSlideData.slideJson.background.color;
-      slide.background = { color: typeof bgColor === 'string' ? bgColor : undefined };
+    if (!extendedSlideData.slideJson) {
+      console.error('No slide JSON available for export');
+      alert('No slide data available to export');
+      return;
     }
-    
-    // Add objects
-    extendedSlideData.slideJson.objects.forEach(obj => {
-      switch (obj.type) {
-        case 'text':
-          slide.addText(obj.text, {
-            x: obj.options.x,
-            y: obj.options.y,
-            w: obj.options.w,
-            h: obj.options.h,
-            fontSize: obj.options.fontSize,
-            fontFace: obj.options.fontFace,
-            color: typeof obj.options.color === 'string' ? obj.options.color : undefined,
-            bold: obj.options.bold,
-            italic: obj.options.italic,
-            underline: obj.options.underline,
-            align: obj.options.align,
-            valign: obj.options.valign
-          });
-          break;
-        case 'shape':
-          if (obj.shape === 'rect' || obj.shape === 'roundRect') {
-            slide.addShape(obj.shape === 'roundRect' ? 'roundRect' : 'rect', {
-              x: obj.options.x,
-              y: obj.options.y,
-              w: obj.options.w,
-              h: obj.options.h,
-              fill: obj.options.fill ? 
-                { color: typeof obj.options.fill.color === 'string' ? obj.options.fill.color : 'ffffff' } : 
-                undefined,
-              rectRadius: obj.options.rectRadius
-            });
-          }
-          break;
+
+    try {
+      console.log('Starting PPTX export...');
+      const PptxGenJSImport = await ensurePptx();
+      if (!PptxGenJSImport) {
+        console.error('PptxGenJS library failed to load');
+        alert('Failed to load PowerPoint export library');
+        return;
       }
-    });
-    
-    await pptx.writeFile({ fileName: 'slide-export.pptx' });
+
+      console.log('PptxGenJS loaded successfully');
+      const PptxCtor = PptxGenJSImport as unknown as new () => {
+        layout: string;
+        author: string;
+        title: string;
+        addSlide: () => unknown;
+        writeFile: (opts: { fileName: string }) => Promise<unknown>;
+      };
+      
+      const pptx = new PptxCtor();
+      pptx.layout = 'LAYOUT_16x9';
+      pptx.author = 'SlideFlip';
+      pptx.title = slideData.description || 'Presentation';
+      
+      console.log('Creating slide...');
+      const slide = pptx.addSlide() as unknown as {
+        background?: { color?: string };
+        addText: (text: string, opts: Record<string, unknown>) => void;
+        addShape: (shape: string, opts: Record<string, unknown>) => void;
+      };
+      
+      // Set background - ensure color format is correct
+      if (extendedSlideData.slideJson.background?.color) {
+        let bgColor = extendedSlideData.slideJson.background.color;
+        // Ensure color has # prefix if it's a hex color
+        if (typeof bgColor === 'string' && bgColor.match(/^[0-9A-Fa-f]{6}$/)) {
+          bgColor = `#${bgColor}`;
+        }
+        console.log('Setting background color:', bgColor);
+        slide.background = { color: bgColor };
+      }
+      
+      // Add objects
+      console.log(`Adding ${extendedSlideData.slideJson.objects.length} objects to slide...`);
+      extendedSlideData.slideJson.objects.forEach((obj, index) => {
+        console.log(`Processing object ${index + 1}:`, obj.type);
+        try {
+          switch (obj.type) {
+            case 'text':
+              let textColor = obj.options.color;
+              // Ensure text color has # prefix if it's a hex color
+              if (typeof textColor === 'string' && textColor.match(/^[0-9A-Fa-f]{6}$/)) {
+                textColor = `#${textColor}`;
+              }
+              
+              slide.addText(obj.text, {
+                x: obj.options.x,
+                y: obj.options.y,
+                w: obj.options.w,
+                h: obj.options.h,
+                fontSize: obj.options.fontSize,
+                fontFace: obj.options.fontFace,
+                color: textColor,
+                bold: obj.options.bold,
+                italic: obj.options.italic,
+                underline: obj.options.underline,
+                align: obj.options.align,
+                valign: obj.options.valign
+              });
+              console.log(`Text object added: "${obj.text.substring(0, 50)}..."`);
+              break;
+              
+            case 'shape':
+              const shapeObj = obj as any; // Type assertion for shape objects
+              if (shapeObj.shape === 'rect' || shapeObj.shape === 'roundRect') {
+                let fillColor = undefined;
+                if (shapeObj.options.fill?.color) {
+                  fillColor = shapeObj.options.fill.color;
+                  // Ensure fill color has # prefix if it's a hex color
+                  if (typeof fillColor === 'string' && fillColor.match(/^[0-9A-Fa-f]{6}$/)) {
+                    fillColor = `#${fillColor}`;
+                  }
+                }
+                
+                slide.addShape(shapeObj.shape === 'roundRect' ? 'roundRect' : 'rect', {
+                  x: shapeObj.options.x,
+                  y: shapeObj.options.y,
+                  w: shapeObj.options.w,
+                  h: shapeObj.options.h,
+                  fill: fillColor ? { color: fillColor } : undefined,
+                  rectRadius: shapeObj.options.rectRadius
+                });
+                console.log(`Shape object added: ${shapeObj.shape}`);
+              }
+              break;
+              
+            case 'rect':
+              // Handle rect objects that might be stored as type 'rect' instead of 'shape'
+              let rectFillColor = undefined;
+              if (obj.options.fill?.color) {
+                rectFillColor = obj.options.fill.color;
+                if (typeof rectFillColor === 'string' && rectFillColor.match(/^[0-9A-Fa-f]{6}$/)) {
+                  rectFillColor = `#${rectFillColor}`;
+                }
+              }
+              
+              slide.addShape('rect', {
+                x: obj.options.x,
+                y: obj.options.y,
+                w: obj.options.w,
+                h: obj.options.h,
+                fill: rectFillColor ? { color: rectFillColor } : undefined
+              });
+              console.log('Rect object added');
+              break;
+              
+            default:
+              console.warn(`Unsupported object type: ${obj.type}`);
+          }
+        } catch (objError) {
+          console.error(`Error processing object ${index + 1}:`, objError);
+        }
+      });
+      
+      console.log('Writing PPTX file...');
+      const fileName = `${slideData.description || 'presentation'}.pptx`.replace(/[^a-zA-Z0-9\-_]/g, '-');
+      await pptx.writeFile({ fileName });
+      console.log('PPTX export completed successfully');
+      
+      // Show success message
+      alert('PowerPoint file downloaded successfully!');
+      
+    } catch (error) {
+      console.error('PPTX export failed:', error);
+      alert('Failed to export PowerPoint file. Please try again.');
+    }
   };
 
   // Save current slide as a template
@@ -613,17 +699,36 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
             </CardContent>
           </Card>
 
-          {/* JSON Preview for debugging */}
-          <details className="group">
-            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-              View JSON Structure (Debug)
-            </summary>
-            <div className="mt-2">
-              <pre className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground font-mono">
-                {JSON.stringify(extendedSlideData.slideJson, null, 2)}
-              </pre>
-            </div>
-          </details>
+          {/* Debug Section */}
+          <div className="space-y-2">
+            {/* JSON Preview for debugging */}
+            <details className="group">
+              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                View JSON Structure (Debug)
+              </summary>
+              <div className="mt-2">
+                <pre className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground font-mono">
+                  {JSON.stringify(extendedSlideData.slideJson, null, 2)}
+                </pre>
+              </div>
+            </details>
+
+            {/* Prompt Preview for debugging */}
+            {lastPrompt && (
+              <details className="group">
+                <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  View Prompt Sent to AI (Debug)
+                </summary>
+                <div className="mt-2">
+                  <div className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground">
+                    <div className="whitespace-pre-wrap font-mono">
+                      {lastPrompt}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            )}
+          </div>
         </>
       )}
 

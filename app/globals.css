@@ -256,3 +256,24 @@ html, body {
       radial-gradient(circle at 0.5px 0.5px, hsl(var(--muted-foreground) / 0.06) 0.5px, transparent 0.5px);
   }
 }
+
+@layer utilities {
+  /* Floating animations for login page slides */
+  @keyframes floatY {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  .animate-float-slow {
+    animation: floatY 10s ease-in-out infinite;
+  }
+  
+  .animate-float-medium {
+    animation: floatY 8s ease-in-out infinite;
+  }
+  
+  .animate-float-delayed {
+    animation: floatY 12s ease-in-out infinite;
+    animation-delay: 1.5s;
+  }
+}

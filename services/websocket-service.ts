@@ -229,7 +229,7 @@ class WebSocketService {
           this.callbacks.onMessage = originalOnMessage;
           this.callbacks.onError = originalOnError;
           reject(new Error('File upload timeout - no response from server'));
-        }, 30000); // 30 second timeout
+        }, 60000); // 60 second timeout
         
         const successHandler = (message: WebSocketMessage) => {
           console.log('File upload handler received message:', message);
