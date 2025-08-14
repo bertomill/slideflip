@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 /**
- * Next.js configuration with development-focused build settings
+ * Next.js configuration optimized for Turbopack development
  * This configuration prioritizes build speed and deployment success over strict code quality checks
  */
 const nextConfig: NextConfig = {
@@ -18,10 +18,15 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Avoid bundling Node-only modules in client code paths
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
+
+  // Webpack Configuration: Only used when Turbopack is disabled
+  // This provides fallback configuration for production builds
+  webpack: (config, { isServer, dev }) => {
+    // Only apply webpack config when NOT using Turbopack (production builds or webpack dev)
+    if (!isServer && !dev) {
       config.resolve = config.resolve || ({} as any);
+      
+      // Handle Node.js modules that shouldn't be bundled in client code
       (config.resolve.alias as any) = {
         ...(config.resolve.alias || {}),
         'node:fs': false,
@@ -51,6 +56,21 @@ const nextConfig: NextConfig = {
       } as any;
     }
     return config;
+  },
+
+  // Additional optimizations for better performance
+  swcMinify: true, // Use SWC for minification (faster than Terser)
+  
+  // Image optimization settings
+  images: {
+    formats: ['image/webp', 'image/avif'],
+    minimumCacheTTL: 60,
+  },
+
+  // Compiler options for better performance
+  compiler: {
+    // Remove console.logs in production
+    removeConsole: process.env.NODE_ENV === 'production',
   },
 };
 

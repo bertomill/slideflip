@@ -45,6 +45,10 @@ interface PreviewStepProps {
   updateSlideData: (updates: Partial<SlideData & { slideJson?: SlideDefinition }>) => void;
   onNext: () => void;
   onPrev: () => void;
+  isConnected?: boolean;
+  connectionStatus?: string;
+  sendProcessSlide?: (options?: any) => boolean;
+  lastMessage?: any;
 }
 
 // Extend SlideData type to include JSON slide
@@ -54,17 +58,125 @@ interface ExtendedSlideData extends SlideData {
 
 type ModelAwareSlideData = SlideData & { selectedModel?: string };
 
-export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepProps) {
+export function PreviewStep({ slideData, updateSlideData, onPrev, isConnected = false, connectionStatus = 'disconnected', sendProcessSlide, lastMessage }: PreviewStepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [backendProgress, setBackendProgress] = useState<{progress: number, message: string} | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const extendedSlideData: ExtendedSlideData = slideData as ExtendedSlideData;
   const modelAwareSlideData = slideData as ModelAwareSlideData;
+
+  // Handle backend messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('Preview step received message from backend:', lastMessage);
+      console.log('Message type:', lastMessage.type);
+      console.log('Message data:', lastMessage.data);
+      
+      if (lastMessage.type === 'slide_generation_complete' || lastMessage.type === 'slide_generation_success' || lastMessage.type === 'processing_complete') {
+        console.log('Processing slide generation completion message');
+        setIsGenerating(false);
+        setIsRegenerating(false);
+        setBackendProgress(null);
+        
+        // Update slide data with backend response
+        if (lastMessage.data.slide_html) {
+          console.log('Updating slide HTML from backend:', lastMessage.data.slide_html.substring(0, 100) + '...');
+          updateSlideData({ slideHtml: lastMessage.data.slide_html });
+          console.log('Slide HTML updated from backend');
+        } else if (lastMessage.data.slide_data) {
+          const slideData = lastMessage.data.slide_data;
+          if (slideData.slide_json) {
+            updateSlideData({ slideJson: slideData.slide_json });
+            console.log('Slide JSON updated from backend');
+          } else if (slideData.content) {
+            // Handle HTML content if JSON not available
+            updateSlideData({ slideHtml: slideData.content });
+            console.log('Slide HTML updated from backend');
+          }
+        } else {
+          console.log('No slide data found in completion message');
+        }
+      } else if (lastMessage.type === 'slide_generation_error' || lastMessage.type === 'processing_error') {
+        console.log('Processing slide generation error message');
+        setIsGenerating(false);
+        setIsRegenerating(false);
+        setBackendProgress(null);
+        console.error('Slide generation error from backend:', lastMessage.data.error);
+        
+        // Generate fallback slide
+        generateFallbackSlide();
+      } else if (lastMessage.type === 'progress_update' && lastMessage.data.step === 'slide_generation') {
+        // Handle slide generation progress updates
+        console.log('Processing slide generation progress update:', lastMessage.data.progress, lastMessage.data.message);
+        
+        // Update loading state based on progress
+        if (lastMessage.data.progress < 100) {
+          setIsGenerating(true);
+          setBackendProgress({
+            progress: lastMessage.data.progress,
+            message: lastMessage.data.message
+          });
+        } else {
+          setIsGenerating(false);
+          setBackendProgress(null);
+        }
+      } else if (lastMessage.type === 'slide_generation_progress' || lastMessage.type === 'processing_status') {
+        // Handle progress updates if needed
+        console.log('Slide generation progress:', lastMessage.data);
+      } else {
+        console.log('Unhandled message type:', lastMessage.type);
+      }
+    }
+  }, [lastMessage, updateSlideData]);
+
+  // Generate fallback slide when backend fails
+  const generateFallbackSlide = () => {
+    const sampleSlide: SlideDefinition = {
+      id: 'generated-slide',
+      background: { color: 'ffffff' },
+      objects: [
+        {
+          type: 'text',
+          text: slideData.description || 'Your Presentation Title',
+          options: {
+            x: 0.5,
+            y: 2.0,
+            w: 9,
+            h: 1.5,
+            fontSize: 44,
+            fontFace: 'Arial',
+            color: '003366',
+            bold: true,
+            align: 'center',
+            valign: 'middle'
+          }
+        },
+        {
+          type: 'text',
+          text: 'Generated from your content',
+          options: {
+            x: 0.5,
+            y: 3.5,
+            w: 9,
+            h: 0.75,
+            fontSize: 24,
+            fontFace: 'Arial',
+            color: '666666',
+            align: 'center',
+            valign: 'middle'
+          }
+        }
+      ]
+    };
+    
+    updateSlideData({ slideJson: sampleSlide });
+  };
 
   // Build request body for slide generation API
   const buildRequestPayload = (overrideFeedback?: string) => {
@@ -91,89 +203,42 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     };
   };
 
-  // Call API to generate slide JSON
+  // Call backend to generate slide JSON
   const generateSlide = async (overrideFeedback?: string) => {
     if (!slideData.description || isGenerating) return;
+    
+    // Check if backend is connected
+    if (!isConnected || !sendProcessSlide) {
+      console.error('Backend not connected or sendProcessSlide not available');
+      generateFallbackSlide();
+      return;
+    }
+
     setIsGenerating(true);
+    
     try {
-      const response = await fetch("/api/generate-slide-json", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildRequestPayload(overrideFeedback)),
+      // Send slide generation request to backend via WebSocket
+      const success = sendProcessSlide({
+        description: slideData.description,
+        theme: slideData.selectedTheme || "Professional",
+        researchData: slideData.wantsResearch ? slideData.researchData : undefined,
+        contentPlan: slideData.contentPlan,
+        userFeedback: overrideFeedback || slideData.userFeedback,
+        documents: slideData.parsedDocuments || slideData.documents,
+        format: "json" // Request JSON format
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.success && data?.slideJson) {
-           updateSlideData({ slideJson: data.slideJson });
-          return;
-        }
+      if (success) {
+        console.log('Slide generation request sent to backend successfully');
+        // The response will be handled in the useEffect hook
+      } else {
+        throw new Error('Failed to send slide generation request to backend');
       }
-      
-      // Fallback to a sample slide if API fails
-      const sampleSlide: SlideDefinition = {
-        id: 'generated-slide',
-        background: { color: 'ffffff' },
-        objects: [
-          {
-            type: 'text',
-            text: slideData.description || 'Your Presentation Title',
-            options: {
-              x: 0.5,
-              y: 2.0,
-              w: 9,
-              h: 1.5,
-              fontSize: 44,
-              fontFace: 'Arial',
-              color: '003366',
-              bold: true,
-              align: 'center',
-              valign: 'middle'
-            }
-          },
-          {
-            type: 'text',
-            text: 'Generated from your content',
-            options: {
-              x: 0.5,
-              y: 3.5,
-              w: 9,
-              h: 0.75,
-              fontSize: 24,
-              fontFace: 'Arial',
-              color: '666666',
-              align: 'center'
-            }
-          }
-        ]
-      };
-      updateSlideData({ slideJson: sampleSlide });
-    } catch (err) {
-      console.error("Slide generation error:", err);
-      // Create a basic slide as fallback
-      const fallbackSlide: SlideDefinition = {
-        id: 'fallback-slide',
-        background: { color: 'f5f5f5' },
-        objects: [
-          {
-            type: 'text',
-            text: 'Slide Generation in Progress',
-            options: {
-              x: 1,
-              y: 2,
-              w: 8,
-              h: 1,
-              fontSize: 36,
-              fontFace: 'Arial',
-              color: '333333',
-              align: 'center'
-            }
-          }
-        ]
-      };
-      updateSlideData({ slideJson: fallbackSlide });
-    } finally {
+
+    } catch (error) {
+      console.error('Slide generation request failed:', error);
       setIsGenerating(false);
+      generateFallbackSlide();
     }
   };
 
@@ -386,6 +451,25 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                     <div>
                       <p className="font-medium text-gray-800">Generating your slide...</p>
                       <p className="text-sm text-gray-600">Creating JSON structure for Fabric.js</p>
+                      
+                      {/* Backend Progress Indicator */}
+                      {backendProgress && (
+                        <div className="mt-4 space-y-2">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                              style={{ width: `${backendProgress.progress}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-gray-600">
+                            <span>Backend Progress</span>
+                            <span>{backendProgress.progress}%</span>
+                          </div>
+                          <p className="text-xs text-gray-500 max-w-xs">
+                            {backendProgress.message}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

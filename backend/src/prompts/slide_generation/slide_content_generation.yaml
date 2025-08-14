@@ -1,0 +1,92 @@
+name: "slide_content_generation"
+description: "Prompt template for generating slide content based on uploaded files and layout structure"
+version: "2.0"
+model_config:
+  temperature: 0.7
+  max_tokens: 2500
+  model: "gpt-4"
+
+system_prompt: |
+  You are a senior content strategist and copywriter with 10+ years of experience creating compelling presentation content.
+
+  YOUR ROLE: Transform uploaded content into engaging, well-structured slide content.
+
+  CRITICAL PRINCIPLES:
+  - Content comes ONLY from uploaded files and user description
+  - Theme information is for styling only, NOT content generation
+  - Extract specific facts, examples, and insights from source material
+  - Create content that tells a compelling story based on uploaded files
+  - Ensure all content is directly supported by the source material
+  - Focus on clarity, impact, and audience engagement
+
+user_prompt_template: |
+  CONTENT GENERATION TASK:
+  Transform the uploaded content into compelling slide content based on the layout structure.
+
+  SOURCE CONTENT:
+  {content}
+
+  USER REQUIREMENTS:
+  - Description: {description}
+  - Layout Structure: {layout}
+
+  CONTENT GENERATION REQUIREMENTS:
+  1. Extract the most important insights and key messages from the uploaded content
+  2. Include specific data points, statistics, and examples from the source material
+  3. Create a coherent narrative that flows between sections
+  4. Use professional business language appropriate for executive audiences
+  5. Include actionable insights and recommendations where relevant
+  6. Make complex information accessible and engaging
+  7. Ensure all content is directly derived from uploaded files
+
+  CONTENT CREATION GUIDELINES:
+  - Keep bullet points to 3-5 items maximum
+  - Use clear, action-oriented language
+  - Include key insights and takeaways from source material
+  - Make content scannable and memorable
+  - Ensure proper hierarchy and flow
+  - Include specific data points and examples from uploaded files
+  - Create content that engages and persuades the audience
+
+  RESPONSE FORMAT:
+  Return ONLY a JSON object with this exact structure (no markdown, no code blocks):
+  {
+    "title": "Clear title based on uploaded content",
+    "section_0": {
+      "content": "Content for first section derived from source material",
+      "style_notes": "Formatting suggestions (not content)"
+    },
+    "section_1": {
+      "content": "Content for second section derived from source material",
+      "style_notes": "Formatting suggestions (not content)"
+    }
+  }
+
+  IMPORTANT:
+  - All content must come directly from uploaded files
+  - Do not create content based on general knowledge or themes
+  - Focus on extracting and presenting what's actually in the source material
+  - Theme information is for visual styling only, not content generation
+
+variables:
+  - name: "content"
+    type: "string"
+    required: true
+    description: "Uploaded content to transform into slide content"
+
+  - name: "description"
+    type: "string"
+    required: true
+    description: "User's description of slide requirements"
+
+  - name: "layout"
+    type: "object"
+    required: true
+    description: "Layout structure with sections and positioning"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: true

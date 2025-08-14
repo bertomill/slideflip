@@ -31,6 +31,10 @@ interface ContentStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void; // Callback to update slide data in parent
   onNext: () => void;                                      // Navigation callback to proceed to next step
   onPrev: () => void;                                      // Navigation callback to return to previous step
+  isConnected?: boolean;                                   // WebSocket connection status
+  connectionStatus?: string;                               // Connection status string
+  sendContentPlanning?: (description: string, documents: any[], researchData?: string, userFeedback?: string, theme?: string) => boolean; // WebSocket function to send content planning request
+  lastMessage?: any;                                       // Last message from backend
 }
 
 /**
@@ -53,13 +57,16 @@ interface ContentStepProps {
  * - User feedback collection for iterative improvements
  * - Document content preview for transparency
  */
-export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: ContentStepProps) {
+export function ContentStep({ slideData, updateSlideData, onNext, onPrev, isConnected = false, connectionStatus = 'disconnected', sendContentPlanning, lastMessage }: ContentStepProps) {
   // ============================================================================
   // COMPONENT STATE: Manages content planning workflow and user interactions
   // ============================================================================
 
   // LOADING STATES: Track async operations for proper UI feedback
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false); // Shows spinner during AI content plan generation
+  const [isSlideGenerating, setIsSlideGenerating] = useState(false); // Shows when slides are being generated in background
+  const [slideGenerationProgress, setSlideGenerationProgress] = useState<{progress: number, message: string} | null>(null);
+  const [contentPlanningProgress, setContentPlanningProgress] = useState<{progress: number, message: string} | null>(null);
 
   // CONTENT PLAN MANAGEMENT: Handles AI-generated and user-modified content plans
   const [contentPlan, setContentPlan] = useState<string>("");           // Original AI-generated content plan (read-only reference)
@@ -81,6 +88,88 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
   // ============================================================================
   // CONTENT PLAN GENERATION: AI-powered analysis and planning
   // ============================================================================
+
+  // Generate fallback plan when backend fails
+  const generateFallbackPlan = useCallback(() => {
+    let fallbackPlan = `Based on your description: "${slideData.description}"\n\n`;
+    fallbackPlan += `I'm planning to create a slide with the following structure:\n\n`;
+    fallbackPlan += `📋 **Main Content:**\n`;
+    fallbackPlan += `• Title based on your description\n`;
+    fallbackPlan += `• Key points extracted from your uploaded documents\n`;
+    fallbackPlan += `• Supporting details and context\n\n`;
+    if (slideData.wantsResearch && slideData.researchData) {
+      fallbackPlan += `🔍 **Research Integration:**\n`;
+      fallbackPlan += `• Industry insights and trends\n`;
+      fallbackPlan += `• Supporting statistics and data\n`;
+      fallbackPlan += `• Best practice recommendations\n\n`;
+    }
+    fallbackPlan += `🎨 **Visual Design:**\n`;
+    fallbackPlan += `• ${slideData.selectedTheme || 'Professional'} theme styling\n`;
+    fallbackPlan += `• Clean, readable layout\n`;
+    fallbackPlan += `• Consistent color scheme\n\n`;
+    fallbackPlan += `This plan will ensure your slide effectively communicates your message!`;
+
+    setContentPlan(fallbackPlan);
+    setEditableContentPlan(fallbackPlan);
+    setPlanGenerated(true);
+  }, [slideData]);
+
+  // Handle backend messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('Content step received message from backend:', lastMessage);
+      console.log('Message type:', lastMessage.type);
+      console.log('Message data:', lastMessage.data);
+      
+      if (lastMessage.type === 'content_planning_complete') {
+        console.log('Processing content planning completion message');
+        setIsGeneratingPlan(false);
+        
+        // Update content plan with backend response
+        if (lastMessage.data.content_plan) {
+          const plan = lastMessage.data.content_plan;
+          setContentPlan(plan);
+          setEditableContentPlan(plan);
+          setPlanGenerated(true);
+          console.log('Content plan updated from backend');
+        }
+      } else if (lastMessage.type === 'content_planning_error') {
+        console.log('Processing content planning error message');
+        setIsGeneratingPlan(false);
+        console.error('Content planning error from backend:', lastMessage.data.error);
+        
+        // Generate fallback plan
+        generateFallbackPlan();
+      } else if (lastMessage.type === 'content_planning_progress') {
+        // Handle progress updates if needed
+        console.log('Content planning progress:', lastMessage.data);
+      } else if (lastMessage.type === 'progress_update' && lastMessage.data.step === 'slide_generation') {
+        // Handle slide generation progress updates
+        console.log('Processing slide generation progress update in content step:', lastMessage.data.progress, lastMessage.data.message);
+        
+        setIsSlideGenerating(lastMessage.data.progress < 100);
+        setSlideGenerationProgress({
+          progress: lastMessage.data.progress,
+          message: lastMessage.data.message
+        });
+        
+        // Clear progress when complete
+        if (lastMessage.data.progress >= 100) {
+          setTimeout(() => {
+            setSlideGenerationProgress(null);
+          }, 2000);
+        }
+      } else if (lastMessage.type === 'slide_generation_complete') {
+        // Slide generation completed
+        console.log('Processing slide generation completion in content step');
+        setIsSlideGenerating(false);
+        setSlideGenerationProgress(null);
+        console.log('Slide generation completed in background');
+      } else {
+        console.log('Unhandled message type in content step:', lastMessage.type);
+      }
+    }
+  }, [lastMessage, generateFallbackPlan]);
 
   /**
    * Generate comprehensive AI content plan based on all collected user data
@@ -148,32 +237,26 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
     model: (slideData as unknown as { selectedModel?: string }).selectedModel || undefined,
       };
 
-      // API REQUEST: Send planning context to AI content planning service
-      // The /api/plan-content endpoint analyzes all inputs and generates
-      // a structured content plan with recommendations and suggestions
-      const response = await fetch('/api/plan-content', {
-        method: 'POST',
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(planningContext),
-      });
-
-      // RESPONSE VALIDATION: Ensure API request was successful before processing
-      if (!response.ok) {
-        throw new Error('Content planning request failed');
+      // Check if backend is connected
+      if (!isConnected || !sendContentPlanning) {
+        throw new Error('Backend not connected or sendContentPlanning not available');
       }
 
-      const data = await response.json();
+      // Send content planning request to backend via WebSocket
+      const success = sendContentPlanning(
+        slideData.description,
+        slideData.parsedDocuments || slideData.documents,
+        slideData.researchData,
+        userFeedback,
+        slideData.selectedTheme
+      );
 
-      // SUCCESS HANDLING: Process successful AI content plan generation
-      if (data.success) {
-        // DUAL STATE MANAGEMENT: Store both original and editable versions
-        setContentPlan(data.contentPlan);              // Original AI plan (reference copy)
-        setEditableContentPlan(data.contentPlan);      // Editable copy for user modifications
-        setPlanGenerated(true);                        // Enable user review interface
+      if (success) {
+        console.log('Content planning request sent to backend successfully');
+        // The response will be handled in the useEffect hook
+        return; // Exit early, response handled in useEffect
       } else {
-        throw new Error(data.error || 'Content planning failed');
+        throw new Error('Failed to send content planning request to backend');
       }
     } catch (error) {
       // ERROR HANDLING: Graceful fallback when AI planning fails
@@ -204,7 +287,7 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
       // CLEANUP: Always clear loading state regardless of success/failure
       setIsGeneratingPlan(false);
     }
-  }, [slideData]);
+  }, [slideData, userFeedback, isConnected, sendContentPlanning]);
 
   // Fallback plan generator removed; logic is inlined in generateContentPlan error handler.
 
@@ -270,6 +353,31 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
   }, [planGenerated, isGeneratingPlan, generateContentPlan]);
 
   // ============================================================================
+  // EFFECTS: Handle side effects and external data changes
+  // ============================================================================
+
+  // Update content planning progress when slideData changes
+  useEffect(() => {
+    if (slideData.contentPlanningProgress) {
+      setContentPlanningProgress(slideData.contentPlanningProgress);
+    }
+  }, [slideData.contentPlanningProgress]);
+
+  // Handle slide generation progress updates from WebSocket
+  useEffect(() => {
+    if (lastMessage?.type === 'progress_update' && lastMessage.data.step === 'slide_generation') {
+      setSlideGenerationProgress({
+        progress: lastMessage.data.progress,
+        message: lastMessage.data.message
+      });
+      setIsSlideGenerating(true);
+    } else if (lastMessage?.type === 'slide_generation_complete') {
+      setIsSlideGenerating(false);
+      setSlideGenerationProgress(null);
+    }
+  }, [lastMessage]);
+
+  // ============================================================================
   // NAVIGATION LOGIC: Control when user can proceed to next step
   // ============================================================================
 
@@ -299,42 +407,77 @@ export function ContentStep({ slideData, updateSlideData, onNext, onPrev }: Cont
       </Card>
 
       {/* ========================================================================
-          LOADING STATE: AI content plan generation progress indicator
+          CONTENT PLANNING PROGRESS: Shows progress during AI content planning
           ========================================================================
-          - Only visible while AI is analyzing user data
-          - Shows spinning loader and progress steps for user feedback
-          - Provides transparency about what AI is processing
+          - Displays when backend is processing content planning request
+          - Shows real-time progress updates from WebSocket
           - Uses glass card variant for subtle appearance during loading
           ======================================================================== */}
-      {isGeneratingPlan && (
+      {isGeneratingPlan && contentPlanningProgress && (
         <Card variant="glass">
           <CardContent className="p-6">
             {/* LOADING HEADER: Spinner and status message */}
             <div className="flex items-center gap-3 mb-4">
               <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
-              <h3 className="font-semibold">Analyzing Your Content</h3>
+              <h3 className="font-semibold">Generating Content Plan</h3>
             </div>
 
-            {/* PROCESS DESCRIPTION: Explains what AI is doing */}
-            <p className="text-sm text-muted-foreground mb-4">
-              AI is reviewing your documents, description, theme choice, and research data to create a comprehensive content plan...
+            {/* PROGRESS BAR: Visual progress indicator */}
+            <div className="w-full bg-muted rounded-full h-2 mb-4">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${contentPlanningProgress.progress}%` }}
+              />
+            </div>
+
+            {/* PROGRESS TEXT: Current step and percentage */}
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{contentPlanningProgress.progress}%</span>
+            </div>
+
+            {/* CURRENT STEP: What's happening now */}
+            <p className="text-sm text-muted-foreground">
+              {contentPlanningProgress.message}
             </p>
+          </CardContent>
+        </Card>
+      )}
 
-            {/* PROGRESS STEPS: Visual indicators of processing stages */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                Processing uploaded documents...
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                Integrating research findings...
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                Creating content structure...
-              </div>
+      {/* ========================================================================
+          SLIDE GENERATION PROGRESS: Shows progress during slide generation
+          ========================================================================
+          - Displays when backend is generating slides in background
+          - Shows real-time progress updates from WebSocket
+          - Uses glass card variant for subtle appearance during loading
+          ======================================================================== */}
+      {isSlideGenerating && slideGenerationProgress && (
+        <Card variant="glass">
+          <CardContent className="p-6">
+            {/* LOADING HEADER: Spinner and status message */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+              <h3 className="font-semibold">Generating Your Slides</h3>
             </div>
+
+            {/* PROGRESS BAR: Visual progress indicator */}
+            <div className="w-full bg-muted rounded-full h-2 mb-4">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${slideGenerationProgress.progress}%` }}
+              />
+            </div>
+
+            {/* PROGRESS TEXT: Current step and percentage */}
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{slideGenerationProgress.progress}%</span>
+            </div>
+
+            {/* CURRENT STEP: What's happening now */}
+            <p className="text-sm text-muted-foreground">
+              {slideGenerationProgress.message}
+            </p>
           </CardContent>
         </Card>
       )}

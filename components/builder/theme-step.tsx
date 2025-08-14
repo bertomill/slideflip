@@ -25,6 +25,10 @@ interface ThemeStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void;
   onNext: () => void;
   onPrev: () => void;
+  sendThemeSelection?: (themeData: any) => boolean;
+  isConnected?: boolean;
+  connectionStatus?: string;
+  lastMessage?: any;
 }
 
 // Shared type for curated example entries
@@ -38,7 +42,7 @@ type CuratedExample = {
   slide_json?: SlideDefinition | null;
 };
 
-export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeStepProps) {
+export function ThemeStep({ slideData, updateSlideData, onNext, onPrev, sendThemeSelection, isConnected = false, connectionStatus = 'disconnected', lastMessage }: ThemeStepProps) {
   type ModelAwareSlideData = SlideData & { selectedModel?: string };
   const modelAwareSlideData = slideData as ModelAwareSlideData;
   // State for managing examples and loading state
@@ -53,6 +57,24 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
   const [aiPrompt, setAiPrompt] = useState<string>('modern, professional, trustworthy');
   const [isPaletteLoading, setIsPaletteLoading] = useState(false);
   const pasteZoneRef = useRef<HTMLDivElement | null>(null);
+
+  // Handle backend messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('Theme step received message from backend:', lastMessage);
+      console.log('Message type:', lastMessage.type);
+      console.log('Message data:', lastMessage.data);
+      
+      if (lastMessage.type === 'theme_selection_success') {
+        console.log('Theme selection successful:', lastMessage.data);
+      } else if (lastMessage.type === 'theme_selection_error') {
+        console.error('Theme selection error:', lastMessage.data.error);
+      } else if (lastMessage.type === 'progress_update' && lastMessage.data.step === 'slide_generation') {
+        // Handle slide generation progress updates
+        console.log('Slide generation progress in theme step:', lastMessage.data.progress, lastMessage.data.message);
+      }
+    }
+  }, [lastMessage]);
 
   // Load examples on component mount
   useEffect(() => {
@@ -99,6 +121,37 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
 
   // Check if user can proceed to next step
   const canProceed = slideData.selectedTheme !== "";
+
+  // Handle theme selection and send to backend
+  const handleThemeSelection = async (themeId: string, themeName: string = '', colorPalette: string[] = []) => {
+    // Update local state
+    updateSlideData({ selectedTheme: themeId });
+    
+    // Send to backend if available
+    if (sendThemeSelection) {
+      try {
+        const themeData = {
+          theme_id: themeId,
+          theme_name: themeName || themeId,
+          theme_description: `Selected theme: ${themeName || themeId}`,
+          color_palette: colorPalette.length > 0 ? colorPalette : (slideData.selectedPalette || []),
+          preview_text: `Theme ${themeName || themeId} selected`,
+          slide_count: slideData.slideCount || 1
+        };
+        
+        console.log('Sending theme selection to backend:', themeData);
+        const success = sendThemeSelection(themeData);
+        
+        if (success) {
+          console.log('Theme selection sent to backend successfully');
+        } else {
+          console.warn('Failed to send theme selection to backend');
+        }
+      } catch (error) {
+        console.error('Error sending theme selection to backend:', error);
+      }
+    }
+  };
 
   // Component for rendering slide preview with proper scaling
   const SlidePreview = ({ html, palette }: { html: string; palette?: string[] }) => {
@@ -384,6 +437,34 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         <p className="text-sm text-muted-foreground">
           Select a slide template that matches your presentation style and industry
         </p>
+        
+        {/* Slide Count Configuration */}
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+          <label htmlFor="slide-count" className="block text-sm font-medium text-foreground mb-2">
+            Number of Slides to Generate
+          </label>
+          <div className="flex items-center gap-3">
+            <Select 
+              value={slideData.slideCount?.toString() || "1"} 
+              onValueChange={(value) => updateSlideData({ slideCount: parseInt(value) })}
+            >
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="1" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 slide</SelectItem>
+                <SelectItem value="3">3 slides</SelectItem>
+                <SelectItem value="5">5 slides</SelectItem>
+                <SelectItem value="7">7 slides</SelectItem>
+                <SelectItem value="10">10 slides</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">
+              Choose how many slides the AI should generate from your content
+            </span>
+          </div>
+        </div>
+        
         {/* AI Model Toggle */}
         <div className="mt-3 flex items-center gap-3">
           <span className="text-xs text-muted-foreground">AI Model</span>
@@ -426,7 +507,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                       key={ex.id}
                       variant={isSelected ? 'premium' : 'glass'}
                       className={`cursor-pointer transition-all duration-200 hover:scale-[1.02] ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''}`}
-                      onClick={() => updateSlideData({ selectedTheme: ex.id })}
+                      onClick={() => handleThemeSelection(ex.id, ex.name, slideData.selectedPalette)}
                     >
                       {ex.slide_json ? (
                         <SlidePreviewJSON slide={ex.slide_json} palette={slideData.selectedPalette} />

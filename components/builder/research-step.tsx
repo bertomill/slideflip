@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,11 @@ interface ResearchStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void; // Callback to update slide data in parent
   onNext: () => void;                                      // Navigation callback to proceed to next step
   onPrev: () => void;                                      // Navigation callback to return to previous step
-  sendGenerateSlide?: (description: string, theme?: string, wantsResearch?: boolean) => boolean; // WebSocket function to send slide generation request
+  isConnected?: boolean;                                   // WebSocket connection status
+  connectionStatus?: string;                               // Connection status string
+  sendResearchRequest?: (description: string, researchOptions: any, wantsResearch: boolean) => boolean; // WebSocket function to send research request
+  sendGenerateSlide?: (description: string, theme: string, wantsResearch: boolean) => boolean; // WebSocket function to send slide generation request
+  lastMessage?: any;                                       // Last message from backend
 }
 
 /**
@@ -28,7 +32,7 @@ interface ResearchStepProps {
  * Allows users to choose whether to enhance their slide with AI-powered research
  * Provides customizable research options and handles the research API integration
  */
-export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendGenerateSlide }: ResearchStepProps) {
+export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, isConnected = false, connectionStatus = 'disconnected', sendResearchRequest, sendGenerateSlide, lastMessage }: ResearchStepProps) {
   type ModelAwareSlideData = SlideData & { selectedModel?: string };
   const modelAwareSlideData = slideData as ModelAwareSlideData;
   // UI State Management: Track research process status
@@ -55,6 +59,30 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendG
     updateSlideData({ researchOptions: newOptions }); // Sync with parent slide data
   };
 
+  // Handle backend messages
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('Research step received message from backend:', lastMessage);
+      
+      if (lastMessage.type === 'research_success') {
+        setIsResearching(false);
+        setResearchComplete(true);
+        
+        // Update slide data with research results
+        if (lastMessage.data.research_data) {
+          updateSlideData({ researchData: lastMessage.data.research_data });
+          console.log('Research data updated from backend');
+        }
+      } else if (lastMessage.type === 'research_error') {
+        setIsResearching(false);
+        console.error('Research error from backend:', lastMessage.data.error);
+      } else if (lastMessage.type === 'research_progress') {
+        // Handle progress updates if needed
+        console.log('Research progress:', lastMessage.data);
+      }
+    }
+  }, [lastMessage]);
+
   /**
    * Handles user's choice about whether to include additional research
    * Updates the slide data and conditionally shows advanced options
@@ -66,82 +94,52 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendG
   };
 
   /**
-   * Initiates the AI research process using the Tavily API
-   * Handles the complete research workflow: API call, success/error handling, and UI updates
+   * Initiates the AI research process using the backend WebSocket
+   * Handles the complete research workflow: WebSocket call, success/error handling, and UI updates
    * Separated from handleResearchChoice to allow users to configure options before starting
    */
   const startResearch = async () => {
-    // Show loading state to provide user feedback during API call
+    // Check if backend is connected
+    if (!isConnected || !sendResearchRequest) {
+      console.error('Backend not connected or sendResearchRequest not available');
+      return;
+    }
+
+    // Show loading state to provide user feedback during research
     setIsResearching(true);
     
     try {
-      // Build research query from user's slide description with fallback
-      // Uses description as primary query since it contains the user's specific intent
-      const query = slideData.description || "business presentation insights";
-      
-      // Make API call to research endpoint with user's query and customized options
-      const response = await fetch('/api/research', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: query,                    // Primary search term
-          description: slideData.description, // Additional context for research
-          options: researchOptions,        // User-configured research parameters
-        }),
-      });
+      // Send research request to backend via WebSocket
+      const success = sendResearchRequest(
+        slideData.description || "business presentation insights",
+        researchOptions,
+        true
+      );
 
-      // Check for HTTP-level errors (network issues, server errors, etc.)
-      if (!response.ok) {
-        throw new Error('Research request failed');
-      }
-
-      // Parse the JSON response from the research API
-      const data = await response.json();
-      
-      // Handle successful research results
-      if (data.success) {
-        // Store research data in global slide state for use in slide generation
-        updateSlideData({ researchData: data.researchData });
-        // Mark research as complete to show results UI and enable next step
-        setResearchComplete(true);
+      if (success) {
+        console.log('Research request sent to backend successfully');
+        // The response will be handled in the useEffect hook
       } else {
-        // Handle API-level errors (invalid query, rate limits, etc.)
-        throw new Error(data.error || 'Research failed');
+        throw new Error('Failed to send research request to backend');
       }
+
     } catch (error) {
-      // Log error details for debugging while providing user-friendly feedback
-      console.error('Research error:', error);
+      // ERROR HANDLING: Reset UI state and log error details
+      setIsResearching(false);    // Hide loading spinner
+      setResearchComplete(false); // Reset success state
+
+      // Log error for debugging while showing user-friendly message
+      console.error('Research request failed:', error);
       
       // Create graceful fallback message that allows user to continue without research
-      // This ensures the slide builder workflow isn't completely blocked by research failures
       let fallbackData = `Research temporarily unavailable. 
       
 Your slide will be created using the uploaded documents and description provided.`;
-
-      // Provide specific guidance based on error type to help user resolve issues
-      if (error instanceof Error) {
-        if (error.message.includes('400')) {
-          // Client-side error: likely invalid or insufficient query parameters
-          fallbackData += `\n\nTip: Try providing a more detailed description for better research results.`;
-        } else if (error.message.includes('500')) {
-          // Server-side error: API service issues, rate limits, or configuration problems
-          fallbackData += `\n\nThe research service is currently unavailable. Please try again later.`;
-        } else {
-          // Generic error: network issues, timeouts, or unexpected failures
-          fallbackData += `\n\nFor enhanced content, please try the research option again later.`;
-        }
-      }
       
       // Store fallback message as research data so user can still proceed
       updateSlideData({ researchData: fallbackData });
       // Mark as complete even on error to allow workflow continuation
       setResearchComplete(true);
-    } finally {
-      // Always clear loading state regardless of success/failure
-      // This ensures UI doesn't get stuck in loading state
-      setIsResearching(false);
     }
   };
 

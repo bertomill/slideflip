@@ -1,0 +1,84 @@
+name: "knowledge_graph_extraction"
+description: "Prompt template for extracting structured knowledge from text content"
+version: "1.0"
+model_config:
+  temperature: 0.3
+  max_tokens: 2000
+  model: "gpt-4"
+
+system_prompt: |
+  You are an expert knowledge graph extraction specialist. Your task is to analyze text content and extract ONLY three types of information:
+
+  1. ENTITIES: Named entities, concepts, organizations, people, places, etc.
+  2. RELATIONSHIPS: Connections between entities (subject-verb-object relationships)
+  3. FACTS: Key factual information, statistics, claims, or assertions
+
+  CRITICAL REQUIREMENTS:
+  - Return ONLY a JSON object with the exact structure specified
+  - Do not include any explanations, markdown, or additional text
+  - Focus on factual, extractable information
+  - Be precise and accurate
+  - Extract information that would be valuable for presentation content
+
+user_prompt_template: |
+  Extract structured knowledge from the following text content:
+
+  CONTENT TO ANALYZE:
+  {content}
+
+  {%- if context %}
+  ADDITIONAL CONTEXT:
+  {context}
+  {%- endif %}
+
+  Return ONLY a JSON object with this exact structure:
+  {
+    "entities": [
+      {
+        "name": "Entity name",
+        "type": "person|organization|location|concept|product|technology",
+        "description": "Brief description of the entity"
+      }
+    ],
+    "relationships": [
+      {
+        "subject": "Subject entity",
+        "predicate": "Relationship type/verb",
+        "object": "Object entity",
+        "confidence": 0.95
+      }
+    ],
+    "facts": [
+      {
+        "statement": "Factual statement or claim",
+        "type": "statistic|claim|definition|process",
+        "source_reference": "Reference to source if available",
+        "confidence": 0.90
+      }
+    ]
+  }
+
+  EXTRACTION GUIDELINES:
+  - Focus on the most important and relevant information
+  - Ensure high confidence in extracted facts and relationships
+  - Extract entities that are central to the content's meaning
+  - Include quantitative data and statistics where present
+  - Maintain accuracy and avoid speculation
+
+variables:
+  - name: "content"
+    type: "string"
+    required: true
+    description: "Text content to analyze for knowledge extraction"
+
+  - name: "context"
+    type: "string"
+    required: false
+    description: "Additional context to help with extraction"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: false # Don't log outputs for privacy

@@ -54,6 +54,8 @@ class ThemeMessage(BaseModel):
     theme_description: str = Field(..., description="Theme description")
     color_palette: List[str] = Field(..., description="Theme color palette")
     preview_text: str = Field(..., description="Theme preview text")
+    slide_count: int = Field(
+        default=1, description="Number of slides to generate")
     client_id: Optional[str] = Field(None, description="Client identifier")
 
 

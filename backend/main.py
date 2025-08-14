@@ -27,6 +27,7 @@ from src.services.kg_processing import perform_final_clustering
 from src.routers.root import router as root_router
 from src.routers.api import router as api_router
 from src.routers.debug import router as debug_router, init_debug_endpoints
+from src.routers.monitoring import router as monitoring_router
 from src.routers.websocket import websocket_endpoint
 
 # Configure logging
@@ -76,6 +77,33 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.TEMP_DIR, exist_ok=True)
     os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
+
+    # Initialize core AI services
+    try:
+        from src.core.initialization import initialize_core_services, validate_system_requirements
+
+        # Validate system requirements first
+        validation_results = validate_system_requirements()
+        if validation_results["status"] == "failed":
+            logger.error(
+                f"System validation failed: {validation_results['errors']}")
+        elif validation_results["status"] == "warning":
+            logger.warning(
+                f"System validation warnings: {validation_results['warnings']}")
+        else:
+            logger.info("System validation passed")
+
+        # Initialize core services
+        init_status = initialize_core_services()
+        if init_status["status"] == "success":
+            logger.info("Core AI services initialized successfully")
+        else:
+            logger.warning(
+                f"Core services initialization: {init_status['status']}")
+            if init_status["errors"]:
+                logger.error(f"Initialization errors: {init_status['errors']}")
+    except Exception as e:
+        logger.error(f"Failed to initialize core AI services: {e}")
 
     # Initialize debug endpoints with required services
     init_debug_endpoints(file_service, websocket_manager,
@@ -138,6 +166,7 @@ app.add_middleware(
 app.include_router(root_router)
 app.include_router(api_router)
 app.include_router(debug_router)
+app.include_router(monitoring_router)
 
 # WebSocket endpoint
 

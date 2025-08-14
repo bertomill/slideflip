@@ -91,6 +91,5 @@ next-env.d.ts
 .cursor/
 
 # Startup scripts
-start-app-robust.sh
 STARTUP_README.md
 

@@ -19,14 +19,26 @@ scikit-learn
 numpy
 tiktoken
 pdfminer.six
+pypdf
 python-docx
 pydantic-settings
 
 # Phase 1: LangGraph and LangChain for agentic research
-langgraph>=0.2.0
-langchain>=0.3.0
-langchain-community>=0.3.0
-langchain-openai>=0.2.0
+langgraph==0.6.4
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.74
+langchain-openai==0.3.30
+langchain-text-splitters==0.3.9
+langgraph-checkpoint==2.1.1
+langgraph-prebuilt==0.6.4
+langgraph-sdk==0.2.0
+
+# Supporting Libraries for LangGraph/LangChain
+sqlalchemy==2.0.43
+tenacity==9.1.2
+marshmallow==3.26.1
+orjson==3.11.2
 
 # Enhanced Research APIs
 tavily-python>=0.5.0
@@ -35,6 +47,11 @@ firecrawl-py>=0.0.12
 # Performance and Monitoring
 asyncio-throttle>=1.0.2
 prometheus-client>=0.19.0
+
+# Template Engine for Prompts and Configuration
+# Added for structured YAML prompt templates and Jinja2 template rendering
+Jinja2==3.1.6
+PyYAML==6.0.2
 
 # Data Analysis (for future phases)
 pandas>=2.0.0

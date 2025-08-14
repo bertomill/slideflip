@@ -1,0 +1,119 @@
+name: "content_planning"
+description: "Prompt template for generating structured content plans based on uploaded files and user description"
+version: "2.0"
+model_config:
+  temperature: 0.7
+  max_tokens: 2000
+  model: "gpt-4"
+
+system_prompt: |
+  You are an expert content strategist and presentation planner with 15+ years of experience analyzing documents and creating compelling presentation content.
+
+  YOUR ROLE: Analyze uploaded content and user requirements to create a strategic content plan.
+
+  CRITICAL PRINCIPLES:
+  - Content comes ONLY from uploaded files and user description
+  - Theme information is for styling suggestions only, NOT content generation
+  - Focus on extracting key insights, facts, and narratives from source material
+  - Create logical content flow that tells a compelling story
+  - Ensure all content recommendations are grounded in the uploaded material
+
+user_prompt_template: |
+  CONTENT ANALYSIS TASK:
+  Create a comprehensive content plan based on the following inputs:
+
+  USER DESCRIPTION: {description}
+
+  UPLOADED FILES CONTENT:
+  {%- if uploaded_files %}
+  {%- for file in uploaded_files %}
+  --- {file.filename} ---
+  Content: {file.content[:1000]}...
+  {%- endfor %}
+  {%- else %}
+  No uploaded files provided
+  {%- endif %}
+
+  {%- if research_data %}
+  ADDITIONAL RESEARCH DATA:
+  {research_data}
+  {%- endif %}
+
+  {%- if user_feedback %}
+  USER FEEDBACK:
+  {user_feedback}
+  {%- endif %}
+
+  CONTENT PLANNING REQUIREMENTS:
+  1. Analyze the uploaded content to identify key themes, facts, and insights
+  2. Create a logical content structure that flows naturally
+  3. Extract specific data points, examples, and quotes from the source material
+  4. Organize content into clear, focused sections
+  5. Ensure all content recommendations are directly supported by uploaded files
+  6. Create a compelling narrative that guides the audience through the information
+
+  CONTENT PLAN STRUCTURE:
+  Return a JSON object with this exact structure:
+  {
+    "title": "Clear, descriptive title based on uploaded content",
+    "main_sections": [
+      {
+        "type": "introduction|content|insights|conclusion",
+        "title": "Section title",
+        "content_summary": "What this section will cover",
+        "key_points": ["Point 1 from source", "Point 2 from source"],
+        "source_references": ["Specific content from uploaded files"],
+        "priority": "high|medium|low"
+      }
+    ],
+    "key_messages": [
+      "Primary takeaway directly from source material",
+      "Secondary insight supported by uploaded content"
+    ],
+    "data_points": [
+      {
+        "value": "Specific fact or statistic from source",
+        "context": "What this data means in context",
+        "source": "Which uploaded file this comes from"
+      }
+    ],
+    "content_flow": {
+      "opening": "How to introduce the topic using source material",
+      "development": "How to develop the main content from uploaded files",
+      "closing": "How to conclude based on source insights"
+    }
+  }
+
+  IMPORTANT: 
+  - All content must be directly derived from uploaded files
+  - Do not create content based on theme or general knowledge
+  - Focus on extracting and organizing what's actually in the source material
+  - Theme information is for styling only, not content generation
+
+variables:
+  - name: "description"
+    type: "string"
+    required: true
+    description: "User's description of what the slide should contain"
+
+  - name: "uploaded_files"
+    type: "array"
+    required: true
+    description: "List of uploaded files with content to analyze"
+
+  - name: "research_data"
+    type: "string"
+    required: false
+    description: "Additional research data to incorporate"
+
+  - name: "user_feedback"
+    type: "string"
+    required: false
+    description: "User's additional requirements or feedback"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: true

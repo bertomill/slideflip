@@ -1,0 +1,79 @@
+name: "search_query_optimization"
+description: "Prompt template for optimizing search queries for better research results"
+version: "1.0"
+model_config:
+  temperature: 0.4
+  max_tokens: 800
+  model: "gpt-4"
+
+system_prompt: |
+  You are an expert information retrieval specialist with deep knowledge of search optimization techniques.
+  You excel at transforming user queries into multiple optimized search queries that will yield comprehensive, relevant results.
+  You understand how different search engines work and how to craft queries for maximum coverage and relevance.
+
+user_prompt_template: |
+  Transform the following user query into optimized search queries for comprehensive research:
+
+  ORIGINAL QUERY: {original_query}
+
+  {%- if context %}
+  CONTEXT: {context}
+  {%- endif %}
+
+  {%- if slide_description %}
+  SLIDE CONTEXT: This is for a presentation about: {slide_description}
+  {%- endif %}
+
+  OPTIMIZATION REQUIREMENTS:
+  1. Create 3-5 diverse search queries that cover different angles of the topic
+  2. Include specific terminology, synonyms, and related concepts
+  3. Balance broad exploratory queries with specific targeted searches
+  4. Consider temporal aspects (recent developments, historical context)
+  5. Include queries for different types of content (statistics, trends, case studies)
+  6. Optimize for both web search engines and academic/professional sources
+
+  Return your response as a JSON object:
+  {
+    "optimized_queries": [
+      {
+        "query": "Optimized search query",
+        "purpose": "What this query is designed to find",
+        "type": "broad|specific|statistical|trend|case_study",
+        "expected_sources": ["type of sources this should return"]
+      }
+    ],
+    "search_strategy": {
+      "primary_focus": "Main aspect to emphasize",
+      "secondary_angles": ["Additional angles to explore"],
+      "temporal_scope": "Time range to focus on",
+      "source_priorities": ["Preferred types of sources"]
+    },
+    "keywords": {
+      "core_terms": ["Essential keywords"],
+      "synonyms": ["Alternative terms"],
+      "related_concepts": ["Broader related topics"]
+    }
+  }
+
+variables:
+  - name: "original_query"
+    type: "string"
+    required: true
+    description: "The original user search query to optimize"
+
+  - name: "context"
+    type: "string"
+    required: false
+    description: "Additional context about the research needs"
+
+  - name: "slide_description"
+    type: "string"
+    required: false
+    description: "Description of the slide this research will support"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: true

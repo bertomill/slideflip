@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class WebSocketManager:
     """
     Manages WebSocket connections for multiple clients
-    
+
     FRONTEND INTEGRATION NOTES:
     - Use this for real-time progress updates during slide generation
     - Each step (@builder/ components) should send/receive messages through WebSocket
@@ -35,18 +35,23 @@ class WebSocketManager:
 
     def __init__(self):
         # Core connection tracking - Frontend connects here
-        self.active_connections: Dict[str, WebSocket] = {}  # client_id -> WebSocket
-        self.client_data: Dict[str, dict] = {}              # Session data for each client
-        self.connection_times: Dict[str, datetime] = {}     # Connection timestamps
-        
+        # client_id -> WebSocket
+        self.active_connections: Dict[str, WebSocket] = {}
+        # Session data for each client
+        self.client_data: Dict[str, dict] = {}
+        # Connection timestamps
+        self.connection_times: Dict[str, datetime] = {}
+
         # Connection management - Prevents race conditions during connect/disconnect
-        self.connecting_clients: Set[str] = set()           # Clients currently connecting
-        self.max_connections = 50                           # Limit to prevent resource exhaustion
+        # Clients currently connecting
+        self.connecting_clients: Set[str] = set()
+        # Limit to prevent resource exhaustion
+        self.max_connections = 50
 
     async def connect(self, websocket: WebSocket, client_id: str):
         """
         Connect a new client and initialize their session
-        
+
         FRONTEND USAGE:
         - Call this when user opens the app or refreshes page
         - client_id should be unique per session (recommend UUID)
@@ -150,7 +155,7 @@ class WebSocketManager:
     def _cleanup_client(self, client_id: str):
         """
         Clean up client data when disconnecting
-        
+
         FRONTEND NOTE: This happens automatically, no action needed
         """
         if client_id in self.active_connections:
@@ -163,7 +168,7 @@ class WebSocketManager:
     async def _initialize_client_session(self, client_id: str):
         """
         Initialize client session with enhanced data tracking for all builder steps
-        
+
         FRONTEND DEVELOPERS:
         - Each step (@builder/upload, @builder/theme, etc.) gets its own data section
         - Track completion status and step-specific data here
@@ -175,7 +180,7 @@ class WebSocketManager:
                 "session_id": client_id,
                 # Step 1: Upload component data
                 "step_1_upload": {"completed": False, "data": {}},
-                # Step 2: Theme selection component data  
+                # Step 2: Theme selection component data
                 "step_2_theme": {"completed": False, "data": {}},
                 # Step 3: Research component data
                 "step_3_research": {"completed": False, "data": {}},
@@ -204,28 +209,17 @@ class WebSocketManager:
     def disconnect(self, client_id: str):
         """
         Disconnect a client and cleanup resources
-        
+
         FRONTEND USAGE: This is called automatically when connection is lost
         """
         self._cleanup_client(client_id)
         logger.info(f"Client {client_id} disconnected")
 
-    async def send_personal_message(self, message: dict, client_id: str):
+    async def send_personal_message(self, message: dict, client_id: str) -> bool:
         """
         Send a message to a specific client
-        
-        FRONTEND DEVELOPERS:
-        - Use this for step-specific updates (upload progress, theme applied, etc.)
-        - Message format: {"type": "message_type", "data": {...}}
-        - Returns True if sent successfully, False if client disconnected
-        - Automatically handles connection cleanup on failures
-        
-        Example message types:
-        - "upload_progress": File upload progress updates
-        - "theme_applied": Theme selection confirmation
-        - "research_complete": Research step completion
-        - "content_generated": Content generation results
-        - "preview_ready": Preview is ready for display
+
+        FRONTEND USAGE: Use this for targeted communication to specific users
         """
         if client_id not in self.active_connections:
             logger.warning(
@@ -233,8 +227,9 @@ class WebSocketManager:
             return False
 
         websocket = self.active_connections[client_id]
+
         try:
-            # Check if WebSocket is still open before sending
+            # Check if connection is still open
             if websocket.client_state.value > 2:  # WebSocket is closed
                 logger.warning(
                     f"WebSocket for client {client_id} is closed, removing from active connections")
@@ -246,6 +241,8 @@ class WebSocketManager:
                 websocket.send_text(json.dumps(message)),
                 timeout=10.0
             )
+            logger.debug(
+                f"Message sent to client {client_id}: {message.get('type', 'unknown')}")
             return True
         except asyncio.TimeoutError:
             logger.error(f"Timeout sending message to client {client_id}")
@@ -259,7 +256,7 @@ class WebSocketManager:
     async def broadcast(self, message: dict):
         """
         Send a message to all connected clients
-        
+
         FRONTEND USAGE:
         - Use for system-wide announcements
         - Server maintenance notifications
@@ -297,7 +294,7 @@ class WebSocketManager:
     def get_client_data(self, client_id: str) -> dict:
         """
         Get stored data for a specific client
-        
+
         FRONTEND USAGE:
         - Access user's session data across all steps
         - Check completion status of each builder step
@@ -308,12 +305,12 @@ class WebSocketManager:
     def update_client_data(self, client_id: str, data: dict):
         """
         Update stored data for a specific client
-        
+
         FRONTEND USAGE:
         - Save progress from each builder step
         - Update completion status when step is finished
         - Store user selections (theme, content preferences, etc.)
-        
+
         Example usage:
         update_client_data(client_id, {
             "step_1_upload": {"completed": True, "data": {"files": [...]}},
@@ -329,7 +326,7 @@ class WebSocketManager:
     def get_connected_clients(self) -> Set[str]:
         """
         Get list of connected client IDs
-        
+
         FRONTEND USAGE: For admin/monitoring purposes
         """
         return set(self.active_connections.keys())
@@ -337,7 +334,7 @@ class WebSocketManager:
     def get_connection_count(self) -> int:
         """
         Get number of active connections
-        
+
         FRONTEND USAGE: Display connection status or implement rate limiting
         """
         return len(self.active_connections)
@@ -345,7 +342,7 @@ class WebSocketManager:
     async def ping_all_clients(self):
         """
         Send ping to all connected clients to check if they're still alive
-        
+
         FRONTEND DEVELOPERS:
         - Your WebSocket client should respond to ping messages
         - This helps detect and cleanup stale connections
@@ -362,7 +359,7 @@ class WebSocketManager:
     async def cleanup_stale_connections(self):
         """
         Clean up stale connections that haven't responded to pings
-        
+
         FRONTEND NOTE: This runs automatically in the background
         """
         stale_clients = []
@@ -382,7 +379,7 @@ class WebSocketManager:
     async def send_heartbeat(self, client_id: str):
         """
         Send a heartbeat to a specific client to check if it's still alive
-        
+
         FRONTEND USAGE: Your client should respond to heartbeat messages
         """
         try:
@@ -404,7 +401,7 @@ class WebSocketManager:
     def get_connection_stats(self) -> dict:
         """
         Get connection statistics
-        
+
         FRONTEND USAGE:
         - Display server capacity to users
         - Implement connection retry logic based on available slots
@@ -420,7 +417,7 @@ class WebSocketManager:
     def get_connection_info(self, client_id: str) -> dict:
         """
         Get connection information for a specific client
-        
+
         FRONTEND USAGE:
         - Debug connection issues
         - Display session duration to user
@@ -440,7 +437,7 @@ class WebSocketManager:
     def get_all_connection_info(self) -> dict:
         """
         Get information about all connections
-        
+
         FRONTEND USAGE: Admin/monitoring dashboard to see all active sessions
         """
         return {
@@ -450,3 +447,65 @@ class WebSocketManager:
                 for client_id in self.active_connections.keys()
             }
         }
+
+    async def check_connection_health(self, client_id: str) -> bool:
+        """
+        Check if a client connection is healthy and responsive
+
+        FRONTEND USAGE: Use this to verify connection status before sending messages
+        """
+        if client_id not in self.active_connections:
+            return False
+
+        websocket = self.active_connections[client_id]
+
+        try:
+            # Check if WebSocket is still open
+            if websocket.client_state.value > 2:
+                logger.warning(f"WebSocket for client {client_id} is closed")
+                self.disconnect(client_id)
+                return False
+
+            # Send a lightweight ping to test responsiveness
+            ping_message = {
+                "type": "ping",
+                "data": {
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+
+            await asyncio.wait_for(
+                websocket.send_text(json.dumps(ping_message)),
+                timeout=5.0
+            )
+            return True
+
+        except Exception as e:
+            logger.warning(
+                f"Connection health check failed for client {client_id}: {e}")
+            self.disconnect(client_id)
+            return False
+
+    async def get_connection_health_stats(self) -> dict:
+        """
+        Get health statistics for all active connections
+
+        FRONTEND USAGE: Monitor connection health in admin dashboard
+        """
+        health_stats = {
+            "total_connections": len(self.active_connections),
+            "healthy_connections": 0,
+            "unhealthy_connections": 0,
+            "connection_details": {}
+        }
+
+        for client_id in list(self.active_connections.keys()):
+            is_healthy = await self.check_connection_health(client_id)
+            if is_healthy:
+                health_stats["healthy_connections"] += 1
+                health_stats["connection_details"][client_id] = "healthy"
+            else:
+                health_stats["unhealthy_connections"] += 1
+                health_stats["connection_details"][client_id] = "unhealthy"
+
+        return health_stats

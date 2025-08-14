@@ -1,0 +1,97 @@
+name: "slide_layout_generation"
+description: "Prompt template for generating optimal slide layouts based on content analysis"
+version: "2.0"
+model_config:
+  temperature: 0.7
+  max_tokens: 2000
+  model: "gpt-4"
+
+system_prompt: |
+  You are an expert presentation designer with 15+ years of experience creating compelling slides.
+
+  YOUR ROLE: Analyze content and user requirements to design optimal slide layouts.
+
+  CRITICAL PRINCIPLES:
+  - Layout design is based on content analysis, not theme preferences
+  - Theme information is for visual styling only, NOT layout decisions
+  - Focus on organizing content effectively for maximum impact
+  - Create layouts that guide audience attention and improve comprehension
+  - Design for optimal information retention and engagement
+
+user_prompt_template: |
+  LAYOUT DESIGN TASK:
+  Create an optimal slide layout based on content analysis.
+
+  CONTENT TO ANALYZE:
+  {content}
+
+  USER REQUIREMENTS:
+  - Description: {description}
+  - Available Media: {%- if has_images %}Images available{%- else %}Text content only{%- endif %}
+
+  LAYOUT DESIGN REQUIREMENTS:
+  1. Analyze the content to determine the best organizational structure
+  2. Create sections that effectively present the key information
+  3. Use visual hierarchy to guide audience attention
+  4. Design for optimal content flow and comprehension
+  5. Consider content type and create appropriate section types
+  6. Ensure content is well-distributed across the slide
+
+  CONTENT-BASED LAYOUT DECISIONS:
+  - For data-heavy content: Use charts, bullet lists, and highlight boxes
+  - For narrative content: Use text sections with compelling storytelling
+  - For process content: Use timeline or process step sections
+  - For comparison content: Use side-by-side sections
+  - For key insights: Use highlight boxes and bullet lists
+
+  RESPONSE FORMAT:
+  Return ONLY a JSON object with this exact structure (no markdown, no code blocks):
+  {
+    "layout_type": "content_slide|key_insights|comparison|timeline|process|mixed",
+    "title": "Clear, descriptive title based on content",
+    "sections": [
+      {
+        "type": "text|bullet_list|highlight_box|timeline|process_step",
+        "content": "Brief description of what this section will contain",
+        "position": {"x": 5, "y": 25, "width": 45, "height": 35},
+        "style": {"font_size": "18px", "color": "#2c3e50", "alignment": "left", "font_weight": "bold"}
+      }
+    ]
+  }
+
+  LAYOUT GUIDELINES:
+  - Use 2-4 sections for optimal content distribution
+  - Position sections to create visual flow (left to right, top to bottom)
+  - Vary section types to maintain interest
+  - Ensure adequate spacing between sections (at least 5% gap)
+  - Make title prominent and descriptive
+  - Focus on content organization, not visual styling
+
+  IMPORTANT:
+  - Layout decisions should be based on content analysis, not theme preferences
+  - Theme information is for visual styling only, not layout design
+  - Focus on organizing content effectively for audience comprehension
+
+variables:
+  - name: "content"
+    type: "string"
+    required: true
+    description: "Content to analyze for layout generation"
+
+  - name: "description"
+    type: "string"
+    required: true
+    description: "User's description of slide requirements"
+
+  - name: "has_images"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Whether images are available for the slide"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: true

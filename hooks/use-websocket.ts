@@ -12,6 +12,7 @@ interface UseWebSocketProps {
   onError?: (error: Event) => void;
   onClose?: () => void;
   onOpen?: () => void;
+  onProgressUpdate?: (step: string, progress: number, message: string, stepData?: any) => void;
 }
 
 export function useWebSocket({
@@ -19,7 +20,8 @@ export function useWebSocket({
   onMessage,
   onError,
   onClose,
-  onOpen
+  onOpen,
+  onProgressUpdate
 }: UseWebSocketProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
@@ -64,6 +66,9 @@ export function useWebSocket({
         onOpen: () => {
           updateConnectionStatus();
           onOpen?.();
+        },
+        onProgressUpdate: (step, progress, message, stepData) => {
+          onProgressUpdate?.(step, progress, message, stepData);
         }
       });
 
@@ -81,7 +86,7 @@ export function useWebSocket({
       clearInterval(statusInterval);
       // Don't disconnect here as other components might be using the service
     };
-  }, [clientId, onMessage, onError, onClose, onOpen, updateConnectionStatus]);
+  }, [clientId, onMessage, onError, onClose, onOpen, updateConnectionStatus, onProgressUpdate]);
 
   const ping = useCallback(() => {
     return websocketService.ping();
@@ -128,13 +133,16 @@ export function useWebSocket({
       onOpen: () => {
         updateConnectionStatus();
         onOpen?.();
+      },
+      onProgressUpdate: (step, progress, message, stepData) => {
+        onProgressUpdate?.(step, progress, message, stepData);
       }
     });
 
     if (success) {
       updateConnectionStatus();
     }
-  }, [clientId, onMessage, onError, onClose, onOpen, updateConnectionStatus]);
+  }, [clientId, onMessage, onError, onClose, onOpen, updateConnectionStatus, onProgressUpdate]);
 
   const disconnect = useCallback(() => {
     websocketService.disconnect();
@@ -161,6 +169,28 @@ export function useWebSocket({
     return websocketService.sendThemeSelection(themeData);
   }, []);
 
+  const sendResearchRequest = useCallback((description: string, researchOptions: any, wantsResearch: boolean) => {
+    return websocketService.sendResearchRequest(description, researchOptions, wantsResearch);
+  }, []);
+
+  const sendContentPlanning = useCallback((
+    description: string, 
+    documents: any[], 
+    researchData?: string, 
+    userFeedback?: string, 
+    theme?: string
+  ) => {
+    return websocketService.sendContentPlanning(description, documents, researchData, userFeedback, theme);
+  }, []);
+
+  const sendStepGuidanceRequest = useCallback((currentStep: string) => {
+    return websocketService.sendStepGuidanceRequest(currentStep);
+  }, []);
+
+  const sendSessionStatusRequest = useCallback(() => {
+    return websocketService.sendSessionStatusRequest();
+  }, []);
+
   const sendProcessSlide = useCallback((options?: any) => {
     return websocketService.sendProcessSlide(options);
   }, []);
@@ -178,6 +208,10 @@ export function useWebSocket({
     sendSlideDescription,
     sendGenerateSlide,
     sendThemeSelection,
+    sendResearchRequest,
+    sendContentPlanning,
+    sendStepGuidanceRequest,
+    sendSessionStatusRequest,
     sendProcessSlide,
     ping
   };

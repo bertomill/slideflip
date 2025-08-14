@@ -82,11 +82,33 @@ export function UploadStep({
       
       if (lastMessage.type === 'file_upload_success') {
         setUploadStatus(`Successfully uploaded ${lastMessage.data.filename}`);
+        
+        // Add parsed document to slideData if available
+        if (lastMessage.data.parsed_document) {
+          const parsedDoc = lastMessage.data.parsed_document;
+          const currentParsedDocs = slideData.parsedDocuments || [];
+          
+          // Check if this document is already in the list (avoid duplicates)
+          const existingIndex = currentParsedDocs.findIndex(doc => doc.filename === parsedDoc.filename);
+          
+          let updatedParsedDocs;
+          if (existingIndex >= 0) {
+            // Update existing document
+            updatedParsedDocs = [...currentParsedDocs];
+            updatedParsedDocs[existingIndex] = parsedDoc;
+          } else {
+            // Add new document
+            updatedParsedDocs = [...currentParsedDocs, parsedDoc];
+          }
+          
+          updateSlideData({ parsedDocuments: updatedParsedDocs });
+          console.log('Added parsed document to slideData:', parsedDoc.filename);
+        }
       } else if (lastMessage.type === 'file_upload_error') {
         setUploadStatus(`Failed to upload: ${lastMessage.data.error}`);
       }
     }
-  }, [lastMessage]);
+  }, [lastMessage, slideData.parsedDocuments, updateSlideData]);
 
   // Detect SpeechRecognition support and initialize recognition instance
   useEffect(() => {

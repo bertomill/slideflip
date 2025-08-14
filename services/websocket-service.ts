@@ -8,6 +8,7 @@ interface WebSocketCallbacks {
   onError?: (error: Event) => void;
   onClose?: () => void;
   onOpen?: () => void;
+  onProgressUpdate?: (step: string, progress: number, message: string, stepData?: any) => void;
 }
 
 class WebSocketService {
@@ -111,6 +112,16 @@ class WebSocketService {
               }));
             }
             
+            // Handle progress updates specifically
+            if (message.type === 'progress_update') {
+              this.callbacks.onProgressUpdate?.(
+                message.data.step,
+                message.data.progress,
+                message.data.message,
+                message.data.step_data
+              );
+            }
+            
             this.callbacks.onMessage?.(message);
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -124,6 +135,8 @@ class WebSocketService {
           }
           
           console.error('WebSocket error:', error);
+          console.error('WebSocket readyState:', ws.readyState);
+          console.error('WebSocket URL:', wsUrl);
           this.connectionStatus = 'error';
           this.isConnecting = false;
           this.callbacks.onError?.(error);
@@ -229,7 +242,7 @@ class WebSocketService {
           this.callbacks.onMessage = originalOnMessage;
           this.callbacks.onError = originalOnError;
           reject(new Error('File upload timeout - no response from server'));
-        }, 30000); // 30 second timeout
+        }, 120000); // 120 second timeout to match backend
         
         const successHandler = (message: WebSocketMessage) => {
           console.log('File upload handler received message:', message);
@@ -312,6 +325,46 @@ class WebSocketService {
     return this.sendMessage({
       type: 'theme_selection',
       data: themeData
+    });
+  }
+
+  sendResearchRequest(description: string, researchOptions: any, wantsResearch: boolean): boolean {
+    return this.sendMessage({
+      type: 'research_request',
+      data: {
+        description,
+        research_options: researchOptions,
+        wants_research: wantsResearch
+      }
+    });
+  }
+
+  sendContentPlanning(description: string, documents: any[], researchData?: string, userFeedback?: string, theme?: string): boolean {
+    return this.sendMessage({
+      type: 'content_planning',
+      data: {
+        description,
+        parsed_documents: documents,
+        research_data: researchData,
+        user_feedback: userFeedback,
+        theme: theme || 'professional' // Default theme if not provided
+      }
+    });
+  }
+
+  sendStepGuidanceRequest(currentStep: string): boolean {
+    return this.sendMessage({
+      type: 'get_step_guidance',
+      data: {
+        current_step: currentStep
+      }
+    });
+  }
+
+  sendSessionStatusRequest(): boolean {
+    return this.sendMessage({
+      type: 'get_session_status',
+      data: {}
     });
   }
 

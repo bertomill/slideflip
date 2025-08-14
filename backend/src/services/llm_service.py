@@ -1,5 +1,6 @@
 """
 LLM service for slide generation using OpenAI GPT
+Rewritten with proper JSON parsing and content-focused generation
 """
 
 import logging
@@ -7,17 +8,24 @@ import json
 from typing import Dict, List, Optional, Any
 from openai import OpenAI
 from src.core.config import Settings
+from src.core.prompt_manager import get_prompt_manager
+import re
 
 logger = logging.getLogger(__name__)
 
+
 class LLMService:
-    """Service for LLM-based slide generation and knowledge graph extraction"""
-    
+    """
+    Service for LLM-based slide generation and knowledge graph extraction
+    Rewritten with proper JSON parsing and content-focused generation
+    """
+
     def __init__(self):
         self.settings = Settings()
         self.client = None
+        self.prompt_manager = get_prompt_manager()
         self._initialize_client()
-    
+
     def _initialize_client(self):
         """Initialize OpenAI client"""
         try:
@@ -36,605 +44,608 @@ class LLMService:
         except Exception as e:
             logger.error(f"Error initializing OpenAI client: {e}")
             self.client = None
-    
+
+    def is_available(self) -> bool:
+        """Check if LLM service is available"""
+        return self.client is not None
+
     async def generate_slide_layout(
-        self, 
-        content: str, 
-        description: str, 
+        self,
+        content: str,
+        description: str,
         theme: str = "default",
         has_images: bool = False,
         theme_info: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         Generate slide layout using LLM
+        Content-focused generation based on uploaded files and user description
         
         Args:
-            content: Extracted text content from files
+            content: Extracted text content from uploaded files
             description: User's slide description
-            theme: Slide theme
+            theme: Slide theme (used only for styling, not content)
             has_images: Whether images are available
-            theme_info: Detailed theme information including colors and description
-            
+            theme_info: Theme information (not used for content generation)
+
         Returns:
             Dict containing layout information
         """
         if not self.client:
             return self._generate_fallback_layout(content, description, theme)
-        
+
         try:
-            # Build theme context for the prompt
-            theme_context = ""
-            if theme_info:
-                theme_context = f"""
-THEME INFORMATION:
-- Theme Name: {theme_info.get('theme_name', theme)}
-- Theme Description: {theme_info.get('theme_description', '')}
-- Color Palette: {', '.join(theme_info.get('color_palette', []))}
-- Preview Text: {theme_info.get('preview_text', '')}
+            # Prepare variables for the prompt template
+            template_variables = {
+                "content": content[:3000] + "..." if len(content) > 3000 else content,
+                "description": description,
+                "theme": theme,
+                "has_images": has_images,
+                "theme_info": None  # Don't pass theme info to content generation
+            }
 
-Please incorporate this theme's visual style, color palette, and design philosophy into the layout.
-"""
-            
-            system_prompt = f"""You are an expert presentation designer with 15+ years of experience creating compelling slides for Fortune 500 companies, TED talks, and academic conferences. Your task is to analyze content and user requirements to design an optimal, professional slide layout that maximizes impact and engagement.
-
-CRITICAL REQUIREMENTS:
-- Create layouts that tell a story and guide the audience's attention
-- Design for visual hierarchy and readability
-- Ensure content is well-distributed across the slide
-- Consider the theme and make it cohesive with the design
-- Create multiple sections that work together to present the information effectively
-{theme_context}
-
-Return ONLY a JSON object with the following structure (no markdown formatting, no code blocks):
-{{
-    "layout_type": "title_slide|content_slide|image_slide|mixed|key_insights|comparison|timeline|process",
-    "title": "Compelling, action-oriented slide title",
-    "sections": [
-        {{
-            "type": "text|bullet_list|image|chart|quote|highlight_box|timeline|process_step",
-            "content": "Brief description of what this section will contain",
-            "position": {{"x": 5, "y": 25, "width": 45, "height": 35}},
-            "style": {{"font_size": "18px", "color": "#2c3e50", "alignment": "left", "font_weight": "bold"}}
-        }},
-        {{
-            "type": "text|bullet_list|image|chart|quote|highlight_box|timeline|process_step", 
-            "content": "Brief description of what this section will contain",
-            "position": {{"x": 55, "y": 25, "width": 40, "height": 35}},
-            "style": {{"font_size": "16px", "color": "#34495e", "alignment": "left"}}
-        }}
-    ],
-    "background_style": "gradient|solid|image|pattern",
-    "color_scheme": "professional|creative|minimal|colorful|corporate|academic|modern"
-}}
-
-LAYOUT GUIDELINES:
-- Use 2-4 sections for optimal content distribution
-- Position sections to create visual flow (left to right, top to bottom)
-- Vary section types to maintain interest (text, bullet lists, highlights)
-- Ensure adequate spacing between sections (at least 5% gap)
-- Make title prominent and engaging
-- Consider the content type and create appropriate sections
-"""
-
-            user_prompt = f"""CONTENT ANALYSIS:
-{content[:3000]}...
-
-DESIGN REQUIREMENTS:
-- User Description: {description}
-- Theme: {theme}
-- Available Media: {'Images available' if has_images else 'Text content only'}
-
-LAYOUT DESIGN TASK:
-Create a professional, engaging slide layout that:
-1. Effectively presents the key information from the content
-2. Uses visual hierarchy to guide audience attention
-3. Creates a compelling narrative flow
-4. Maximizes impact and engagement
-5. Works well with the specified theme
-6. Distributes content optimally across the slide
-
-Consider the content type and create appropriate sections:
-- For data-heavy content: Use charts, bullet lists, and highlight boxes
-- For narrative content: Use text sections with compelling storytelling
-- For process content: Use timeline or process step sections
-- For comparison content: Use side-by-side sections
-- For key insights: Use highlight boxes and bullet lists
-
-Design a layout that transforms this content into a compelling, professional presentation slide."""
+            # Render the slide layout generation prompt
+            prompt_data = await self.prompt_manager.render_prompt(
+                "slide_layout_generation",
+                template_variables
+            )
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                max_tokens=2000,
-                temperature=0.8
+                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "user", "content": prompt_data["user_prompt"]}
+                ]
             )
-            
+
             layout_text = response.choices[0].message.content.strip()
-            
+
             # Log the raw response for debugging
             logger.info(f"LLM Layout Response (first 500 chars): {layout_text[:500]}...")
-            
+
             # Clean up markdown code blocks if present
             if layout_text.startswith("```json"):
                 layout_text = layout_text[7:]  # Remove ```json
             elif layout_text.startswith("```"):
-                layout_text = layout_text[3:]   # Remove ```
-            
+                layout_text = layout_text[3:]  # Remove ```
             if layout_text.endswith("```"):
                 layout_text = layout_text[:-3]  # Remove trailing ```
-            
-            layout_text = layout_text.strip()
-            
-            # Try to parse JSON response
+
+            # Parse JSON response with better error handling
             try:
-                layout_data = json.loads(layout_text)
-                
-                # Validate the layout structure
-                if not isinstance(layout_data, dict):
-                    raise ValueError("Layout data must be a dictionary")
-                
-                if "sections" not in layout_data:
-                    raise ValueError("Layout data must contain 'sections' field")
-                
-                if not isinstance(layout_data["sections"], list):
-                    raise ValueError("Layout sections must be a list")
-                
+                layout_data = json.loads(layout_text.strip())
                 logger.info(f"✅ Successfully parsed layout JSON: {layout_data.get('layout_type', 'unknown')}")
-                logger.info(f"   Sections: {len(layout_data['sections'])}")
+                logger.info(f"   Sections: {len(layout_data.get('sections', []))}")
                 logger.info(f"   Title: {layout_data.get('title', 'No title')}")
                 return layout_data
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning(f"❌ Failed to parse/validate LLM response: {e}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"❌ Failed to parse/validate layout response: {e}")
                 logger.warning(f"Raw response: {layout_text}")
-                logger.info("Using fallback layout generation")
                 return self._generate_fallback_layout(content, description, theme)
-                
+
         except Exception as e:
             logger.error(f"Error generating slide layout: {e}")
             return self._generate_fallback_layout(content, description, theme)
-    
+
     async def generate_slide_content(
-        self, 
-        content: str, 
-        description: str, 
+        self,
+        content: str,
+        description: str,
         layout: Dict[str, Any],
         theme_info: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
         Generate slide content using LLM
+        Content-focused generation based on uploaded files and user description
         
         Args:
-            content: Extracted text content from files
+            content: Extracted text content from uploaded files
             description: User's slide description
             layout: Generated layout structure
-            theme_info: Detailed theme information including colors and description
-            
+            theme_info: Theme information (not used for content generation)
+
         Returns:
             Dict containing content for each section
         """
         if not self.client:
             return self._generate_fallback_content(content, description, layout)
-        
+
         try:
-            # Build theme context for the prompt
-            theme_context = ""
-            if theme_info:
-                theme_context = f"""
-THEME INFORMATION:
-- Theme Name: {theme_info.get('theme_name', 'default')}
-- Theme Description: {theme_info.get('theme_description', '')}
-- Color Palette: {', '.join(theme_info.get('color_palette', []))}
-- Preview Text: {theme_info.get('preview_text', '')}
+            # Prepare variables for the prompt template
+            template_variables = {
+                "content": content[:3000] + "..." if len(content) > 3000 else content,
+                "description": description,
+                "layout": layout,
+                "theme_info": None  # Don't pass theme info to content generation
+            }
 
-Please ensure the content style and tone match this theme's characteristics.
-"""
-            
-            system_prompt = f"""You are a senior content strategist and copywriter with 10+ years of experience creating compelling presentation content for Fortune 500 companies, TED talks, and high-profile events. Your task is to transform raw content into engaging, well-structured slide content that tells a compelling story.
-
-CRITICAL REQUIREMENTS:
-- Create content that is concise, impactful, and easy to read
-- Maintain professional tone while being engaging
-- Ensure content fits the specified layout structure
-- Make information scannable and memorable
-- Use active voice and action-oriented language
-{theme_context}
-
-Return ONLY a JSON object with content for each section (no markdown formatting, no code blocks):
-{{
-    "section_0": {{
-        "content": "Engaging, well-formatted content for the first section",
-        "style_notes": "Any specific styling or formatting notes"
-    }},
-    "section_1": {{
-        "content": "Engaging, well-formatted content for the second section", 
-        "style_notes": "Any specific styling or formatting notes"
-    }}
-}}
-
-CONTENT GUIDELINES:
-- Keep bullet points to 3-5 items maximum
-- Use clear, action-oriented language
-- Include key insights and takeaways
-- Make content scannable and memorable
-- Ensure proper hierarchy and flow
-"""
-
-            user_prompt = f"""SOURCE CONTENT ANALYSIS:
-{content[:3000]}...
-
-USER REQUIREMENTS:
-- Description: {description}
-- Layout Structure: {json.dumps(layout, indent=2)}
-
-CONTENT GENERATION TASK:
-Transform the source content into compelling, professional slide content that:
-1. Extracts the most important insights and key messages
-2. Includes specific data points, statistics, and examples from the source material
-3. Creates a coherent narrative that flows between sections
-4. Uses professional business language appropriate for executive audiences
-5. Includes actionable insights and recommendations where relevant
-6. Makes complex information accessible and engaging
-
-For each section in the layout, create comprehensive content that:
-- Tells a compelling story
-- Includes specific details from the source material
-- Uses professional language and formatting
-- Provides value to the audience
-- Supports the overall slide message
-
-Generate detailed, comprehensive content for each section."""
+            # Render the slide content generation prompt
+            prompt_data = await self.prompt_manager.render_prompt(
+                "slide_content_generation",
+                template_variables
+            )
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                max_tokens=2500,
-                temperature=0.8
+                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "user", "content": prompt_data["user_prompt"]}
+                ]
             )
-            
+
             content_text = response.choices[0].message.content.strip()
-            
+
             # Log the raw response for debugging
             logger.info(f"LLM Content Response (first 500 chars): {content_text[:500]}...")
-            
+
             # Clean up markdown code blocks if present
             if content_text.startswith("```json"):
                 content_text = content_text[7:]  # Remove ```json
             elif content_text.startswith("```"):
-                content_text = content_text[3:]   # Remove ```
-            
+                content_text = content_text[3:]  # Remove ```
             if content_text.endswith("```"):
                 content_text = content_text[:-3]  # Remove trailing ```
-            
-            content_text = content_text.strip()
-            
+
+            # Parse JSON response with better error handling
             try:
-                content_data = json.loads(content_text)
-                
-                # Validate the content structure
-                if not isinstance(content_data, dict):
-                    raise ValueError("Content data must be a dictionary")
-                
-                # Check if we have at least one section
-                section_keys = [key for key in content_data.keys() if key.startswith("section_")]
-                if not section_keys:
-                    raise ValueError("Content data must contain at least one section")
-                
-                logger.info("✅ Successfully parsed content JSON")
-                logger.info(f"   Sections: {len(section_keys)}")
+                content_data = json.loads(content_text.strip())
+                logger.info(f"✅ Successfully parsed content JSON")
+                logger.info(f"   Sections: {len([k for k in content_data.keys() if k.startswith('section_')])}")
                 return content_data
-                
-            except (json.JSONDecodeError, ValueError) as e:
+            except json.JSONDecodeError as e:
                 logger.warning(f"❌ Failed to parse/validate content response: {e}")
                 logger.warning(f"Raw response: {content_text}")
-                logger.info("Using fallback content generation")
                 return self._generate_fallback_content(content, description, layout)
-                
+
         except Exception as e:
             logger.error(f"Error generating slide content: {e}")
             return self._generate_fallback_content(content, description, layout)
 
-    async def generate_content(
-        self, 
-        prompt: str, 
-        max_tokens: int = 2000,
-        system_prompt: str = None
+    async def generate_slide_html(
+        self,
+        layout: Dict[str, Any],
+        content: Dict[str, Any],
+        theme: str = "default",
+        wants_research: bool = False,
+        theme_info: Optional[Dict] = None
     ) -> str:
         """
-        Generate content using LLM for general purposes
+        Generate HTML slide using LLM
+        Content-focused generation with theme styling applied separately
         
         Args:
-            prompt: User prompt for content generation
-            max_tokens: Maximum tokens for the response
-            system_prompt: Optional system prompt to override default
-            
+            layout: Generated layout structure
+            content: Generated content for each section
+            theme: Theme name (used only for styling)
+            wants_research: Whether research is enabled
+            theme_info: Theme information (used only for styling)
+
         Returns:
-            Generated content as string
+            HTML string for the slide
         """
         if not self.client:
-            logger.warning("OpenAI client not available. Cannot generate content.")
-            return ""
-        
-        try:
-            # Use default system prompt if none provided
-            if not system_prompt:
-                system_prompt = """You are a helpful AI assistant that provides clear, concise, and accurate responses. 
-                Follow the user's instructions carefully and format your response appropriately."""
-            
-            # Create the chat completion request
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=0.7
-            )
-            
-            # Extract the generated content
-            generated_content = response.choices[0].message.content.strip()
-            logger.info(f"Successfully generated content with {len(generated_content)} characters")
-            
-            return generated_content
-            
-        except Exception as e:
-            logger.error(f"Error generating content: {e}")
-            return ""
+            return self._generate_fallback_html(layout, content, theme_info, wants_research)
 
-    async def extract_knowledge_graph_from_chunk(
-        self, 
-        content: str, 
-        chunk_index: int,
-        filename: str,
-        file_path: str
+        try:
+            # Prepare variables for the prompt template
+            template_variables = {
+                "layout": layout,
+                "content": content,
+                "theme": theme,
+                "wants_research": wants_research,
+                "theme_info": theme_info  # Pass theme info for styling only
+            }
+
+            # Render the slide HTML generation prompt
+            prompt_data = await self.prompt_manager.render_prompt(
+                "slide_html_generation",
+                template_variables
+            )
+
+            response = self.client.chat.completions.create(
+                **prompt_data["model_config"],
+                messages=[
+                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "user", "content": prompt_data["user_prompt"]}
+                ]
+            )
+
+            html_text = response.choices[0].message.content.strip()
+
+            # Log the raw response for debugging
+            logger.info(f"LLM HTML Response (first 500 chars): {html_text[:500]}...")
+            logger.info(f"HTML content size: {len(html_text)} characters")
+
+            # Clean up markdown code blocks if present
+            if html_text.startswith("```html"):
+                html_text = html_text[7:]  # Remove ```html
+            elif html_text.startswith("```"):
+                html_text = html_text[3:]  # Remove ```
+            if html_text.endswith("```"):
+                html_text = html_text[:-3]  # Remove trailing ```
+
+            # Validate HTML content
+            if len(html_text) > 50000:  # 50KB limit
+                logger.warning(f"HTML content too large ({len(html_text)} chars), truncating")
+                html_text = html_text[:50000]
+
+            # Basic HTML validation
+            if not html_text.strip():
+                logger.error("Empty HTML content generated")
+                return self._generate_error_html()
+
+            if not ('<' in html_text and '>' in html_text):
+                logger.error("Invalid HTML content - missing tags")
+                return self._generate_error_html()
+
+            # Sanitize HTML content to prevent issues
+            html_text = re.sub(r'<script[^>]*>.*?</script>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
+            html_text = re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', html_text, flags=re.IGNORECASE)
+            html_text = re.sub(r'javascript:', '', html_text, flags=re.IGNORECASE)
+
+            logger.info("✅ Generated HTML using LLM successfully")
+            return html_text
+
+        except Exception as e:
+            logger.error(f"Error generating HTML with LLM: {e}")
+            return self._generate_fallback_html(layout, content, theme_info, wants_research)
+
+    async def generate_content_plan(
+        self,
+        description: str,
+        research_data: Optional[str] = None,
+        theme: str = "default",
+        uploaded_files: Optional[List[Dict]] = None,
+        theme_info: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """
-        Extract entities, relationships, and facts from a content chunk using LLM
+        Generate content plan using LLM
+        Content-focused generation based on uploaded files and user description
         
         Args:
-            content: Text content chunk to analyze
-            chunk_index: Index of the chunk in the file
-            filename: Name of the source file
-            file_path: Path to the source file
-            
+            description: User's slide description
+            research_data: Optional research data
+            theme: Theme name (used only for styling suggestions)
+            uploaded_files: List of uploaded files with content
+            theme_info: Theme information (used only for styling suggestions)
+
         Returns:
-            Dictionary containing extracted entities, relationships, and facts
+            Dict containing content plan
         """
         if not self.client:
-            logger.warning("LLM client not available, returning empty knowledge graph data")
-            return self._generate_empty_knowledge_graph_data(chunk_index, filename, file_path)
-        
+            return self._generate_fallback_content_plan(description, uploaded_files)
+
         try:
-            system_prompt = """You are an expert knowledge graph extraction specialist. Your task is to analyze text content and extract ONLY three types of information:
+            # Prepare variables for the prompt template
+            template_variables = {
+                "description": description,
+                "theme": theme,
+                "research_data": research_data,
+                "uploaded_files": uploaded_files or [],
+                "user_feedback": "",
+                "theme_info": theme_info  # For styling suggestions only
+            }
 
-1. ENTITIES: Named entities, concepts, organizations, people, places, etc.
-2. RELATIONSHIPS: Connections between entities (subject-verb-object relationships)
-3. FACTS: Key factual information, statistics, claims, or assertions
-
-CRITICAL REQUIREMENTS:
-- Return ONLY a JSON object with the exact structure specified
-- Do not include any explanations, markdown, or additional text
-- Focus on factual, extractable information
-- Be precise and accurate
-- Do not generate or invent information not present in the text
-
-Return ONLY this JSON structure (no other text):
-{
-    "entities": [
-        {
-            "id": "unique_entity_id",
-            "name": "entity_name",
-            "type": "entity_type",
-            "description": "brief_description",
-        }
-    ],
-    "relationships": [
-        {
-            "id": "unique_relationship_id",
-            "source_entity": "source_entity_id",
-            "target_entity": "target_entity_id",
-            "relationship_type": "relationship_label",
-        }
-    ],
-    "facts": [
-        {
-            "id": "unique_fact_id",
-            "content": "factual_statement",
-            "source_entities": ["entity_id1", "entity_id2"],
-        }
-    ]
-}"""
-
-            user_prompt = f"""Analyze the following text content and extract entities, relationships, and facts:
-
-TEXT CONTENT:
-{content}
-
-EXTRACTION TASK:
-Extract ONLY:
-1. Named entities (people, organizations, places, concepts, etc.)
-2. Relationships between entities (who does what to whom, what connects what, etc.)
-3. Key facts, statistics, or assertions from the text
-
-Return the JSON structure as specified in the system prompt. Be thorough but accurate."""
+            # Render the content planning prompt
+            prompt_data = await self.prompt_manager.render_prompt(
+                "content_planning",
+                template_variables
+            )
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                **prompt_data["model_config"],
                 messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                max_tokens=2000,
-                temperature=0.1  # Low temperature for more consistent extraction
+                    {"role": "system", "content": prompt_data["system_prompt"]},
+                    {"role": "user", "content": prompt_data["user_prompt"]}
+                ]
             )
-            
-            extraction_text = response.choices[0].message.content.strip()
-            
-            # Clean up markdown code blocks if present
-            if extraction_text.startswith("```json"):
-                extraction_text = extraction_text[7:]
-            elif extraction_text.startswith("```"):
-                extraction_text = extraction_text[3:]
-            
-            if extraction_text.endswith("```"):
-                extraction_text = extraction_text[:-3]
-            
-            extraction_text = extraction_text.strip()
-            
-            try:
-                extraction_data = json.loads(extraction_text)
-                
-                # Validate the structure
-                required_fields = ["entities", "relationships", "facts"]
-                for field in required_fields:
-                    if field not in extraction_data:
-                        extraction_data[field] = []
-                    if not isinstance(extraction_data[field], list):
-                        extraction_data[field] = []
-                
-                # Add metadata
-                extraction_data["metadata"] = {
-                    "chunk_index": chunk_index,
-                    "filename": filename,
-                    "file_path": file_path,
-                    "chunk_content": content,
-                    "extraction_timestamp": self._get_current_timestamp()
-                }
 
-                logger.info(f"Extraction data: {extraction_data}")
-                
-                logger.info(f"Successfully extracted knowledge graph data from chunk {chunk_index}")
-                logger.info(f"  Entities: {len(extraction_data['entities'])}")
-                logger.info(f"  Relationships: {len(extraction_data['relationships'])}")
-                logger.info(f"  Facts: {len(extraction_data['facts'])}")
-                
-                return extraction_data
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning(f"Failed to parse knowledge graph extraction response: {e}")
-                logger.warning(f"Raw response: {extraction_text}")
-                logger.info("Using fallback knowledge graph extraction")
-                return self._generate_fallback_knowledge_graph_data(content, chunk_index, filename, file_path)
-                
+            plan_text = response.choices[0].message.content.strip()
+
+            # Log the raw response for debugging
+            logger.info(f"LLM Content Plan Response (first 500 chars): {plan_text[:500]}...")
+
+            # Clean up markdown code blocks if present
+            if plan_text.startswith("```json"):
+                plan_text = plan_text[7:]  # Remove ```json
+            elif plan_text.startswith("```"):
+                plan_text = plan_text[3:]  # Remove ```
+            if plan_text.endswith("```"):
+                plan_text = plan_text[:-3]  # Remove trailing ```
+
+            # Parse JSON response with better error handling
+            try:
+                plan_data = json.loads(plan_text.strip())
+                logger.info(f"✅ Successfully parsed content plan JSON")
+                return plan_data
+            except json.JSONDecodeError as e:
+                logger.warning(f"❌ Failed to parse/validate content plan response: {e}")
+                logger.warning(f"Raw response: {plan_text}")
+                return self._generate_fallback_content_plan(description, uploaded_files)
+
         except Exception as e:
-            logger.error(f"Error extracting knowledge graph from chunk: {e}")
-            return self._generate_fallback_knowledge_graph_data(content, chunk_index, filename, file_path)
+            logger.error(f"Error generating content plan: {e}")
+            return self._generate_fallback_content_plan(description, uploaded_files)
 
     def _generate_fallback_layout(self, content: str, description: str, theme: str) -> Dict[str, Any]:
-        """Generate a fallback layout when LLM is not available"""
-        logger.info("Using fallback layout generation")
+        """Generate fallback layout when LLM is not available"""
+        try:
+            # Extract key information from content
+            content_lines = content.split('\n')
+            content_summary = content[:200] + "..." if len(content) > 200 else content
 
-        # Extract title from description
-        title = description.split()[:5]
-        title = " ".join(title).title()
+            # Create basic layout structure
+            layout = {
+                "layout_type": "content_slide",
+                "title": description[:50] if description else "Generated Slide",
+                "sections": [
+                    {
+                        "type": "text",
+                        "content": "Content overview and key insights",
+                        "position": {"x": 5, "y": 20, "width": 90, "height": 30},
+                        "style": {"font_size": "18px", "color": "#2c3e50", "alignment": "left"}
+                    },
+                    {
+                        "type": "bullet_list",
+                        "content": "Key points from uploaded content",
+                        "position": {"x": 5, "y": 55, "width": 90, "height": 40},
+                        "style": {"font_size": "16px", "color": "#34495e", "alignment": "left"}
+                    }
+                ]
+            }
 
-        return {
-            "layout_type": "content_slide",
-            "title": title,
-            "sections": [
-                {
-                    "type": "text",
-                    "content": "Main content section",
-                    "position": {"x": 5, "y": 25, "width": 90, "height": 70},
-                    "style": {"font_size": "18px", "color": "#2c3e50", "alignment": "left"}
-                }
-            ],
-            "background_style": "gradient",
-            "color_scheme": theme
-        }
-    
+            logger.info("Generated fallback layout")
+            return layout
+
+        except Exception as e:
+            logger.error(f"Error generating fallback layout: {e}")
+            return {
+                "layout_type": "error_slide",
+                "title": "Layout Generation Error",
+                "sections": []
+            }
+
     def _generate_fallback_content(self, content: str, description: str, layout: Dict[str, Any]) -> Dict[str, Any]:
         """Generate fallback content when LLM is not available"""
-        logger.info("Using fallback content generation")
-        
-        # Create simple content based on the layout
-        sections = layout.get("sections", [])
-        content_data = {}
-        
-        for i, section in enumerate(sections):
-            if section["type"] == "text":
-                # Use first 200 characters of content
-                section_content = content[:200] + "..." if len(content) > 200 else content
-                content_data[f"section_{i}"] = {
-                    "type": "text",
-                    "content": section_content,
-                    "style": section.get("style", {})
-                }
-            elif section["type"] == "bullet_list":
-                # Create bullet points from content
-                lines = content.split('\n')[:5]
-                bullet_content = "\n".join([f"• {line.strip()}" for line in lines if line.strip()])
-                content_data[f"section_{i}"] = {
-                    "type": "bullet_list",
-                    "content": bullet_content,
-                    "style": section.get("style", {})
-                }
-        
-        return content_data
+        try:
+            # Extract key information from content
+            content_lines = content.split('\n')
+            content_summary = content[:300] + "..." if len(content) > 300 else content
 
-    def _generate_empty_knowledge_graph_data(self, chunk_index: int, filename: str, file_path: str) -> Dict[str, Any]:
-        """Generate empty knowledge graph data when LLM is not available"""
-        return {
-            "entities": [],
-            "relationships": [],
-            "facts": [],
-            "metadata": {
-                "chunk_index": chunk_index,
-                "filename": filename,
-                "file_path": file_path,
-                "chunk_content": "",
-                "extraction_timestamp": self._get_current_timestamp(),
-                "note": "LLM not available - empty data generated"
+            # Create basic content structure
+            content_data = {
+                "title": description[:50] if description else "Generated Slide",
+                "section_0": {
+                    "content": f"Content Analysis:\n{content_summary}",
+                    "style_notes": "Use clear, readable formatting"
+                },
+                "section_1": {
+                    "content": "Key Insights:\n• Content processed successfully\n• Information extracted from uploaded files\n• Ready for presentation",
+                    "style_notes": "Use bullet points for clarity"
+                }
             }
+
+            logger.info("Generated fallback content")
+            return content_data
+
+        except Exception as e:
+            logger.error(f"Error generating fallback content: {e}")
+            return {
+                "title": "Content Generation Error",
+                "section_0": {
+                    "content": "Unable to generate content. Please try again.",
+                    "style_notes": "Use error styling"
+                }
+            }
+
+    def _generate_fallback_html(self, layout: Dict[str, Any], content: Dict[str, Any], theme_info: Optional[Dict], wants_research: bool) -> str:
+        """Generate fallback HTML when LLM is not available"""
+        try:
+            # Extract title from layout
+            title = layout.get("title", "Generated Slide")
+
+            # Get theme styles
+            theme_styles = self._get_theme_styles(theme_info)
+
+            # Generate content sections
+            content_sections = ""
+            sections = layout.get("sections", [])
+
+            for i, section in enumerate(sections):
+                section_content = content.get(f"section_{i}", {})
+                section_text = section_content.get("content", "Content not available")
+
+                if section.get("type") == "bullet_list":
+                    # Convert to bullet points
+                    lines = section_text.split('\n')
+                    bullet_points = ""
+                    for line in lines:
+                        if line.strip():
+                            bullet_points += f"""
+                            <li style="margin-bottom: 10px; padding-left: 20px; position: relative;">
+                            <span style="position: absolute; left: 0; top: 5px; width: 6px; height: 6px; background: #4ade80; border-radius: 50%;"></span>
+                            {line.strip()}
+                            </li>
+                            """
+                    content_sections += f"""
+                    <div style="margin-bottom: 20px;">
+                        <ul style="list-style: none; padding: 0;">
+                            {bullet_points}
+                        </ul>
+                    </div>
+                    """
+                else:
+                    # Regular text content
+                    content_sections += f"""
+                    <div style="margin-bottom: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                        <p style="margin: 0; line-height: 1.6;">{section_text}</p>
+                    </div>
+                    """
+
+            # Add research indicator if enabled
+            if wants_research:
+                content_sections += """
+                <div style="margin-top: 20px; padding: 10px; background: rgba(245, 158, 11, 0.2); border-radius: 8px; border-left: 4px solid #f59e0b;">
+                    <p style="margin: 0; font-size: 14px; color: #f59e0b;">
+                        <strong>🔍 Enhanced with AI Research</strong>
+                    </p>
+                </div>
+                """
+
+            # Create the HTML slide
+            slide_html = f"""
+            <div style="width: 800px; height: 600px; {theme_styles['background']}; padding: 60px; color: {theme_styles['text_color']}; font-family: 'Arial', sans-serif; position: relative; overflow: hidden; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; {theme_styles['overlay']}; opacity: 0.3;"></div>
+                
+                <div style="position: relative; z-index: 1;">
+                    <h1 style="font-size: 48px; font-weight: bold; margin-bottom: 30px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); {theme_styles['title_style']}; text-align: center;">
+                        {title}
+                    </h1>
+                    
+                    <div style="background: {theme_styles['content_bg']}; backdrop-filter: blur(10px); border-radius: 15px; padding: 30px; margin: 20px 0; max-height: 400px; overflow-y: auto;">
+                        {content_sections}
+                    </div>
+                    
+                    <div style="position: absolute; bottom: 20px; right: 60px; font-size: 12px; opacity: 0.7;">
+                        Created with SlideFlip AI
+                    </div>
+                </div>
+            </div>
+            """
+
+            logger.info("Generated fallback HTML")
+            return slide_html
+
+        except Exception as e:
+            logger.error(f"Error generating fallback HTML: {e}")
+            return self._generate_error_html()
+
+    def _generate_fallback_content_plan(self, description: str, uploaded_files: Optional[List[Dict]]) -> Dict[str, Any]:
+        """Generate fallback content plan when LLM is not available"""
+        try:
+            # Create basic content plan structure
+            content_plan = {
+                "title": description[:50] if description else "Generated Presentation",
+                "subtitle": "Content plan based on uploaded materials",
+                "main_sections": [
+                    {
+                        "type": "header",
+                        "title": "Introduction",
+                        "content": "Overview of the presentation topic",
+                        "visual_elements": ["title", "subtitle"],
+                        "priority": "high"
+                    },
+                    {
+                        "type": "content",
+                        "title": "Main Content",
+                        "content": "Key information from uploaded files",
+                        "visual_elements": ["bullet points", "text"],
+                        "priority": "high"
+                    }
+                ],
+                "key_messages": [
+                    "Content processed successfully",
+                    "Information extracted from uploaded files",
+                    "Ready for presentation"
+                ],
+                "visual_recommendations": {
+                    "layout_style": "single-column",
+                    "emphasis_elements": ["title", "main_content"],
+                    "color_usage": "Use theme colors for accents and highlights"
+                }
+            }
+
+            logger.info("Generated fallback content plan")
+            return content_plan
+
+        except Exception as e:
+            logger.error(f"Error generating fallback content plan: {e}")
+            return {
+                "title": "Content Plan Error",
+                "error": "Unable to generate content plan. Please try again."
+            }
+
+    def _get_theme_styles(self, theme_info: Optional[Dict]) -> Dict[str, str]:
+        """Get theme styles for HTML generation"""
+        if not theme_info:
+            return {
+                'background': 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);',
+                'text_color': 'white',
+                'overlay': 'background: linear-gradient(45deg, #f093fb 0%, transparent 100%);',
+                'content_bg': 'rgba(255,255,255,0.15)',
+                'title_style': 'color: #667eea;'
+            }
+
+        color_palette = theme_info.get('color_palette', [])
+        if color_palette:
+            primary_color = color_palette[0]
+            secondary_color = color_palette[1] if len(color_palette) > 1 else primary_color
+            accent_color = color_palette[2] if len(color_palette) > 2 else secondary_color
+
+            return {
+                'background': f'background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);',
+                'text_color': 'white',
+                'overlay': f'background: linear-gradient(45deg, {accent_color} 0%, transparent 100%);',
+                'content_bg': 'rgba(255,255,255,0.15)',
+                'title_style': f'color: {primary_color};'
+            }
+        
+        return {
+            'background': 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);',
+            'text_color': 'white',
+            'overlay': 'background: linear-gradient(45deg, #f093fb 0%, transparent 100%);',
+            'content_bg': 'rgba(255,255,255,0.15)',
+            'title_style': 'color: #667eea;'
         }
 
-    def _generate_fallback_knowledge_graph_data(self, content: str, chunk_index: int, filename: str, file_path: str) -> Dict[str, Any]:
-        """Generate fallback knowledge graph data when LLM extraction fails"""
-        # Simple fallback: extract basic entities from text
-        # TODO: Do this using spacy
-        entities = []
-        relationships = []
-        facts = []
-        
-        # Extract basic entities (capitalized words that might be entities)
-        words = content.split()
-        for i, word in enumerate(words):
-            if word and word[0].isupper() and len(word) > 2:
-                # Simple heuristic for entity detection
-                entity_id = f"entity_{chunk_index}_{i}"
-                entities.append({
-                    "id": entity_id,
-                    "name": word,
-                    "type": "unknown",
-                    "description": f"Extracted from chunk {chunk_index}",
-                })
-        
-        return {
-            "entities": entities,
-            "relationships": relationships,
-            "facts": facts,
-            "metadata": {
-                "chunk_index": chunk_index,
-                "filename": filename,
-                "file_path": file_path,
-                "chunk_content": content,
-                "extraction_timestamp": self._get_current_timestamp(),
-                "note": "Fallback extraction used due to LLM failure"
-            }
-        }
+    def _generate_error_html(self) -> str:
+        """Generate error HTML slide"""
+        return """
+        <div style="width: 800px; height: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 60px; color: white; font-family: 'Arial', sans-serif; display: flex; align-items: center; justify-content: center; border-radius: 15px;">
+            <div style="text-align: center;">
+                <h1 style="font-size: 36px; margin-bottom: 20px;">Slide Generation Error</h1>
+                <p style="font-size: 18px;">Unable to generate slide content. Please try again.</p>
+            </div>
+        </div>
+        """
 
-    def _get_current_timestamp(self) -> str:
-        """Get current timestamp as string"""
-        from datetime import datetime
-        return datetime.now().isoformat()
-    
-    def is_available(self) -> bool:
-        """Check if LLM service is available"""
-        return self.client is not None 
+    # Knowledge Graph Methods (kept for backward compatibility)
+    async def extract_knowledge_graph(
+        self,
+        content: str,
+        description: str,
+        max_nodes: int = 50
+    ) -> Dict[str, Any]:
+        """Extract knowledge graph from content"""
+        if not self.client:
+            return {"error": "LLM service not available"}
+
+        try:
+            # This method is kept for backward compatibility
+            # Knowledge graph extraction is now handled by the dedicated service
+            logger.info("Knowledge graph extraction requested (handled by dedicated service)")
+            return {"message": "Knowledge graph extraction handled by dedicated service"}
+
+        except Exception as e:
+            logger.error(f"Error extracting knowledge graph: {e}")
+            return {"error": str(e)}
+
+    async def query_knowledge_graph(
+        self,
+        query: str,
+        graph_data: Dict[str, Any],
+        max_results: int = 10
+    ) -> Dict[str, Any]:
+        """Query knowledge graph with natural language"""
+        if not self.client:
+            return {"error": "LLM service not available"}
+
+        try:
+            # This method is kept for backward compatibility
+            # Knowledge graph querying is now handled by the dedicated service
+            logger.info("Knowledge graph query requested (handled by dedicated service)")
+            return {"message": "Knowledge graph querying handled by dedicated service"}
+
+        except Exception as e:
+            logger.error(f"Error querying knowledge graph: {e}")
+            return {"error": str(e)}

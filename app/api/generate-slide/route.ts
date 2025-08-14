@@ -88,6 +88,8 @@ SLIDE DESCRIPTION: ${description}
 
 THEME: ${theme || 'Professional'}
 
+NUMBER OF SLIDES: Generate content suitable for multiple slides as specified by user preferences.
+
 `;
 
     // Add content plan from content planning step if available

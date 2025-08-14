@@ -1,0 +1,113 @@
+name: "web_research"
+description: "Prompt template for web research agent to find relevant information"
+version: "1.0"
+model_config:
+  temperature: 0.3
+  max_tokens: 1500
+  model: "gpt-4"
+
+system_prompt: |
+  You are an expert research analyst with deep expertise in information gathering, source evaluation, and synthesis.
+  You excel at finding relevant, credible information from web sources and presenting it in a structured, actionable format.
+  You always prioritize accuracy, recency, and relevance while maintaining objectivity.
+
+user_prompt_template: |
+  Conduct comprehensive web research on the following topic and provide structured insights:
+
+  RESEARCH TOPIC: {query}
+
+  CONTEXT: {context}
+
+  {%- if slide_description %}
+  SLIDE CONTEXT: This research will be used for a presentation slide about: {slide_description}
+  {%- endif %}
+
+  {%- if search_results %}
+  SEARCH RESULTS TO ANALYZE:
+  {%- for result in search_results %}
+
+  Source: {result.url}
+  Title: {result.title}
+  Content: {result.content}
+  Score: {result.score}
+  Published: {result.published_date}
+
+  {%- endfor %}
+  {%- endif %}
+
+  RESEARCH REQUIREMENTS:
+  1. Analyze the provided search results for relevance and credibility
+  2. Extract key insights, statistics, and factual information
+  3. Identify trends, patterns, and important developments
+  4. Assess source quality and recency
+  5. Synthesize findings into actionable insights
+  6. Focus on information that would be valuable for a presentation
+
+  Please provide your analysis in the following JSON format:
+  {
+    "key_insights": [
+      {
+        "insight": "Main finding or trend",
+        "supporting_data": "Statistics or evidence",
+        "source_quality": "high|medium|low",
+        "recency": "recent|moderate|dated"
+      }
+    ],
+    "statistics": [
+      {
+        "metric": "Specific statistic or number",
+        "context": "What this metric means",
+        "source": "Source attribution",
+        "reliability": "high|medium|low"
+      }
+    ],
+    "trends": [
+      {
+        "trend": "Identified trend or pattern",
+        "timeframe": "When this trend is occurring",
+        "impact": "Significance of this trend"
+      }
+    ],
+    "recommendations": [
+      {
+        "recommendation": "Actionable insight",
+        "rationale": "Why this is important",
+        "priority": "high|medium|low"
+      }
+    ],
+    "source_summary": {
+      "total_sources": 0,
+      "high_quality_sources": 0,
+      "recent_sources": 0,
+      "credibility_score": 0.0
+    },
+    "synthesis": "Overall summary tying together the key findings and their relevance to the research topic"
+  }
+
+variables:
+  - name: "query"
+    type: "string"
+    required: true
+    description: "The research query or topic to investigate"
+
+  - name: "context"
+    type: "string"
+    required: true
+    description: "Additional context about what kind of information is needed"
+
+  - name: "slide_description"
+    type: "string"
+    required: false
+    description: "Description of the slide this research will support"
+
+  - name: "search_results"
+    type: "array"
+    required: false
+    description: "Array of search results to analyze"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: true

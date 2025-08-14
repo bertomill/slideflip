@@ -7,9 +7,11 @@ import asyncio
 import json
 import logging
 from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, Any
+from typing import Dict, Any, Set
+from enum import Enum
 
 from src.core.websocket_manager import WebSocketManager
+from src.core.config import Settings
 from src.handlers.file_handler import FileHandler
 from src.handlers.slide_handler import SlideHandler
 from src.models.message_models import (
@@ -33,6 +35,7 @@ from src.services.knowledge_graph_service import KnowledgeGraphService
 from src.services.kg_task_manager import KnowledgeGraphTaskManager
 from src.services.graph_query_service import GraphQueryService
 from src.services.llm_service import LLMService
+from src.services.document_parser import DocumentParserService
 from src.services.kg_processing import process_file_for_knowledge_graph, perform_final_clustering, get_current_timestamp
 from src.handlers.kg_message_handlers import (
     handle_kg_status_request,
@@ -41,14 +44,103 @@ from src.handlers.kg_message_handlers import (
     handle_force_reprocessing_request
 )
 
+# Add workflow state management at the top of the file
+
+
+class WorkflowState(Enum):
+    IDLE = "idle"
+    UPLOADING = "uploading"
+    THEME_SELECTING = "theme_selecting"
+    CONTENT_PLANNING = "content_planning"
+    SLIDE_GENERATING = "slide_generating"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+class WorkflowStateManager:
+    """Manages workflow state to prevent concurrent service execution"""
+
+    def __init__(self):
+        self.client_states: Dict[str, WorkflowState] = {}
+        self.processing_clients: Set[str] = set()
+        self._lock = asyncio.Lock()
+
+    async def can_transition_to(self, client_id: str, target_state: WorkflowState) -> bool:
+        """Check if client can transition to target state"""
+        async with self._lock:
+            current_state = self.client_states.get(
+                client_id, WorkflowState.IDLE)
+
+            # Define valid state transitions
+            valid_transitions = {
+                WorkflowState.IDLE: [WorkflowState.UPLOADING, WorkflowState.THEME_SELECTING, WorkflowState.CONTENT_PLANNING, WorkflowState.SLIDE_GENERATING],
+                WorkflowState.UPLOADING: [WorkflowState.THEME_SELECTING, WorkflowState.CONTENT_PLANNING, WorkflowState.SLIDE_GENERATING],
+                WorkflowState.THEME_SELECTING: [WorkflowState.CONTENT_PLANNING, WorkflowState.SLIDE_GENERATING],
+                WorkflowState.CONTENT_PLANNING: [WorkflowState.SLIDE_GENERATING, WorkflowState.COMPLETED],
+                WorkflowState.SLIDE_GENERATING: [WorkflowState.COMPLETED, WorkflowState.ERROR],
+                WorkflowState.COMPLETED: [WorkflowState.IDLE],
+                WorkflowState.ERROR: [WorkflowState.IDLE]
+            }
+
+            can_transition = target_state in valid_transitions.get(
+                current_state, [])
+            logger.info(
+                f"State transition check for client {client_id}: {current_state} -> {target_state} = {can_transition}")
+            return can_transition
+
+    async def transition_to(self, client_id: str, target_state: WorkflowState) -> bool:
+        """Transition client to target state if valid"""
+        async with self._lock:
+            logger.info(
+                f"Attempting state transition for client {client_id}: {self.client_states.get(client_id, WorkflowState.IDLE)} -> {target_state}")
+
+            if self.can_transition_to(client_id, target_state):
+                self.client_states[client_id] = target_state
+                if target_state in [WorkflowState.UPLOADING, WorkflowState.CONTENT_PLANNING, WorkflowState.SLIDE_GENERATING]:
+                    self.processing_clients.add(client_id)
+                else:
+                    self.processing_clients.discard(client_id)
+                logger.info(
+                    f"Client {client_id} transitioned to {target_state}")
+                return True
+            else:
+                current_state = self.client_states.get(
+                    client_id, WorkflowState.IDLE)
+                logger.warning(
+                    f"Invalid state transition for client {client_id}: {current_state} -> {target_state}")
+                return False
+
+    async def is_processing(self, client_id: str) -> bool:
+        """Check if client is currently processing"""
+        async with self._lock:
+            return client_id in self.processing_clients
+
+    async def get_current_state(self, client_id: str) -> WorkflowState:
+        """Get current state of client"""
+        async with self._lock:
+            return self.client_states.get(client_id, WorkflowState.IDLE)
+
+    async def reset_client(self, client_id: str):
+        """Reset client to idle state"""
+        async with self._lock:
+            self.client_states[client_id] = WorkflowState.IDLE
+            self.processing_clients.discard(client_id)
+            logger.info(f"Client {client_id} reset to IDLE state")
+
+
+# Initialize workflow state manager
+workflow_state_manager = WorkflowStateManager()
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Initialize services
+settings = Settings()
 file_service = FileService()
 slide_service = SlideService()
 kg_task_manager = KnowledgeGraphTaskManager()
 websocket_manager = WebSocketManager()
+document_parser = DocumentParserService()
 
 # Phase 2: Enhanced progress tracking constants
 PROGRESS_STEPS = {
@@ -65,7 +157,8 @@ ERROR_CODES = {
     "PROCESSING_ERROR": "PROC001",
     "SERVICE_ERROR": "SVC001",
     "TIMEOUT_ERROR": "TIME001",
-    "RESOURCE_ERROR": "RES001"
+    "RESOURCE_ERROR": "RES001",
+    "STEP_GUIDANCE": "STEP001"  # New error code for step guidance
 }
 
 
@@ -79,8 +172,24 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         # Note: Session initialization is now handled by the WebSocket manager
         # No need to call initialize_client_session here as it's already done
 
-        # Check if this client has pending knowledge graph tasks that need clustering
-        if await kg_task_manager.is_clustering_needed(client_id):
+        # Wait a moment for session initialization to complete
+        await asyncio.sleep(0.1)
+
+        # Check current workflow state and log it
+        current_state = await workflow_state_manager.get_current_state(client_id)
+        logger.info(
+            f"Current workflow state for client {client_id}: {current_state}")
+
+        # Initialize workflow state for this client if not already set
+        if current_state == WorkflowState.IDLE:
+            await workflow_state_manager.reset_client(client_id)
+            logger.info(f"Initialized workflow state for client {client_id}")
+        else:
+            logger.info(
+                f"Client {client_id} already has workflow state: {current_state}")
+
+        # Check if this client has pending knowledge graph tasks that need clustering (only if knowledge graph is enabled)
+        if not settings.SKIP_KNOWLEDGE_GRAPH and await kg_task_manager.is_clustering_needed(client_id):
             logger.info(
                 f"Client {client_id} has pending knowledge graph tasks, performing clustering")
             # Wait for any pending tasks to complete
@@ -94,12 +203,15 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 await perform_final_clustering(client_id, kg_service, kg_task_manager)
                 await kg_task_manager.mark_clustering_completed(client_id)
 
+        elif settings.SKIP_KNOWLEDGE_GRAPH:
+            logger.info(
+                f"⚡ Skipping knowledge graph clustering (SKIP_KNOWLEDGE_GRAPH=True)")
         else:
             logger.info(
                 f"Client {client_id} has no pending knowledge graph tasks")
 
-        # Try to load existing graphs if available
-        if await kg_task_manager.load_existing_graphs_if_available(client_id):
+        # Try to load existing graphs if available (only if knowledge graph is enabled)
+        if not settings.SKIP_KNOWLEDGE_GRAPH and await kg_task_manager.load_existing_graphs_if_available(client_id):
             logger.info(
                 f"Client {client_id} reconnected, loaded existing knowledge graphs")
 
@@ -108,7 +220,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
             # Send a status update to the client
             try:
-                logger.info("Existing knowledge graphs loaded succes")
+                logger.info("Existing knowledge graphs loaded successfully")
                 status_message = ServerMessage(
                     type="kg_status_response",
                     data={
@@ -130,17 +242,20 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             except Exception as e:
                 logger.warning(
                     f"Could not send status update to client {client_id}: {e}")
+        elif settings.SKIP_KNOWLEDGE_GRAPH:
+            logger.info(
+                f"⚡ Skipping knowledge graph loading (SKIP_KNOWLEDGE_GRAPH=True)")
         else:
             logger.info(f"Client {client_id} has no existing knowledge graphs")
         # Main message loop
         while True:
             try:
                 # Receive message from client with timeout
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=120.0)
                 message_data = json.loads(data)
             except asyncio.TimeoutError:
                 logger.warning(f"Client {client_id} connection timed out")
-                break
+                continue
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON from client {client_id}: {e}")
                 try:
@@ -173,14 +288,14 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             except asyncio.TimeoutError:
                 logger.error(
                     f"Message handling timed out for client {client_id}")
+                timeout_message = ServerMessage(
+                    type="error",
+                    data={
+                        "error": "Message processing timed out",
+                        "error_code": ERROR_CODES["TIMEOUT_ERROR"]
+                    }
+                )
                 try:
-                    timeout_message = ServerMessage(
-                        type="error",
-                        data={
-                            "error": "Message processing timed out",
-                            "error_code": ERROR_CODES["TIMEOUT_ERROR"]
-                        }
-                    )
                     await websocket.send_text(timeout_message.model_dump_json())
                 except Exception as send_error:
                     logger.error(
@@ -208,6 +323,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     except WebSocketDisconnect:
         logger.info(f"Client {client_id} disconnected normally")
         websocket_manager.disconnect(client_id)
+        # Reset workflow state on disconnect
+        await workflow_state_manager.reset_client(client_id)
 
         # Note: We don't clear the knowledge graph tasks on disconnect
         # as the client might reconnect and we want to preserve the work
@@ -218,6 +335,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     except Exception as e:
         logger.error(f"WebSocket error for client {client_id}: {e}")
         websocket_manager.disconnect(client_id)
+        # Reset workflow state on error
+        await workflow_state_manager.reset_client(client_id)
 
         # Same note about preserving tasks
         logger.info(
@@ -273,6 +392,17 @@ async def send_enhanced_progress_update(
 ):
     """Phase 2: Enhanced progress update with step-specific tracking"""
     try:
+        # Map step names to actual step keys
+        step_mapping = {
+            "file_processing": "step_1_upload",
+            "slide_description": "step_1_upload",
+            "theme_selection": "step_2_theme",
+            "research": "step_3_research",
+            "content_planning": "step_4_content",
+            "slide_generation": "step_5_preview",
+            "agentic_research": "step_3_research"
+        }
+
         # Update client data
         client_data = websocket_manager.get_client_data(client_id)
         if client_data:
@@ -280,8 +410,8 @@ async def send_enhanced_progress_update(
             client_data["overall_progress"] = progress
             client_data["last_activity"] = get_current_timestamp()
 
-            if step_data:
-                step_key = f"step_{step.split('_')[0]}_{step.split('_')[1]}"
+            if step_data and step in step_mapping:
+                step_key = step_mapping[step]
                 if step_key in client_data:
                     client_data[step_key]["completed"] = progress >= 100
                     client_data[step_key]["data"].update(step_data)
@@ -314,29 +444,136 @@ async def send_enhanced_progress_update(
         logger.error(f"Error sending progress update: {e}")
 
 
+async def get_step_guidance(client_id: str, current_step: str) -> Dict[str, Any]:
+    """Provide guidance on what steps users can take next"""
+    try:
+        client_data = websocket_manager.get_client_data(client_id)
+        if not client_data:
+            return {"available_actions": [], "guidance": "Session not found"}
+
+        available_actions = []
+        guidance = ""
+
+        # Check what steps are available
+        if client_data.get("step_1_upload", {}).get("completed", False):
+            available_actions.append("theme_selection")
+            available_actions.append("research_request")
+            available_actions.append("content_planning")
+            available_actions.append("slide_generation")
+
+            if not client_data.get("step_2_theme", {}).get("completed", False):
+                guidance = "You can choose a theme or continue with the default. All other steps are available."
+            elif not client_data.get("step_3_research", {}).get("completed", False):
+                guidance = "Research is optional. You can skip it and go directly to content planning or slide generation."
+            elif not client_data.get("step_4_content", {}).get("completed", False):
+                guidance = "You can plan your content or go directly to slide generation."
+            else:
+                guidance = "All steps completed! You can generate and preview your slides."
+        else:
+            available_actions.append("file_upload")
+            guidance = "Please start by uploading a document."
+
+        return {
+            "available_actions": available_actions,
+            "guidance": guidance,
+            "current_progress": client_data.get("overall_progress", 0)
+        }
+
+    except Exception as e:
+        logger.error(
+            f"Error getting step guidance for client {client_id}: {e}")
+        return {"available_actions": [], "guidance": "Error retrieving guidance"}
+
+
+async def auto_complete_theme_step(client_id: str) -> bool:
+    """Auto-complete theme step with default theme if not already completed"""
+    try:
+        client_data = websocket_manager.get_client_data(client_id)
+        if not client_data:
+            return False
+
+        # Check if theme step is already completed
+        if client_data.get("step_2_theme", {}).get("completed", False):
+            return True
+
+        # Auto-complete with default theme
+        default_theme_data = {
+            "theme_id": "professional",
+            "theme_name": "Professional",
+            "color_palette": ["#980000", "#111111", "#333333", "#b3b3b3", "#ffffff"],
+            "slide_count": client_data.get("step_1_upload", {}).get("data", {}).get("slide_count", 1)
+        }
+
+        # Mark theme step as completed
+        if "step_2_theme" not in client_data:
+            client_data["step_2_theme"] = {"completed": False, "data": {}}
+
+        client_data["step_2_theme"]["completed"] = True
+        client_data["step_2_theme"]["data"] = default_theme_data
+
+        websocket_manager.update_client_data(client_id, client_data)
+        logger.info(
+            f"✅ Auto-completed theme step for client {client_id} with default theme")
+        return True
+
+    except Exception as e:
+        logger.error(
+            f"Error auto-completing theme step for client {client_id}: {e}")
+        return False
+
+
 async def validate_step_prerequisites(client_id: str, current_step: str) -> Dict[str, Any]:
     """Phase 2: Validate that previous steps are completed before proceeding"""
     client_data = websocket_manager.get_client_data(client_id)
     if not client_data:
+        logger.error(
+            f"❌ Validation failed for {client_id}: Client session not found")
         return {"valid": False, "error": "Client session not found", "error_code": ERROR_CODES["VALIDATION_ERROR"]}
 
+    # More flexible step requirements - only require essential steps
     step_requirements = {
         "step_2_theme": ["step_1_upload"],
-        "step_3_research": ["step_1_upload", "step_2_theme"],
-        "step_4_content": ["step_1_upload", "step_2_theme"],
-        "step_5_preview": ["step_1_upload", "step_2_theme", "step_4_content"]
+        # Research is optional, don't require theme
+        "step_3_research": ["step_1_upload"],
+        # Content planning only requires upload
+        "step_4_content": ["step_1_upload"],
+        "step_5_preview": ["step_1_upload"]    # Preview only requires upload
     }
+
+    logger.info(f"🔍 Validating {current_step} for client {client_id}")
+    logger.info(f"📊 Client data keys: {list(client_data.keys())}")
 
     if current_step in step_requirements:
         for required_step in step_requirements[current_step]:
-            if not client_data.get(required_step, {}).get("completed", False):
+            step_data = client_data.get(required_step, {})
+            is_completed = step_data.get("completed", False)
+            logger.info(
+                f"📋 Checking {required_step}: completed={is_completed}, data={step_data}")
+
+            if not is_completed:
+                logger.error(
+                    f"❌ Validation failed: {required_step} not completed for {current_step}")
+
+                # Provide helpful guidance based on the missing step
+                guidance_message = ""
+                if required_step == "step_1_upload":
+                    guidance_message = "Please upload a document first to get started."
+                elif required_step == "step_2_theme":
+                    guidance_message = "A theme will be automatically selected for you to continue."
+                elif required_step == "step_3_research":
+                    guidance_message = "Research is optional - you can skip this step."
+                elif required_step == "step_4_content":
+                    guidance_message = "Please complete content planning before generating slides."
+
                 return {
                     "valid": False,
-                    "error": f"Step {required_step} must be completed before {current_step}",
-                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
-                    "missing_step": required_step
+                    "error": f"Step {required_step} must be completed before {current_step}. {guidance_message}",
+                    "error_code": ERROR_CODES["STEP_GUIDANCE"],
+                    "missing_step": required_step,
+                    "guidance": guidance_message
                 }
 
+    logger.info(f"✅ Validation passed for {current_step}")
     return {"valid": True}
 
 
@@ -392,6 +629,9 @@ async def handle_client_message(websocket: WebSocket, client_id: str, message: C
         elif message.type == "get_session_status":
             # Phase 2: Handle session status request
             await handle_session_status_request(websocket, client_id)
+        elif message.type == "get_step_guidance":
+            # Handle step guidance request
+            await handle_step_guidance_request(websocket, client_id, message.data)
         else:
             logger.warning(f"Unknown message type: {message.type}")
             error_message = ServerMessage(
@@ -426,6 +666,19 @@ async def handle_client_message(websocket: WebSocket, client_id: str, message: C
 async def handle_session_status_request(websocket: WebSocket, client_id: str):
     """Phase 2: Handle session status request"""
     try:
+        # Check workflow state - only allow status requests if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
         client_data = websocket_manager.get_client_data(client_id)
         if not client_data:
             error_message = ServerMessage(
@@ -443,6 +696,22 @@ async def handle_session_status_request(websocket: WebSocket, client_id: str):
                               if client_data.get(step, {}).get("completed", False))
         overall_progress = (completed_steps / 5) * 100
 
+        # Determine next available steps and provide guidance
+        next_steps = []
+        if not client_data.get("step_1_upload", {}).get("completed", False):
+            next_steps.append("Upload a document to get started")
+        elif not client_data.get("step_2_theme", {}).get("completed", False):
+            next_steps.append("Choose a theme or continue with default")
+        elif not client_data.get("step_3_research", {}).get("completed", False):
+            next_steps.append("Optional: Add research data")
+        elif not client_data.get("step_4_content", {}).get("completed", False):
+            next_steps.append("Plan your content structure")
+        elif not client_data.get("step_5_preview", {}).get("completed", False):
+            next_steps.append("Generate and preview your slides")
+        else:
+            next_steps.append(
+                "All steps completed! You can export your slides")
+
         status_message = ServerMessage(
             type="session_status",
             data={
@@ -458,6 +727,8 @@ async def handle_session_status_request(websocket: WebSocket, client_id: str):
                 },
                 "session_start_time": client_data.get("session_start_time"),
                 "last_activity": client_data.get("last_activity"),
+                "next_steps": next_steps,
+                "workflow_guidance": "You can proceed through steps sequentially or jump to any completed step",
                 "message": "Session status retrieved successfully"
             }
         )
@@ -485,9 +756,95 @@ async def handle_session_status_request(websocket: WebSocket, client_id: str):
             logger.error(f"Error sending session status error: {send_error}")
 
 
+async def handle_step_guidance_request(websocket: WebSocket, client_id: str, data: dict):
+    """Handle step guidance request from client"""
+    try:
+        # Check workflow state - only allow guidance if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="step_guidance_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        logger.info(f"Providing step guidance for client {client_id}")
+
+        # Get guidance for the current step
+        guidance = await get_step_guidance(client_id, data.get("current_step", "unknown"))
+
+        # Send guidance message
+        guidance_message = ServerMessage(
+            type="step_guidance",
+            data={
+                "available_actions": guidance["available_actions"],
+                "guidance": guidance["guidance"],
+                "current_progress": guidance["current_progress"],
+                "message": "Step guidance provided successfully"
+            }
+        )
+
+        await asyncio.wait_for(
+            websocket.send_text(guidance_message.model_dump_json()),
+            timeout=10.0
+        )
+
+        logger.info(f"Step guidance sent to client {client_id}")
+
+    except Exception as e:
+        logger.error(f"Error handling step guidance request: {e}")
+        try:
+            error_message = ServerMessage(
+                type="error",
+                data={
+                    "error": "Failed to provide step guidance",
+                    "details": str(e),
+                    "error_code": ERROR_CODES["SERVICE_ERROR"]
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+        except Exception as send_error:
+            logger.error(f"Error sending step guidance error: {send_error}")
+
+
 async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
     """Handle file upload from client"""
     try:
+        # Check workflow state - only allow upload if client is idle
+        current_state = await workflow_state_manager.get_current_state(client_id)
+        logger.info(
+            f"File upload request for client {client_id}, current state: {current_state}")
+
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="file_upload_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(current_state)
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Transition to uploading state
+        logger.info(
+            f"Attempting to transition client {client_id} to UPLOADING state")
+        if not await workflow_state_manager.transition_to(client_id, WorkflowState.UPLOADING):
+            error_message = ServerMessage(
+                type="file_upload_error",
+                data={
+                    "error": "Invalid workflow state for file upload",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"]
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
         # Phase 2: Send enhanced progress update
         await send_enhanced_progress_update(
             websocket, client_id, "file_processing", 10,
@@ -544,6 +901,20 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 }
             )
 
+            # Manually ensure step_1_upload is marked as completed
+            client_data = websocket_manager.get_client_data(client_id)
+            if client_data:
+                client_data["step_1_upload"]["completed"] = True
+                client_data["step_1_upload"]["data"] = {
+                    "filename": file_data.filename,
+                    "file_path": str(file_path),
+                    "file_size": len(file_data.content),
+                    "file_type": file_data.file_type
+                }
+                websocket_manager.update_client_data(client_id, client_data)
+                logger.info(
+                    f"✅ Step 1 (upload) marked as completed for client {client_id}")
+
             # Send success message with existing processing note
             success_data = {
                 "filename": file_data.filename,
@@ -558,6 +929,13 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                     "text_length": len(content_info.get('text', '')) if content_info.get('text') else 0,
                     "images_count": len(content_info.get('images', [])),
                     "images": content_info.get('images', [])
+                }
+
+                # Add parsed document data for frontend consumption
+                success_data["parsed_document"] = {
+                    "filename": file_data.filename,
+                    "content": content_info.get('text', '') or '',
+                    "success": True if content_info.get('text') else False
                 }
 
             success_message = ServerMessage(
@@ -611,6 +989,20 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 }
             )
 
+            # Manually ensure step_1_upload is marked as completed
+            client_data = websocket_manager.get_client_data(client_id)
+            if client_data:
+                client_data["step_1_upload"]["completed"] = True
+                client_data["step_1_upload"]["data"] = {
+                    "filename": file_data.filename,
+                    "file_path": str(file_path),
+                    "file_size": len(file_data.content),
+                    "file_type": file_data.file_type
+                }
+                websocket_manager.update_client_data(client_id, client_data)
+                logger.info(
+                    f"✅ Step 1 (upload) marked as completed for client {client_id}")
+
             # Send success message with existing graph note
             success_data = {
                 "filename": file_data.filename,
@@ -625,6 +1017,13 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                     "text_length": len(content_info.get('text', '')) if content_info.get('text') else 0,
                     "images_count": len(content_info.get('images', [])),
                     "images": content_info.get('images', [])
+                }
+
+                # Add parsed document data for frontend consumption
+                success_data["parsed_document"] = {
+                    "filename": file_data.filename,
+                    "content": content_info.get('text', '') or '',
+                    "success": True if content_info.get('text') else False
                 }
 
             success_message = ServerMessage(
@@ -660,45 +1059,109 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
         if client_id:
             await slide_service.store_file_content(client_id, str(file_path), file_data.filename)
 
-        # Phase 2: Update progress
-        await send_enhanced_progress_update(
-            websocket, client_id, "file_processing", 90,
-            "Starting knowledge graph extraction..."
-        )
+        # Check if knowledge graph processing should be skipped
+        if settings.SKIP_KNOWLEDGE_GRAPH:
+            logger.info(
+                f"⚡ Skipping knowledge graph processing for {file_data.filename} (SKIP_KNOWLEDGE_GRAPH=True)")
 
-        # Start knowledge graph extraction process
-        try:
-            # Get or create knowledge graph service for this client
-            kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
-
-            # Get file info for knowledge graph processing
-            file_info = FileInfo(
-                filename=file_data.filename,
-                file_path=str(file_path),
-                file_size=len(file_data.content),
-                file_type=file_data.file_type,
-                upload_time=get_current_timestamp()
+            # Phase 2: Update progress for document parsing
+            await send_enhanced_progress_update(
+                websocket, client_id, "file_processing", 90,
+                "Processing document with LangChain parser..."
             )
 
-            # Use the already extracted content for knowledge graph
-            content_text = content_info.get('text', '') if content_info else ''
+            try:
+                # Use LangChain document parser for structured content extraction
+                parsed_content = await document_parser.parse_document(
+                    file_path=str(file_path),
+                    file_type=file_data.file_type,
+                    filename=file_data.filename
+                )
 
-            # Create and track the processing task
-            processing_task = asyncio.create_task(process_file_for_knowledge_graph(
-                kg_service, file_info, content_text, client_id, kg_task_manager
-            ))
+                # Store the parsed content in slide service for later use
+                await slide_service.store_parsed_document_content(
+                    client_id,
+                    file_data.filename,
+                    parsed_content
+                )
 
-            # Add task to manager for tracking
-            await kg_task_manager.add_processing_task(client_id, file_data.filename, processing_task)
+                logger.info(
+                    f"📄 LangChain document parsing completed for {file_data.filename}")
+                logger.info(
+                    f"   - Parsed successfully: {parsed_content.get('parsed_successfully', False)}")
+                logger.info(
+                    f"   - Total chunks: {parsed_content.get('total_chunks', 0)}")
+                logger.info(
+                    f"   - Content length: {parsed_content.get('total_characters', 0)} characters")
 
-            # Mark that clustering will be needed
-            await kg_task_manager.mark_clustering_needed(client_id)
+            except Exception as e:
+                logger.error(
+                    f"❌ Error in document parsing for {file_data.filename}: {e}")
+                # Fallback to basic content if parsing fails
+                content_text = content_info.get(
+                    'text', '') if content_info else ''
+                logger.info(
+                    f"📄 Falling back to basic content extraction: {len(content_text)} characters")
 
-            logger.info(
-                f"Started knowledge graph extraction for file: {file_data.filename}")
+                # Store the fallback content in slide service
+                if content_text:
+                    fallback_content = {
+                        "parsed_successfully": True,
+                        "total_chunks": 1,
+                        "total_characters": len(content_text),
+                        "content": content_text,
+                        "filename": file_data.filename,
+                        "file_type": file_data.file_type
+                    }
+                    await slide_service.store_parsed_document_content(
+                        client_id,
+                        file_data.filename,
+                        fallback_content
+                    )
+                    logger.info(
+                        f"📄 Stored fallback content for {file_data.filename}")
 
-        except Exception as e:
-            logger.error(f"Error starting knowledge graph extraction: {e}")
+        else:
+            # Phase 2: Update progress
+            await send_enhanced_progress_update(
+                websocket, client_id, "file_processing", 90,
+                "Starting knowledge graph extraction..."
+            )
+
+            # Start knowledge graph extraction process
+            try:
+                # Get or create knowledge graph service for this client
+                kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
+
+                # Get file info for knowledge graph processing
+                file_info = FileInfo(
+                    filename=file_data.filename,
+                    file_path=str(file_path),
+                    file_size=len(file_data.content),
+                    file_type=file_data.file_type,
+                    upload_time=get_current_timestamp()
+                )
+
+                # Use the already extracted content for knowledge graph
+                content_text = content_info.get(
+                    'text', '') if content_info else ''
+
+                # Create and track the processing task
+                processing_task = asyncio.create_task(process_file_for_knowledge_graph(
+                    kg_service, file_info, content_text, client_id, kg_task_manager
+                ))
+
+                # Add task to manager for tracking
+                await kg_task_manager.add_processing_task(client_id, file_data.filename, processing_task)
+
+                # Mark that clustering will be needed
+                await kg_task_manager.mark_clustering_needed(client_id)
+
+                logger.info(
+                    f"Started knowledge graph extraction for file: {file_data.filename}")
+
+            except Exception as e:
+                logger.error(f"Error starting knowledge graph extraction: {e}")
 
         # Phase 2: Update progress and mark step as completed
         await send_enhanced_progress_update(
@@ -711,6 +1174,20 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 "file_type": file_data.file_type
             }
         )
+
+        # Manually ensure step_1_upload is marked as completed
+        client_data = websocket_manager.get_client_data(client_id)
+        if client_data:
+            client_data["step_1_upload"]["completed"] = True
+            client_data["step_1_upload"]["data"] = {
+                "filename": file_data.filename,
+                "file_path": str(file_path),
+                "file_size": len(file_data.content),
+                "file_type": file_data.file_type
+            }
+            websocket_manager.update_client_data(client_id, client_data)
+            logger.info(
+                f"✅ Step 1 (upload) marked as completed for client {client_id}")
 
         # Prepare success data
         success_data = {
@@ -728,6 +1205,13 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
                 "images": content_info.get('images', [])
             }
 
+            # Add parsed document data for frontend consumption
+            success_data["parsed_document"] = {
+                "filename": file_data.filename,
+                "content": content_info.get('text', '') or '',
+                "success": True if content_info.get('text') else False
+            }
+
         # Send success message
         success_message = ServerMessage(
             type="file_upload_success",
@@ -738,10 +1222,14 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
             timeout=10.0
         )
 
+        # Transition to idle state after successful upload
+        await workflow_state_manager.transition_to(client_id, WorkflowState.IDLE)
         logger.info(f"File uploaded successfully: {file_data.filename}")
 
     except Exception as e:
         logger.error(f"Error handling file upload: {e}")
+        # Reset workflow state on error
+        await workflow_state_manager.reset_client(client_id)
         try:
             error_message = ServerMessage(
                 type="file_upload_error",
@@ -760,6 +1248,19 @@ async def handle_file_upload(websocket: WebSocket, client_id: str, data: dict):
 async def handle_slide_description(websocket: WebSocket, client_id: str, data: dict):
     """Handle slide description from client"""
     try:
+        # Check workflow state - only allow slide description if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="slide_description_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
         # Phase 2: Send enhanced progress update
         await send_enhanced_progress_update(
             websocket, client_id, "slide_description", 25,
@@ -801,10 +1302,14 @@ async def handle_slide_description(websocket: WebSocket, client_id: str, data: d
             timeout=10.0
         )
 
+        # Transition to idle state after successful slide description
+        await workflow_state_manager.transition_to(client_id, WorkflowState.IDLE)
         logger.info(f"Slide description stored for client {client_id}")
 
     except Exception as e:
         logger.error(f"Error handling slide description: {e}")
+        # Reset workflow state on error
+        await workflow_state_manager.reset_client(client_id)
         try:
             error_message = ServerMessage(
                 type="slide_description_error",
@@ -824,9 +1329,42 @@ async def handle_slide_description(websocket: WebSocket, client_id: str, data: d
 async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dict):
     """Handle theme selection from client"""
     try:
+        # Check workflow state - only allow theme selection if client is idle
+        current_state = await workflow_state_manager.get_current_state(client_id)
+        logger.info(
+            f"Theme selection request for client {client_id}, current state: {current_state}")
+
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="theme_selection_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(current_state)
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Transition to theme selecting state
+        logger.info(
+            f"Attempting to transition client {client_id} to THEME_SELECTING state")
+        if not await workflow_state_manager.transition_to(client_id, WorkflowState.THEME_SELECTING):
+            error_message = ServerMessage(
+                type="theme_selection_error",
+                data={
+                    "error": "Invalid workflow state for theme selection. Please complete file upload first.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"]
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
         # Phase 2: Validate step prerequisites
         validation = await validate_step_prerequisites(client_id, "step_2_theme")
         if not validation["valid"]:
+            # Reset workflow state on validation failure
+            await workflow_state_manager.reset_client(client_id)
             error_message = ServerMessage(
                 type="theme_selection_error",
                 data={
@@ -853,8 +1391,8 @@ async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dic
             "Storing theme information..."
         )
 
-        # Store the theme information
-        await slide_service.store_theme_selection(client_id, theme_data)
+        # Store the theme information - convert ThemeMessage to dict
+        await slide_service.store_theme_selection(client_id, theme_data.model_dump())
 
         # Phase 2: Update progress and mark step as completed
         await send_enhanced_progress_update(
@@ -863,9 +1401,26 @@ async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dic
             {
                 "theme_id": theme_data.theme_id,
                 "theme_name": theme_data.theme_name,
-                "color_palette": theme_data.color_palette
+                "color_palette": theme_data.color_palette,
+                "slide_count": theme_data.slide_count
             }
         )
+
+        # Manually ensure step is marked as completed
+        client_data = websocket_manager.get_client_data(client_id)
+        if client_data:
+            client_data["step_2_theme"]["completed"] = True
+            client_data["step_2_theme"]["data"] = {
+                "theme_id": theme_data.theme_id,
+                "theme_name": theme_data.theme_name,
+                "color_palette": theme_data.color_palette,
+                "slide_count": theme_data.slide_count
+            }
+            client_data["current_step"] = "step_3_research"
+            client_data["overall_progress"] = 40
+            websocket_manager.update_client_data(client_id, client_data)
+            logger.info(
+                f"✅ Step 2 (theme) marked as completed for client {client_id}")
 
         # Send success message
         success_message = ServerMessage(
@@ -873,7 +1428,8 @@ async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dic
             data={
                 "theme_id": theme_data.theme_id,
                 "theme_name": theme_data.theme_name,
-                "color_palette": theme_data.color_palette
+                "color_palette": theme_data.color_palette,
+                "slide_count": theme_data.slide_count
             }
         )
         await asyncio.wait_for(
@@ -881,11 +1437,15 @@ async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dic
             timeout=10.0
         )
 
+        # Transition to idle state after successful theme selection
+        await workflow_state_manager.transition_to(client_id, WorkflowState.IDLE)
         logger.info(
             f"Theme selection stored for client {client_id}: {theme_data.theme_id}")
 
     except Exception as e:
         logger.error(f"Error handling theme selection: {e}")
+        # Reset workflow state on error
+        await workflow_state_manager.reset_client(client_id)
         try:
             error_message = ServerMessage(
                 type="theme_selection_error",
@@ -904,9 +1464,39 @@ async def handle_theme_selection(websocket: WebSocket, client_id: str, data: dic
 async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict):
     """Handle slide generation request from client"""
     try:
+        # Check workflow state - only allow slide generation if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="slide_generation_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Transition to slide generation state
+        if not await workflow_state_manager.transition_to(client_id, WorkflowState.SLIDE_GENERATING):
+            error_message = ServerMessage(
+                type="slide_generation_error",
+                data={
+                    "error": "Invalid workflow state for slide generation. Please complete previous steps first.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"]
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Auto-complete theme step if not already completed
+        await auto_complete_theme_step(client_id)
+
         # Phase 2: Validate step prerequisites
         validation = await validate_step_prerequisites(client_id, "step_5_preview")
         if not validation["valid"]:
+            # Reset workflow state on validation failure
+            await workflow_state_manager.reset_client(client_id)
             error_message = ServerMessage(
                 type="slide_generation_error",
                 data={
@@ -1001,64 +1591,78 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
         )
 
         # Phase 2: Query knowledge graph for relevant content using enhanced GraphQueryService
-        await send_enhanced_progress_update(
-            websocket, client_id, "slide_generation", 35,
-            "Querying knowledge graph for relevant content..."
-        )
-
-        # Initialize knowledge graph service and query service
-        kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
-        llm_service = LLMService()
-        logger.info(f"Knowledge graph service: {kg_service}")
-        logger.info(f"LLM service: {llm_service}")
-        query_service = GraphQueryService(
-            knowledge_graph_service=kg_service,
-            llm_service=llm_service
-        )
-
-        # Query the knowledge graph for relevant content
-        graph_query_result = None
-        try:
-            logger.info(f"Querying knowledge graph for client {client_id} with description: {description[:100]}...")
-            
-            graph_query_result = await query_service.query_graph_for_slide_content(
-                slide_description=description,
-                top_k=10,  # Get top 10 results for each category
-                similarity_threshold=0.3,  # Balanced similarity threshold
-                include_embeddings=False,  # Don't include embedding data in response
-                max_tokens=1500  # Limit LLM response tokens
+        # Only query knowledge graph if not disabled
+        if not settings.SKIP_KNOWLEDGE_GRAPH:
+            await send_enhanced_progress_update(
+                websocket, client_id, "slide_generation", 35,
+                "Querying knowledge graph for relevant content..."
             )
-            
-            if "error" in graph_query_result:
-                logger.warning(f"Graph query failed for client {client_id}: {graph_query_result['error']}")
+
+            # Initialize knowledge graph service and query service
+            kg_service = await kg_task_manager.get_or_create_kg_service(client_id)
+            llm_service = LLMService()
+            logger.info(f"Knowledge graph service: {kg_service}")
+            logger.info(f"LLM service: {llm_service}")
+            query_service = GraphQueryService(
+                knowledge_graph_service=kg_service,
+                llm_service=llm_service
+            )
+
+            # Query the knowledge graph for relevant content
+            graph_query_result = None
+            try:
+                logger.info(
+                    f"Querying knowledge graph for client {client_id} with description: {description[:100]}...")
+
+                graph_query_result = await query_service.query_graph_for_slide_content(
+                    slide_description=description,
+                    top_k=10,  # Get top 10 results for each category
+                    similarity_threshold=0.3,  # Balanced similarity threshold
+                    include_embeddings=False,  # Don't include embedding data in response
+                    max_tokens=1500  # Limit LLM response tokens
+                )
+
+                if "error" in graph_query_result:
+                    logger.warning(
+                        f"Graph query failed for client {client_id}: {graph_query_result['error']}")
+                    # Continue without graph query results - slide generation will still work
+                else:
+                    logger.info(f"Graph query successful for client {client_id}: "
+                                f"Found {graph_query_result['metadata']['total_entities_found']} entities, "
+                                f"{graph_query_result['metadata']['total_facts_found']} facts")
+
+                    # Log the key insights for debugging
+                    insights = graph_query_result.get(
+                        'high_level_insights', {})
+                    if insights:
+                        logger.info(f"Key insights for client {client_id}: "
+                                    f"Main themes: {insights.get('main_themes', [])[:3]}, "
+                                    f"Central entities: {insights.get('central_entities', [])[:3]}")
+
+                    # Send progress update with knowledge graph results summary
+                    await send_enhanced_progress_update(
+                        websocket, client_id, "slide_generation", 38,
+                        f"Knowledge graph analysis complete: Found {graph_query_result['metadata']['total_entities_found']} relevant entities and {graph_query_result['metadata']['total_facts_found']} facts"
+                    )
+
+            except Exception as e:
+                logger.error(
+                    f"Error querying knowledge graph for client {client_id}: {e}")
                 # Continue without graph query results - slide generation will still work
-            else:
-                logger.info(f"Graph query successful for client {client_id}: "
-                           f"Found {graph_query_result['metadata']['total_entities_found']} entities, "
-                           f"{graph_query_result['metadata']['total_facts_found']} facts")
-                
-                # Log the key insights for debugging
-                insights = graph_query_result.get('high_level_insights', {})
-                if insights:
-                    logger.info(f"Key insights for client {client_id}: "
-                               f"Main themes: {insights.get('main_themes', [])[:3]}, "
-                               f"Central entities: {insights.get('central_entities', [])[:3]}")
-                
-                # Send progress update with knowledge graph results summary
+                graph_query_result = None
+
+                # Send progress update indicating fallback
                 await send_enhanced_progress_update(
                     websocket, client_id, "slide_generation", 38,
-                    f"Knowledge graph analysis complete: Found {graph_query_result['metadata']['total_entities_found']} relevant entities and {graph_query_result['metadata']['total_facts_found']} facts"
+                    "Knowledge graph analysis unavailable, proceeding with standard content generation"
                 )
-                
-        except Exception as e:
-            logger.error(f"Error querying knowledge graph for client {client_id}: {e}")
-            # Continue without graph query results - slide generation will still work
+        else:
+            logger.info(
+                f"⚡ Skipping knowledge graph querying (SKIP_KNOWLEDGE_GRAPH=True)")
             graph_query_result = None
-            
-            # Send progress update indicating fallback
             await send_enhanced_progress_update(
                 websocket, client_id, "slide_generation", 38,
-                "Knowledge graph analysis unavailable, proceeding with standard content generation"
+                "Knowledge graph disabled, proceeding with standard content generation"
             )
 
         # Phase 2: Update progress
@@ -1082,17 +1686,16 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
 
         # Generate the slide with the provided parameters and status callback
         logger.info(f"Starting slide generation for client {client_id}")
-        
-        # Pass graph query results as additional context if available
+
+        # Pass parameters that match the generate_slides method signature
         generation_kwargs = {
-            "files": files,
+            "client_id": client_id,
             "description": description,
             "theme": theme,
             "wants_research": wants_research,
-            "client_id": client_id,
             "status_callback": send_status_update
         }
-        
+
         # Add knowledge graph context if available
         if graph_query_result and "error" not in graph_query_result:
             generation_kwargs["knowledge_graph_context"] = {
@@ -1104,12 +1707,13 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
                 "llm_analysis": graph_query_result.get("llm_analysis", {})
             }
             logger.info(f"Using knowledge graph context for client {client_id}: "
-                       f"{len(generation_kwargs['knowledge_graph_context']['entities'])} entities, "
-                       f"{len(generation_kwargs['knowledge_graph_context']['facts'])} facts")
+                        f"{len(generation_kwargs['knowledge_graph_context']['entities'])} entities, "
+                        f"{len(generation_kwargs['knowledge_graph_context']['facts'])} facts")
         else:
-            logger.info(f"No knowledge graph context available for client {client_id}, proceeding with standard generation")
-        
-        slide_result = await slide_service.generate_slide_with_params(**generation_kwargs)
+            logger.info(
+                f"No knowledge graph context available for client {client_id}, proceeding with standard generation")
+
+        slide_result = await slide_service.generate_slides(**generation_kwargs)
 
         # Phase 2: Update progress
         await send_enhanced_progress_update(
@@ -1136,7 +1740,7 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             "wants_research": wants_research,
             "message": "Slide generation completed successfully"
         }
-        
+
         # Add knowledge graph context information if available
         if graph_query_result and "error" not in graph_query_result:
             message_data["knowledge_graph_used"] = True
@@ -1148,7 +1752,8 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
                 "main_themes": graph_query_result.get('high_level_insights', {}).get('main_themes', [])[:3],
                 "central_entities": graph_query_result.get('high_level_insights', {}).get('central_entities', [])[:3]
             }
-            logger.info(f"Knowledge graph context included in completion message for client {client_id}")
+            logger.info(
+                f"Knowledge graph context included in completion message for client {client_id}")
         else:
             message_data["knowledge_graph_used"] = False
             message_data["knowledge_graph_summary"] = None
@@ -1197,27 +1802,40 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             }
         )
 
+        # Transition to completed state after successful slide generation
+        await workflow_state_manager.transition_to(client_id, WorkflowState.COMPLETED)
         logger.info(
             f"Slide generation completed for client {client_id} with theme: {theme}, research: {wants_research}")
 
         # Log knowledge graph integration summary
         if graph_query_result and "error" not in graph_query_result:
-            logger.info(f"Knowledge graph integration summary for client {client_id}:")
-            logger.info(f"  - Entities used: {graph_query_result['metadata']['total_entities_found']}")
-            logger.info(f"  - Facts used: {graph_query_result['metadata']['total_facts_found']}")
-            logger.info(f"  - Chunks used: {graph_query_result['metadata']['total_chunks_found']}")
-            logger.info(f"  - Relationships used: {graph_query_result['metadata']['total_relationships_found']}")
-            
+            logger.info(
+                f"Knowledge graph integration summary for client {client_id}:")
+            logger.info(
+                f"  - Entities used: {graph_query_result['metadata']['total_entities_found']}")
+            logger.info(
+                f"  - Facts used: {graph_query_result['metadata']['total_facts_found']}")
+            logger.info(
+                f"  - Chunks used: {graph_query_result['metadata']['total_chunks_found']}")
+            logger.info(
+                f"  - Relationships used: {graph_query_result['metadata']['total_relationships_found']}")
+
             insights = graph_query_result.get('high_level_insights', {})
             if insights:
-                logger.info(f"  - Main themes: {insights.get('main_themes', [])}")
-                logger.info(f"  - Central entities: {insights.get('central_entities', [])}")
-                logger.info(f"  - Key relationships: {insights.get('key_relationships', [])}")
+                logger.info(
+                    f"  - Main themes: {insights.get('main_themes', [])}")
+                logger.info(
+                    f"  - Central entities: {insights.get('central_entities', [])}")
+                logger.info(
+                    f"  - Key relationships: {insights.get('key_relationships', [])}")
         else:
-            logger.info(f"No knowledge graph context used for client {client_id} - standard generation mode")
+            logger.info(
+                f"No knowledge graph context used for client {client_id} - standard generation mode")
 
     except Exception as e:
         logger.error(f"Error generating slide: {e}")
+        # Reset workflow state on error
+        await workflow_state_manager.reset_client(client_id)
         try:
             error_message = ServerMessage(
                 type="slide_generation_error",
@@ -1236,6 +1854,22 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
 async def handle_research_request(websocket: WebSocket, client_id: str, data: dict):
     """Handle research request from client"""
     try:
+        # Check workflow state - only allow research if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="research_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Auto-complete theme step if not already completed
+        await auto_complete_theme_step(client_id)
+
         # Phase 2: Validate step prerequisites
         validation = await validate_step_prerequisites(client_id, "step_3_research")
         if not validation["valid"]:
@@ -1349,7 +1983,41 @@ async def handle_research_request(websocket: WebSocket, client_id: str, data: di
 async def handle_content_planning(websocket: WebSocket, client_id: str, data: dict):
     """Handle content planning request from client"""
     try:
+        # Check workflow state - only allow content planning if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="content_planning_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        # Transition to content planning state
+        if not await workflow_state_manager.transition_to(client_id, WorkflowState.CONTENT_PLANNING):
+            error_message = ServerMessage(
+                type="content_planning_error",
+                data={
+                    "error": "Invalid workflow state for content planning. Please complete file upload first.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"]
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
+        logger.info(
+            f"🚀 Starting content planning handler for client {client_id}")
+        logger.info(f"📥 Content planning data received: {data}")
+
+        # Auto-complete theme step if not already completed
+        await auto_complete_theme_step(client_id)
+
         # Phase 2: Validate step prerequisites
+        logger.info(
+            f"🔍 About to validate step prerequisites for step_4_content")
         validation = await validate_step_prerequisites(client_id, "step_4_content")
         if not validation["valid"]:
             error_message = ServerMessage(
@@ -1400,22 +2068,33 @@ async def handle_content_planning(websocket: WebSocket, client_id: str, data: di
             "Generating content plan using AI..."
         )
 
-        # Generate content plan using AI
+        # Generate content plan using AI - use stored parsed documents, not the message data
         content_plan_result = await slide_service.generate_content_plan(
             client_id=client_id,
             description=planning_data.description,
             research_data=planning_data.research_data,
-            theme=planning_data.theme
+            theme=planning_data.theme or "default"  # Use provided theme or default
         )
+
+        # Check if content plan was generated successfully
+        if "error" in content_plan_result:
+            raise Exception(
+                f"Content planning failed: {content_plan_result['error']}")
+
+        # Extract content plan data
+        content_plan = content_plan_result.get("content_plan", {})
+        suggestions = content_plan_result.get("suggestions", [])
+        estimated_slide_count = content_plan_result.get(
+            "estimated_slide_count", 1)
 
         # Phase 2: Update progress and mark step as completed
         await send_enhanced_progress_update(
             websocket, client_id, "content_planning", 100,
             "Content planning completed successfully",
             {
-                "content_plan": content_plan_result["content_plan"],
-                "suggestions": content_plan_result["suggestions"],
-                "estimated_slide_count": content_plan_result["estimated_slide_count"]
+                "content_plan": content_plan,
+                "suggestions": suggestions,
+                "estimated_slide_count": estimated_slide_count
             }
         )
 
@@ -1424,9 +2103,9 @@ async def handle_content_planning(websocket: WebSocket, client_id: str, data: di
             type="content_planning_complete",
             data={
                 "status": ProcessingStatus.COMPLETED,
-                "content_plan": content_plan_result["content_plan"],
-                "suggestions": content_plan_result["suggestions"],
-                "estimated_slide_count": content_plan_result["estimated_slide_count"],
+                "content_plan": content_plan,
+                "suggestions": suggestions,
+                "estimated_slide_count": estimated_slide_count,
                 "message": "Content plan generated successfully"
             }
         )
@@ -1435,10 +2114,14 @@ async def handle_content_planning(websocket: WebSocket, client_id: str, data: di
             timeout=10.0
         )
 
+        # Transition to idle state after successful content planning
+        await workflow_state_manager.transition_to(client_id, WorkflowState.IDLE)
         logger.info(f"Content planning completed for client {client_id}")
 
     except Exception as e:
         logger.error(f"Error handling content planning: {e}")
+        # Reset workflow state on error
+        await workflow_state_manager.reset_client(client_id)
         try:
             error_message = ServerMessage(
                 type="content_planning_error",
@@ -1457,6 +2140,19 @@ async def handle_content_planning(websocket: WebSocket, client_id: str, data: di
 async def handle_agentic_research_request(websocket: WebSocket, client_id: str, data: dict):
     """Handle agentic research request from client"""
     try:
+        # Check workflow state - only allow research if client is idle
+        if await workflow_state_manager.is_processing(client_id):
+            error_message = ServerMessage(
+                type="agentic_research_error",
+                data={
+                    "error": "Client is currently processing another request. Please wait for completion.",
+                    "error_code": ERROR_CODES["VALIDATION_ERROR"],
+                    "current_state": str(await workflow_state_manager.get_current_state(client_id))
+                }
+            )
+            await websocket.send_text(error_message.model_dump_json())
+            return
+
         logger.info(
             f"Processing agentic research request for client {client_id}")
 

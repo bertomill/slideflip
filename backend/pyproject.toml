@@ -28,6 +28,15 @@ dependencies = [
     "tiktoken>=0.11.0",
     "tavily-python>=0.7.10",
     "firecrawl-py>=2.16.5",
+    "pdfminer.six",
+    "python-docx",
+    "jinja2>=3.1.0",
+    "pyyaml>=6.0",
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "pypdf>=6.0.0",
 ]
 
 [build-system]

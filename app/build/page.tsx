@@ -67,6 +67,7 @@ export type SlideData = {
   description: string;      // User's description of what the slide should contain
   selectedTheme: string;    // Visual theme choice for the presentation
   selectedPalette?: string[]; // Hex colors chosen/generated for this slide
+  slideCount?: number;      // Number of slides to generate (default: 1)
   wantsResearch: boolean;   // Whether user wants additional research performed
   researchOptions?: ResearchOptions; // Customizable research parameters
   researchData?: string;    // Optional research results from external sources
@@ -74,6 +75,11 @@ export type SlideData = {
   userFeedback?: string;    // User's feedback and additional requirements
   slideHtml?: string;       // Generated HTML content for the slide (legacy)
   slideJson?: any;          // Generated JSON slide definition for Fabric.js/PptxGenJS
+  contentPlanningProgress?: {
+    progress: number;
+    message: string;
+    stepData?: any;
+  };
 };
 
 // Configuration for the multi-step slide builder process
@@ -108,13 +114,19 @@ export default function Build() {
 
   // ============================================================================
   // UI STATE MANAGEMENT: Controls responsive navigation and sidebar visibility
-  // ============================================================================
   // These state variables manage the various collapsible UI elements in the builder
   // to provide optimal user experience across different screen sizes and preferences
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);         // Main navigation sidebar collapse state (desktop)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);             // Mobile hamburger menu visibility toggle
   const [progressSidebarCollapsed, setProgressSidebarCollapsed] = useState(false); // Progress tracker sidebar collapse state (reserved for future enhancement)
+  
+  // Notification state for user guidance
+  const [notification, setNotification] = useState<{
+    type: 'info' | 'success' | 'warning' | 'error';
+    message: string;
+    details?: string;
+  } | null>(null);
 
   // ============================================================================
   // SLIDE DATA MANAGEMENT: Centralized storage for all user inputs and AI outputs
@@ -149,11 +161,17 @@ export default function Build() {
     sendSlideDescription,
     sendGenerateSlide,
     sendThemeSelection,
+    sendResearchRequest,
+    sendContentPlanning,
+    sendStepGuidanceRequest,
+    sendSessionStatusRequest,
     sendProcessSlide,
   } = useWebSocket({
     clientId,
     onMessage: (message) => {
       console.log('Received message from backend:', message);
+      console.log('Message type:', message.type);
+      console.log('Message data:', message.data);
       
       // Handle different message types from backend
       if (message.type === 'processing_complete') {
@@ -161,6 +179,36 @@ export default function Build() {
         if (message.data?.slide_data?.content) {
           updateSlideData({ slideHtml: message.data.slide_data.content });
         }
+      } else if (message.type === 'slide_generation_complete') {
+        // Handle slide generation completion from backend
+        console.log('Slide generation completed:', message.data);
+        
+        // Update slide data with the generated content
+        if (message.data.slide_html) {
+          updateSlideData({ slideHtml: message.data.slide_html });
+          console.log('Slide HTML updated from backend completion message');
+        }
+        
+        // Show success notification
+        showNotification('success', 'Slide Generated', 'Your slide has been created successfully!');
+      } else if (message.type === 'progress_update') {
+        // Handle progress updates from backend
+        console.log('Progress update:', message.data.step, message.data.progress, message.data.message);
+        
+        // Store progress updates in state for step components to access
+        if (message.data.step === 'content_planning') {
+          setSlideData(prev => ({
+            ...prev,
+            contentPlanningProgress: {
+              progress: message.data.progress,
+              message: message.data.message,
+              stepData: message.data.step_data
+            }
+          }));
+        }
+        
+        // You can add progress tracking state here if needed
+        // For now, just log the progress updates
       } else if (message.type === 'processing_status') {
         // Log processing status updates
         console.log('Processing status:', message.data.status, message.data.message);
@@ -168,6 +216,34 @@ export default function Build() {
         console.log('File uploaded successfully:', message.data.filename);
       } else if (message.type === 'connection_established') {
           console.log('Connected to Slideo Backend:', message.data.message);
+      } else if (message.type === 'step_guidance') {
+        // Handle step guidance from backend
+        console.log('Step guidance received:', message.data.guidance);
+        console.log('Available actions:', message.data.available_actions);
+        showNotification('info', 'Step Guidance', message.data.guidance);
+      } else if (message.type === 'session_status') {
+        // Handle session status updates
+        console.log('Session status received:', message.data);
+        if (message.data.next_steps && message.data.next_steps.length > 0) {
+          showNotification('info', 'Next Steps', message.data.next_steps[0]);
+        }
+      } else if (message.type === 'content_planning_error' || 
+                 message.type === 'slide_generation_error' || 
+                 message.type === 'research_error' ||
+                 message.type === 'theme_selection_error') {
+        // Handle validation and processing errors with better user guidance
+        console.error('Error received:', message.data.error);
+        showNotification('error', 'Workflow Error', message.data.error);
+        if (message.data.guidance) {
+          console.log('Guidance:', message.data.guidance);
+          showNotification('info', 'Guidance', message.data.guidance);
+        }
+        if (message.data.error_code === 'STEP001') {
+          // This is a step guidance error, we can request guidance
+          sendStepGuidanceRequest(currentStep.toString());
+        }
+      } else {
+        console.log('Unhandled message type:', message.type);
       }
     },
     onError: (error) => {
@@ -238,6 +314,27 @@ export default function Build() {
     }
   };
 
+  // Helper function to get step guidance when users encounter issues
+  const getStepGuidance = () => {
+    if (isConnected) {
+      sendStepGuidanceRequest(currentStep.toString());
+    }
+  };
+
+  // Helper function to get session status
+  const getSessionStatus = () => {
+    if (isConnected) {
+      sendSessionStatusRequest();
+    }
+  };
+
+  // Helper function to show notifications
+  const showNotification = (type: 'info' | 'success' | 'warning' | 'error', message: string, details?: string) => {
+    setNotification({ type, message, details });
+    // Auto-hide after 5 seconds
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   // Component Rendering: Dynamic step component selection based on current workflow position
   // Each step receives slideData for context and callbacks for navigation and data updates
   const renderStep = () => {
@@ -252,7 +349,7 @@ export default function Build() {
             connectionStatus={connectionStatus}
             sendFileUpload={sendFileUpload}
             sendSlideDescription={sendSlideDescription}
-             lastMessage={lastMessage as any}
+            lastMessage={lastMessage as any}
           />
         );
       case 2:
@@ -261,7 +358,11 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-             onPrev={prevStep}
+            onPrev={prevStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendThemeSelection={sendThemeSelection}
+            lastMessage={lastMessage as any}
           />
         );
       case 3:
@@ -270,7 +371,12 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-             onPrev={prevStep}
+            onPrev={prevStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendResearchRequest={sendResearchRequest}
+            sendGenerateSlide={sendGenerateSlide}
+            lastMessage={lastMessage as any}
           />
         );
       case 4:
@@ -279,7 +385,11 @@ export default function Build() {
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
-            onPrev={prevStep} 
+            onPrev={prevStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendContentPlanning={sendContentPlanning}
+            lastMessage={lastMessage as any}
           />
         );
       case 5:
@@ -289,6 +399,10 @@ export default function Build() {
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
             onPrev={prevStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendProcessSlide={sendProcessSlide}
+            lastMessage={lastMessage as any}
           />
         );
       // case 6: Download step removed - export functionality moved to Preview step
@@ -307,7 +421,18 @@ export default function Build() {
         {/* Header with collapse button */}
         <div className="p-4 border-b border-border relative flex items-center justify-between">
           {!progressSidebarCollapsed && (
-            <h3 className="text-lg font-semibold text-foreground">Progress</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground">Progress</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 rounded-full border border-border bg-background shadow-md hover:bg-accent p-0"
+                onClick={getStepGuidance}
+                title="Get step guidance"
+              >
+                ?
+              </Button>
+            </div>
           )}
 
           {/* Collapse button */}
@@ -470,6 +595,31 @@ export default function Build() {
 
         {/* MAIN CONTAINER: Full-width container with responsive padding */}
         <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">
+          {/* Notification system */}
+          {notification && (
+            <div className={`fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md transition-all duration-300 ${
+              notification.type === 'error' ? 'bg-red-100 border border-red-300 text-red-800' :
+              notification.type === 'warning' ? 'bg-yellow-100 border border-yellow-300 text-yellow-800' :
+              notification.type === 'success' ? 'bg-green-100 border border-green-300 text-green-800' :
+              'bg-blue-100 border border-blue-300 text-blue-800'
+            }`}>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h4 className="font-medium mb-1">{notification.message}</h4>
+                  {notification.details && (
+                    <p className="text-sm opacity-90">{notification.details}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setNotification(null)}
+                  className="ml-3 text-gray-500 hover:text-gray-700"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+          
           {/* ============================================================================
               MAIN LAYOUT: Single column layout with fixed sidebars
               ============================================================================
@@ -496,7 +646,18 @@ export default function Build() {
             <div className="lg:hidden mt-8">
               <Card variant="glass">
                 <CardContent className="p-4">
-                  <h3 className="text-lg font-semibold mb-4 text-foreground">Progress</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-foreground">Progress</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 rounded-full border border-border bg-background shadow-md hover:bg-accent p-0"
+                      onClick={getStepGuidance}
+                      title="Get step guidance"
+                    >
+                      ?
+                    </Button>
+                  </div>
                   <div className="space-y-4">
                     {steps.map((step, index) => (
                       <div key={step.id} className="flex items-start">

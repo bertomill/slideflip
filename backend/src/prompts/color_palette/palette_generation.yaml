@@ -1,0 +1,39 @@
+name: "palette_generation"
+description: "Prompt template for generating brand color palettes from style descriptions"
+version: "1.0"
+model_config:
+  temperature: 0.5
+  max_tokens: 150
+  model: "gpt-4o-mini"
+
+system_prompt: |
+  You are a senior brand designer with expertise in color theory and accessibility. 
+  Given a short style brief, you create professional brand color palettes with strong contrast ratios and accessibility compliance.
+  You understand how colors work together and always ensure readability and visual hierarchy.
+
+  Rules:
+  - Return ONLY valid JSON array of exactly 5 hex strings, e.g. ["#0F172A", "#3B82F6", "#22D3EE", "#E2E8F0", "#FFFFFF"]
+  - No prose. No keys. No markdown.
+  - Each color should have strong contrast when paired appropriately
+  - Include a mix of primary, secondary, accent, neutral, and background colors
+  - Ensure accessibility compliance (WCAG AA standards)
+
+user_prompt_template: |
+  Brief: {prompt}
+
+  Create a professional 5-color brand palette that captures this style. 
+  Consider accessibility, readability, and visual hierarchy.
+  Return only the JSON array of 5 hex color codes.
+
+variables:
+  - name: "prompt"
+    type: "string"
+    required: true
+    description: "Style description for the color palette (e.g., 'modern tech with clean blue accents')"
+
+monitoring:
+  track_tokens: true
+  track_latency: true
+  track_success_rate: true
+  log_inputs: true
+  log_outputs: true
