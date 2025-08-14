@@ -1,424 +1,327 @@
 # Slideo Frontend
 
-A modern Next.js application for generating professional presentations with real-time collaboration and AI-powered slide generation.
+A modern Next.js 15 frontend for the AI-powered presentation generator with real-time WebSocket communication and Supabase authentication.
 
-## Features
+## Architecture Overview
 
-- **Modern UI/UX**: Built with Next.js 14, Tailwind CSS, and shadcn/ui components
-- **Real-time Communication**: WebSocket integration for live updates and collaboration
-- **Authentication**: Supabase-powered authentication with password-based auth
-- **File Upload**: Drag-and-drop file upload with progress tracking
-- **Slide Builder**: Interactive slide creation with theme customization
-- **Real-time Chat**: Live chat functionality for collaboration
-- **Responsive Design**: Works seamlessly across desktop and mobile devices
-- **Theme Support**: Dark/light mode with system preference detection
+This frontend is built with **Next.js 15 App Router**, **TypeScript**, **Tailwind CSS**, and **shadcn/ui** components. It communicates with a Python FastAPI backend via WebSocket for real-time slide generation workflows.
 
-## Tech Stack
-
-- **Framework**: Next.js 14 with App Router
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui
-- **Authentication**: Supabase Auth
-- **Real-time**: WebSocket connections
-- **State Management**: React hooks and context
-- **TypeScript**: Full type safety
-- **Deployment**: Vercel-ready
+### Tech Stack
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript with strict mode
+- **Styling**: Tailwind CSS + shadcn/ui (New York variant)
+- **Authentication**: Supabase Auth with Google OAuth
+- **Real-time Communication**: Native WebSocket API
+- **State Management**: React hooks + WebSocket provider
+- **Forms**: React Hook Form with Zod validation
+- **Icons**: Lucide React
+- **Build**: Turbopack (dev) / Webpack (production)
 
 ## Project Structure
 
 ```
-app/
-├── api/                    # API routes
-│   ├── generate-description/
-│   └── research/
-├── auth/                   # Authentication pages
-│   ├── login/
-│   ├── sign-up/
-│   ├── forgot-password/
-│   └── ...
-├── builder/               # Main slide builder
-├── demo/                  # Demo page
-├── protected/             # Protected routes
-└── globals.css           # Global styles
+app/                    # Next.js App Router pages
+├── api/               # API routes (server-side)
+├── auth/              # Authentication pages
+├── build/             # Multi-step slide builder
+├── presentations/     # User presentations
+├── templates/         # Template gallery
+├── waitlist/          # Waitlist page
+└── ...
 
-components/
-├── auth/                  # Authentication components
-├── builder/               # Slide builder components
-│   ├── download-step.tsx
-│   ├── preview-step.tsx
-│   ├── research-step.tsx
-│   ├── theme-step.tsx
-│   └── upload-step.tsx
-├── ui/                    # Reusable UI components
-└── websocket-provider.tsx # WebSocket context
+components/            # React components
+├── ui/               # shadcn/ui base components
+├── builder/          # Slide builder step components
+├── auth/             # Authentication forms
+└── ...
 
-hooks/
-├── use-chat-scroll.tsx    # Chat scroll management
-├── use-realtime-chat.tsx  # Real-time chat hook
-└── use-websocket.ts       # WebSocket hook
+lib/                   # Utility libraries
+├── supabase/         # Supabase client configuration
+├── utils.ts          # Utility functions
+└── ...
 
-lib/
-├── supabase/              # Supabase configuration
-└── utils.ts               # Utility functions
+services/              # External service integrations
+├── websocket-service.ts  # WebSocket communication
+└── backend-service.ts    # HTTP API calls
 
-services/
-├── backend-service.ts      # Backend API service
-└── websocket-service.ts   # WebSocket service
+hooks/                 # Custom React hooks
+├── use-websocket.ts      # WebSocket hook
+└── ...
+
+types/                 # TypeScript type definitions
 ```
 
-## Getting Started
+## Key Features & Implementation
 
-### Prerequisites
+### 1. Multi-Step Slide Builder (`/app/build`)
 
-- Node.js 18+ 
-- npm, yarn, or pnpm
-- Supabase account and project
+A 6-step workflow for creating presentations:
 
-### Installation
+1. **Upload**: File upload with drag-and-drop support
+2. **Theme**: Template and color palette selection
+3. **Research**: Optional web research integration  
+4. **Content**: AI-generated content planning with WYSIWYG editing
+5. **Preview**: Real-time slide preview with Fabric.js canvas
+6. **Download**: Export to PowerPoint or HTML
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-cd slideflip
-   ```
+Each step is implemented as a separate component in `/components/builder/`.
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   # or
-   yarn install
-   # or
-   pnpm install
-   ```
+### 2. Real-time WebSocket Communication
 
-3. **Set up environment variables**:
-   Create a `.env.local` file in the root directory:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-   ```
-
-4. **Run the development server**:
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   # or
-   pnpm dev
-   ```
-
-5. **Open your browser**:
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## Authentication
-
-The frontend uses Supabase for authentication with the following features:
-
-- **Sign Up**: User registration with email verification
-- **Sign In**: Email/password authentication
-- **Password Reset**: Forgot password functionality
-- **Protected Routes**: Automatic redirect for unauthenticated users
-- **Session Management**: Persistent sessions with cookies
-
-### Authentication Flow
-
-1. User visits the application
-2. If not authenticated, redirected to login page
-3. User can sign up or sign in
-4. Upon successful authentication, redirected to builder
-5. Session persists across browser sessions
-
-## Slide Builder
-
-The main application feature is the slide builder with the following steps:
-
-### 1. Upload Step
-- Drag-and-drop file upload
-- Support for PDF, DOCX, TXT, MD files
-- File validation and progress tracking
-- Real-time upload status
-
-### 2. Research Step
-- AI-powered content analysis
-- Topic extraction and suggestions
-- Content structure recommendations
-- Research summary generation
-
-### 3. Theme Step
-- Professional theme selection
-- Color scheme customization
-- Layout options
-- Preview of theme changes
-
-### 4. Preview Step
-- Real-time slide preview
-- Content editing capabilities
-- Layout adjustments
-- Export options
-
-### 5. Download Step
-- Multiple export formats
-- Quality settings
-- Batch download options
-- Share functionality
-
-## Real-time Features
-
-### WebSocket Integration
-- Live connection status
-- Real-time slide updates
-- Collaborative editing
-- Progress tracking
-
-### Chat System
-- Real-time messaging
-- User presence indicators
-- Message history
-- Typing indicators
-
-## Component Architecture
-
-### Core Components
-
-#### Authentication Components
-- `AuthButton`: Universal auth button with login/logout
-- `LoginForm`: Sign-in form with validation
-- `SignUpForm`: Registration form
-- `ForgotPasswordForm`: Password reset form
-
-#### Builder Components
-- `UploadStep`: File upload with drag-and-drop
-- `ResearchStep`: AI-powered content analysis
-- `ThemeStep`: Theme and styling selection
-- `PreviewStep`: Slide preview and editing
-- `DownloadStep`: Export and download options
-
-#### UI Components
-- `Button`: Reusable button component
-- `Card`: Content container component
-- `Dialog`: Modal dialog component
-- `Input`: Form input component
-- `Navigation`: Navigation menu component
-
-### Custom Hooks
-
-#### `useWebSocket`
-Manages WebSocket connections and real-time communication:
+**WebSocket Service** (`/services/websocket-service.ts`):
 ```typescript
-const { sendMessage, isConnected, lastMessage } = useWebSocket(clientId);
+class WebSocketService {
+  // Singleton pattern for global WebSocket management
+  connect(clientId: string, callbacks: WebSocketCallbacks)
+  sendMessage(message: any)
+  disconnect()
+  // Auto-reconnection with exponential backoff
+  // Message queuing during disconnection
+  // Heartbeat system for connection health
+}
 ```
 
-#### `useRealtimeChat`
-Handles real-time chat functionality:
+**React Hook** (`/hooks/use-websocket.ts`):
 ```typescript
-const { messages, sendMessage, isTyping } = useRealtimeChat();
+const { sendFileUpload, isConnected, progress } = useWebSocket({
+  clientId: 'user123',
+  onMessage: (message) => {
+    // Handle progress_update, slide_generation_complete, etc.
+  }
+})
 ```
 
-#### `useChatScroll`
-Manages chat scroll behavior:
-```typescript
-const { scrollToBottom, isAtBottom } = useChatScroll();
+### 3. Authentication System (Supabase)
+
+**Configuration**:
+- **Client**: Browser-based Supabase client (`/lib/supabase/client.ts`)
+- **Server**: Server-side client for API routes (`/lib/supabase/server.ts`)
+- **Middleware**: Session validation and route protection (`/lib/supabase/middleware.ts`)
+
+**Authentication Flow**:
+1. User clicks "Sign in with Google"
+2. Redirected to Google OAuth (configured in Supabase)
+3. Google redirects to Supabase callback
+4. Supabase redirects to `/auth/callback/route.ts`
+5. Session established and user redirected to app
+
+**Protected Routes**: Automatically handled by `/middleware.ts`
+
+### 4. Component System (shadcn/ui)
+
+**Base Configuration**:
+```json
+{
+  "style": "new-york",
+  "tailwind": {
+    "baseColor": "neutral",
+    "cssVariables": true
+  }
+}
 ```
 
-## Styling and Theming
+**Custom Components**:
+- **Glass Effect**: `variant="glass"` for modern UI
+- **Engineering Theme**: Custom button variants
+- **Responsive Navigation**: Mobile-first navigation system
+- **Theme Toggle**: Light/dark mode support
 
-### Tailwind CSS
-- Utility-first CSS framework
-- Responsive design utilities
-- Dark mode support
-- Custom component styling
+### 5. Build System & Development
 
-### shadcn/ui
-- Pre-built component library
-- Consistent design system
-- Accessibility features
-- Customizable themes
+**Development Commands**:
+```bash
+npm run dev          # Turbopack development server (recommended)
+npm run dev:webpack  # Webpack development (for debugging)
+npm run build        # Production build
+npm run lint         # ESLint with Next.js rules
+```
 
-### Theme System
-- Light/dark mode toggle
-- System preference detection
-- Custom color schemes
-- Consistent branding
+**Build Configuration** (`next.config.ts`):
+- **Turbopack**: Fast development builds
+- **Webpack Fallbacks**: Node.js module polyfills for browser builds
+- **Error Handling**: Ignores build errors for rapid prototyping
+- **Image Optimization**: WebP/AVIF support with caching
 
 ## API Integration
 
-### Backend Service
-The frontend communicates with the backend through the `BackendService`:
+### HTTP API Routes (`/app/api/`)
 
+Server-side API routes for various operations:
+- `/api/generate-slide` - AI slide generation
+- `/api/color-palette/generate` - Color palette generation
+- `/api/examples/list` - Template listings
+- `/api/parse-documents` - Document text extraction
+- `/api/auth/*` - Authentication handling
+
+### WebSocket Messages
+
+**Outbound Messages** (Frontend → Backend):
 ```typescript
-const backendService = new BackendService();
+// File upload
+{ type: 'file_upload', data: FileUploadMessage }
 
-// Generate slide description
-const description = await backendService.generateDescription(content);
+// Theme selection  
+{ type: 'theme_selection', data: ThemeMessage }
 
-// Research content
-const research = await backendService.researchContent(topic);
+// Content planning
+{ type: 'content_planning', data: ContentPlanningMessage }
+
+// Slide generation
+{ type: 'slide_generation', data: SlideGenerationMessage }
 ```
 
-### WebSocket Service
-Real-time communication through `WebSocketService`:
-
+**Inbound Messages** (Backend → Frontend):
 ```typescript
-const wsService = new WebSocketService();
+// Progress updates
+{ type: 'progress_update', data: ProgressUpdateMessage }
 
-// Connect to backend
-await wsService.connect(clientId);
+// Slide generation complete
+{ type: 'slide_generation_complete', data: { slideHtml, slideName } }
 
-// Send messages
-wsService.sendMessage({
-  type: 'file_upload',
-  data: { filename, content }
-});
+// Content plan response
+{ type: 'content_plan_response', data: ContentPlanResponseMessage }
 ```
 
-## State Management
+## Environment Configuration
 
-### React Context
-- Authentication state
-- WebSocket connection state
-- Theme preferences
-- User settings
+### Required Environment Variables (`.env.local`)
 
-### Local State
-- Form data
-- UI state
-- Component-specific state
-- Temporary data
-
-## Error Handling
-
-### Global Error Boundary
-- Catches unhandled errors
-- Graceful error display
-- Error reporting
-- Recovery mechanisms
-
-### Form Validation
-- Client-side validation
-- Real-time feedback
-- Error messages
-- Success indicators
-
-### Network Error Handling
-- Connection retry logic
-- Offline detection
-- Error recovery
-- User notifications
-
-## Performance Optimization
-
-### Code Splitting
-- Route-based splitting
-- Component lazy loading
-- Dynamic imports
-- Bundle optimization
-
-### Image Optimization
-- Next.js Image component
-- Automatic optimization
-- Responsive images
-- Lazy loading
-
-### Caching
-- Static generation
-- Incremental static regeneration
-- API response caching
-- Browser caching
-
-## Testing
-
-### Unit Tests
 ```bash
-npm run test
+# Supabase Configuration (Required)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Backend URLs (Required for development)
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_BACKEND_WS_URL=ws://localhost:8000
+
+# AI Services (Required for AI features)
+OPENAI_API_KEY=your_openai_api_key
+
+# Optional Services
+TAVILY_API_KEY=your_tavily_api_key  # For web research
 ```
 
-### Integration Tests
+### Supabase Setup
+
+1. **Create Supabase Project**: Get project URL and anon key
+2. **Configure Google OAuth**:
+   - Add Google OAuth provider in Supabase Auth settings
+   - Set redirect URLs: `https://your-project.supabase.co/auth/v1/callback`
+   - Configure authorized JavaScript origins in Google Console
+3. **Database Tables**: Run migrations from `/supabase/migrations/`
+
+## Development Workflow
+
+### Getting Started
+
 ```bash
-npm run test:integration
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your configuration
+
+# Start development server
+npm run dev
+
+# Open browser to http://localhost:3000
 ```
 
-### E2E Tests
+### Development Tools
+
+**ESLint Configuration**:
+- Next.js recommended rules
+- TypeScript strict checking
+- Modern JavaScript features
+
+**Tailwind CSS**:
+- JIT compilation for fast builds
+- Custom color system with CSS variables
+- Responsive design utilities
+- Dark mode support
+
+### Testing
+
 ```bash
-npm run test:e2e
+npm run test           # Unit tests (to be implemented)
+npm run test:e2e       # End-to-end tests (to be implemented)
 ```
+
+## File Upload & Processing
+
+### Supported File Types
+- **PDF**: Server-side text extraction via backend
+- **DOCX**: Server-side extraction using python-docx
+- **TXT/MD**: Direct text processing
+- **Images**: Base64 encoding for preview
+
+### Upload Flow
+1. **Frontend**: File selected via drag-and-drop or file picker
+2. **Validation**: File type and size validation (50MB limit)
+3. **Encoding**: Base64 encoding for WebSocket transmission
+4. **Backend Processing**: Text extraction and knowledge graph generation
+5. **Progress Updates**: Real-time progress via WebSocket
 
 ## Deployment
 
-### Vercel Deployment
-1. Connect your GitHub repository to Vercel
-2. Configure environment variables
-3. Deploy automatically on push
+### Production Build
 
-### Environment Variables
-- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anonymous key
-- `NEXT_PUBLIC_BACKEND_URL`: Backend service URL
-
-### Build Process
 ```bash
 npm run build
 npm run start
 ```
 
-## Development Guidelines
+### Vercel Deployment
 
-### Code Style
-- TypeScript for type safety
-- ESLint for code quality
-- Prettier for formatting
-- Consistent naming conventions
+1. **Connect Repository**: Link GitHub repository to Vercel
+2. **Environment Variables**: Configure all required environment variables
+3. **Build Settings**: 
+   - Build Command: `npm run build`
+   - Output Directory: `.next`
+   - Node.js Version: 18.x or higher
 
-### Component Guidelines
-- Functional components with hooks
-- Props interface definitions
-- Error boundary usage
-- Accessibility features
+### Environment-Specific Configuration
 
-### State Management
-- Use React hooks for local state
-- Context for global state
-- Avoid prop drilling
-- Optimize re-renders
+**Development**: Uses Turbopack for fast builds
+**Production**: Uses Webpack with optimizations and polyfills
+
+## Performance Optimizations
+
+### Frontend Optimizations
+- **Code Splitting**: Dynamic imports for route-level splitting
+- **Image Optimization**: Next.js Image component with responsive sizing
+- **Bundle Analysis**: Webpack bundle analyzer for size optimization
+- **Caching**: Aggressive caching for static assets
+
+### Real-time Communication
+- **Connection Pooling**: Singleton WebSocket service
+- **Message Queuing**: Queue messages during disconnection
+- **Heartbeat System**: Automatic connection health monitoring
+- **Reconnection**: Exponential backoff retry strategy
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Authentication Problems
-- Check Supabase configuration
-- Verify environment variables
-- Clear browser cache
-- Check network connectivity
+**Authentication Problems**:
+- Check Supabase URL and keys
+- Verify Google OAuth configuration
+- Check redirect URLs in both Google Console and Supabase
 
-#### WebSocket Connection Issues
-- Verify backend is running
-- Check WebSocket URL
-- Review network settings
-- Check firewall configuration
+**WebSocket Connection Issues**:
+- Ensure backend is running on port 8000
+- Check firewall settings for WebSocket connections
+- Verify `NEXT_PUBLIC_BACKEND_WS_URL` environment variable
 
-#### Build Errors
-- Clear node_modules and reinstall
-- Check TypeScript errors
-- Verify dependency versions
-- Review import statements
+**Build Errors**:
+- Clear `.next` directory and `node_modules`
+- Reinstall dependencies with `npm install`
+- Check TypeScript errors with `npx tsc --noEmit`
 
-## Contributing
+### Development Tips
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For support and questions:
-- Create an issue on GitHub
-- Check the documentation
-- Review troubleshooting guide
-- Contact the development team 
+**Hot Reload Issues**: Restart development server if hot reload stops working
+**Memory Issues**: Use `--max_old_space_size=4096` for large builds
+**Port Conflicts**: Change port with `npm run dev -- -p 3001`

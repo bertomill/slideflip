@@ -1,521 +1,436 @@
-# SlideFlip Backend
+# Slideo Backend
 
-A Python-based backend service for the SlideFlip presentation generator with WebSocket communication, AI integration, knowledge graph processing, and advanced file processing capabilities.
+A Python FastAPI backend service for AI-powered presentation generation with real-time WebSocket communication, knowledge graph processing, and multi-format document parsing.
 
-## 🚀 Overview
+## Architecture Overview
 
-The SlideFlip backend is a FastAPI application that provides:
+This backend provides a **FastAPI-based web service** with **WebSocket support** for real-time communication with the Next.js frontend. It handles document processing, AI-powered content generation, and slide creation workflows.
 
-- **Real-time WebSocket Communication**: Bidirectional communication with frontend
-- **AI-Powered Content Processing**: LLM integration for slide generation
-- **Knowledge Graph Processing**: Advanced document analysis and entity extraction
-- **Multi-format File Support**: PDF, DOCX, TXT, MD file processing
-- **Advanced Slide Generation**: Professional presentation creation
-- **Content Storage & Management**: Structured data storage and retrieval
-- **HTML Feature Processing**: Rich content extraction and processing
+### Tech Stack
+- **Framework**: FastAPI with Uvicorn ASGI server
+- **Language**: Python 3.12+ with async/await patterns
+- **Package Manager**: `uv` (modern Python package management)
+- **WebSocket**: Native FastAPI WebSocket support
+- **AI Integration**: OpenAI GPT models with structured prompts
+- **Document Processing**: Multi-format support (PDF, DOCX, TXT, MD)
+- **Knowledge Graphs**: NetworkX with optional clustering
+- **Templates**: YAML-based prompts with Jinja2 rendering
 
-## ✨ Features
-
-### Core Features
-
-- **WebSocket Communication**: Real-time bidirectional communication with frontend
-- **File Upload & Processing**: Handle multiple file types with validation
-- **AI-Powered Slide Generation**: LLM integration for intelligent content processing
-- **Knowledge Graph Generation**: Extract entities, relationships, and facts from documents
-- **Content Storage**: Structured storage with metadata management
-- **HTML Processing**: Advanced HTML parsing and feature extraction
-- **Image Extraction**: Automatic image extraction from documents
-- **Theme Customization**: Professional slide themes and layouts
-
-### Technical Features
-
-- **Async Processing**: Non-blocking file and slide processing
-- **Client Management**: Track multiple client connections and their data
-- **Error Handling**: Comprehensive error handling and recovery
-- **Security**: File validation, size limits, and sanitization
-- **Performance**: Optimized for high-throughput processing
-- **Monitoring**: Health checks and performance metrics
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 backend/
-├── main.py                 # Main application entry point
-├── start.py               # Alternative startup script
+├── main.py                 # FastAPI application entry point
+├── start.py               # Alternative startup script with environment detection
 ├── requirements.txt        # Python dependencies
-├── pyproject.toml         # Project configuration
-├── README.md              # This comprehensive documentation
-├── MIGRATION_GUIDE.md     # Complete migration guide for Phases 1-4
-├── PRD_BACKEND_UNIFICATION.md  # Project requirements document
-├── PHASE1_IMPLEMENTATION.md    # Phase 1: Core service enhancement
-├── PHASE2_IMPLEMENTATION.md    # Phase 2: WebSocket message enhancement
-├── PHASE3_IMPLEMENTATION.md    # Phase 3: Integration & testing
-├── PHASE4_CLEANUP_ANALYSIS.md  # Phase 4: Cleanup analysis
-├── src/
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── config.py      # Application settings
-│   │   └── websocket_manager.py  # WebSocket connection management
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── message_models.py     # Pydantic models for messages
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── ai_service.py         # AI integration service
-│   │   ├── file_service.py       # File handling operations
-│   │   ├── llm_service.py        # LLM integration service
-│   │   ├── ppt_service.py        # PowerPoint generation
-│   │   ├── slide_service.py      # Slide generation logic
-│   │   ├── theme_service.py      # Theme management service
-│   │   ├── research_service.py   # Research API integration
-│   │   ├── knowledge_graph_service.py  # Knowledge graph processing
-│   │   ├── kg_task_manager.py    # Knowledge graph task management
-│   │   └── kg_processing.py      # Knowledge graph processing utilities
-│   ├── handlers/
-│   │   ├── __init__.py
-│   │   ├── file_handler.py       # File operation handlers
-│   │   ├── slide_handler.py      # Slide operation handlers
-│   │   └── kg_message_handlers.py # Knowledge graph message handlers
-│   ├── routers/
-│   │   ├── __init__.py
-│   │   ├── websocket.py          # WebSocket router (5-step workflow)
-│   │   ├── api.py                # HTTP API endpoints
-│   │   ├── debug.py              # Consolidated debug endpoints
-│   │   └── root.py               # Basic routing
-│   └── utils/
-│       ├── __init__.py
-│       └── helpers.py            # Utility functions
-├── tests/                 # Test files (consolidated)
-│   ├── test_comprehensive_suite.py  # Comprehensive test suite
-│   ├── test_env_setup.py            # Environment setup tests
-│   └── README.md                    # Test documentation
-├── kg/                    # Knowledge graph data storage
-├── output/                # Generated output files
-├── temp/                  # Temporary files
-└── uploads/               # Uploaded files storage
+├── pyproject.toml         # uv project configuration
+├── .env                   # Environment configuration
+
+src/                       # Main source code
+├── core/                  # Core system components
+│   ├── config.py          # Settings and configuration
+│   ├── websocket_manager.py # WebSocket connection management
+│   ├── prompt_manager.py   # YAML prompt template system
+│   ├── initialization.py   # Service initialization and validation
+│   └── monitoring.py      # Performance and usage tracking
+
+├── agents/                # AI agent implementations
+│   ├── base_agent.py      # Base agent class with LangGraph integration
+│   ├── content_creator_agent.py # Enhanced content generation
+│   └── web_research_agent.py    # Web research capabilities
+
+├── handlers/              # WebSocket message handlers
+│   ├── file_handler.py    # File upload and processing
+│   ├── slide_handler.py   # Slide generation workflows
+│   └── kg_message_handlers.py # Knowledge graph operations
+
+├── models/                # Pydantic data models
+│   └── message_models.py  # WebSocket message types and validation
+
+├── prompts/               # YAML-based prompt templates
+│   ├── slide_generation/  # Slide generation prompts
+│   ├── research_agents/   # Research and web search prompts
+│   └── color_palette/     # Color scheme generation
+
+├── routers/               # FastAPI route handlers
+│   ├── websocket.py       # Main WebSocket endpoint
+│   ├── api.py            # HTTP API endpoints
+│   ├── debug.py          # Development and debugging endpoints
+│   └── monitoring.py     # Health checks and metrics
+
+├── services/              # Business logic services
+│   ├── file_service.py       # File processing and storage
+│   ├── document_parser.py    # Document text extraction
+│   ├── llm_service.py        # OpenAI integration and content generation
+│   ├── slide_service.py      # Slide creation and HTML generation
+│   ├── knowledge_graph_service.py # Graph-based document analysis
+│   ├── kg_task_manager.py    # Background knowledge graph processing
+│   ├── agentic_research_service.py # LangGraph-based research workflows
+│   └── theme_service.py      # Theme and styling management
+
+├── workflows/             # LangGraph workflow definitions
+│   ├── slide_generation_workflow.py # Main slide generation pipeline
+│   └── research_workflow.py         # Research integration workflow
+
+└── utils/                 # Utility functions and helpers
+
+uploads/                   # Client file storage (created at runtime)
+├── client_{client_id}/    # Per-client upload folders
+└── ...
+
+kg/                        # Knowledge graph data storage
+├── client_{client_id}/    # Per-client graph data
+│   ├── graphs/           # NetworkX .gml files
+│   ├── graph_data/       # JSON graph data
+│   └── clustered_graphs/ # Processed graph clusters
+└── ...
+
+tests/                     # Test suite
+├── test_comprehensive_suite.py # Main test suite
+├── test_phase1.py            # Core functionality tests
+├── test_phase2_integration.py # WebSocket integration tests
+└── test-backend.sh          # Backend test script
 ```
 
-## 📊 **Implementation Status**
+## Key Features & Implementation
 
-### **Overall Progress: 100% Complete** 🎉
+### 1. WebSocket Communication (`/src/routers/websocket.py`)
 
-| Phase       | Status          | Completion Date | Key Achievements                                  |
-| ----------- | --------------- | --------------- | ------------------------------------------------- |
-| **Phase 1** | ✅ **COMPLETE** | Week 1-2        | Core service enhancement with AI integration      |
-| **Phase 2** | ✅ **COMPLETE** | Week 2-3        | WebSocket message enhancement and 5-step workflow |
-| **Phase 3** | ✅ **COMPLETE** | Week 3-4        | Integration testing and performance optimization  |
-| **Phase 4** | ✅ **COMPLETE** | Week 4          | Cleanup, documentation, and production readiness  |
+**Endpoint**: `ws://localhost:8000/ws/{client_id}`
 
-### **What's Ready for Production**
+**5-Step Workflow State Machine**:
+```python
+class WorkflowState(Enum):
+    IDLE = "idle"
+    UPLOADING = "uploading"
+    THEME_SELECTING = "theme_selecting"
+    CONTENT_PLANNING = "content_planning"
+    SLIDE_GENERATING = "slide_generating"
+    COMPLETED = "completed"
+    ERROR = "error"
+```
 
-- **✅ AI Service**: OpenAI integration fully functional
-- **✅ Research Service**: Infrastructure ready for real API integration
-- **✅ Theme Service**: Professional theme collection with customization
-- **✅ Enhanced Slide Service**: AI-powered slide generation
-- **✅ Error Handling**: Comprehensive error handling and validation
-- **✅ Testing**: Full test coverage for all services
-- **✅ WebSocket Flow**: Complete 5-step workflow integration
-- **✅ Progress Tracking**: Real-time progress updates with step-specific information
-- **✅ Step Validation**: Robust prerequisite system preventing workflow violations
-- **✅ Session Management**: Enhanced session data with persistent state tracking
-- **✅ Message Handling**: Complete WebSocket message flow for all workflow steps
-- **✅ Cleanup**: Obsolete files removed, codebase optimized
-- **✅ Documentation**: Comprehensive migration guide and updated documentation
+**Message Processing**:
+- **Connection Management**: Up to 50 concurrent connections
+- **State Validation**: Prevents concurrent operations per client
+- **Progress Updates**: Real-time progress notifications
+- **Error Handling**: Structured error codes and messages
 
-### **Performance Metrics Achieved**
+**Supported Message Types**:
+```python
+# Inbound (Frontend → Backend)
+- file_upload          # Document upload and processing
+- theme_selection      # Theme and styling configuration
+- content_planning     # Content structure generation
+- slide_generation     # Final slide creation
+- research_request     # Web research integration
 
-- **Overall Score**: 81% (Production Ready)
-- **Response Time**: <2 seconds for WebSocket messages
-- **Memory Usage**: Optimized for production load
-- **Concurrent Connections**: Tested with multiple clients
-- **File Count Reduction**: 60-70% reduction in test file count
-- **Code Quality**: Eliminated duplicate functionality and obsolete code
+# Outbound (Backend → Frontend)
+- progress_update      # Processing progress
+- slide_generation_complete # Generated slide data
+- content_plan_response    # AI-generated content plan
+- error               # Error notifications
+```
 
-## 🛠️ Installation
+### 2. File Processing Pipeline (`/src/services/`)
 
-### Prerequisites
+**File Service** (`file_service.py`):
+- **Multi-format Support**: PDF, DOCX, TXT, MD, PPTX, HTML
+- **Base64 Decoding**: WebSocket-compatible file transmission
+- **Client Isolation**: Per-client upload directories
+- **Content Extraction**: Text and metadata extraction
 
-- Python 3.11+
-- uv package manager (recommended) or pip
-- Virtual environment (recommended)
+**Document Parser** (`document_parser.py`):
+- **PDF Processing**: `pdfminer.six` for robust text extraction
+- **DOCX Processing**: `python-docx` for Word documents
+- **Fallback Mechanisms**: Multiple extraction strategies
+- **LangChain Integration**: Advanced document chunking and processing
 
-### 1. Create Virtual Environment
+**Upload Flow**:
+1. WebSocket receives base64-encoded file
+2. File validation and type detection
+3. Content extraction (text, images, metadata)
+4. Optional knowledge graph generation
+5. Progress updates sent to frontend
+
+### 3. AI Integration & Content Generation (`/src/services/llm_service.py`)
+
+**OpenAI Integration**:
+```python
+class LLMService:
+    # GPT-4 primary, GPT-4o-mini fallback
+    async def generate_content_from_files(client_id: str) -> ContentPlan
+    async def generate_slide_html(content_plan: dict, theme: dict) -> str
+    # Robust JSON parsing with fallback methods
+    # Token usage tracking and monitoring
+```
+
+**Prompt Management System** (`/src/core/prompt_manager.py`):
+- **YAML Templates**: Structured prompts with variable validation
+- **Jinja2 Rendering**: Dynamic prompt generation
+- **Template Categories**: slide_generation, research_agents, color_palette
+- **Usage Metrics**: Token counting and success rate tracking
+
+**Content-First Architecture**:
+- All content generated from uploaded files, not themes
+- Themes only affect visual styling, not content structure
+- Research integration enhances existing content
+
+### 4. Knowledge Graph Processing (Optional)
+
+**Knowledge Graph Service** (`/src/services/knowledge_graph_service.py`):
+- **NetworkX Graphs**: Entity and relationship extraction
+- **DBSCAN Clustering**: Graph node clustering for content organization
+- **Background Processing**: Async task management
+- **Development Flag**: `SKIP_KNOWLEDGE_GRAPH=True` for faster development
+
+**Graph Storage**:
+- **Client Isolation**: Per-client graph directories
+- **File Formats**: NetworkX .gml files + JSON data
+- **Clustering Results**: Processed graph clusters for content organization
+
+### 5. Research Integration (`/src/services/agentic_research_service.py`)
+
+**LangGraph Workflows**:
+- **Web Research Agent**: Tavily API integration for web search
+- **Search Query Optimization**: AI-powered query enhancement
+- **Research Synthesis**: Combines web research with document content
+
+**Research APIs**:
+- **Tavily**: Primary web search API
+- **Firecrawl**: Web scraping capabilities
+- **Optional Integration**: Research enhances but doesn't replace document content
+
+## Development Commands
+
+### Using `uv` (Recommended)
 
 ```bash
-# Using uv (recommended)
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Setup
+uv venv                    # Create virtual environment
+uv sync                    # Install dependencies from pyproject.toml
 
-# Or using traditional venv
+# Development
+uv run python main.py      # Start backend server
+uv run python start.py     # Alternative startup with environment detection
+
+# Testing
+uv run python -m pytest tests/                    # Run full test suite
+uv run python -m pytest tests/test_phase1.py     # Run specific test file
+uv run python test_content_creator_agent.py      # Test specific agent
+
+# Scripts
+./test-backend.sh          # Backend test script (uses uv run)
+```
+
+### Traditional Python (Alternative)
+
+```bash
+# Setup
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-### 2. Install Dependencies
-
-```bash
-# Using uv (recommended)
-uv sync
-
-# Or using pip
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
 
-### 3. Set Up Environment Variables
-
-Create a `.env.local` file in the backend directory:
-
-```bash
-# Required for AI integration
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Optional: Customize directories
-UPLOAD_DIR=uploads
-TEMP_DIR=temp
-OUTPUT_DIR=output
-```
-
-### 4. Verify Installation
-
-```bash
-# Run comprehensive test suite
-python tests/test_comprehensive_suite.py
-
-# Or test specific components
-python -c "from src.services.ai_service import AIService; print('AI Service OK')"
-python -c "from src.services.theme_service import ThemeService; print('Theme Service OK')"
-python -c "from src.services.research_service import ResearchService; print('Research Service OK')"
-```
-
-## 🚀 Quick Start
-
-### 1. Start the Backend
-
-```bash
-# Start with auto-reload
+# Development
 python main.py
-
-# Or use the alternative startup script
 python start.py
+
+# Testing
+python -m pytest tests/
 ```
 
-The backend will be available at `http://localhost:8000`
-
-### 2. Test WebSocket Connection
+### Full Application Startup
 
 ```bash
-# Test WebSocket endpoint
-curl -I http://localhost:8000/ws/test_client
-
-# Check health status
-curl http://localhost:8000/api/health
+# From project root - starts both frontend and backend
+./start-app-robust.sh
 ```
 
-### 3. Monitor System Status
+## Environment Configuration
+
+### Required Environment Variables (`backend/.env`)
 
 ```bash
-# Check WebSocket connections
-curl http://localhost:8000/debug/connections
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
 
-# View knowledge graph overview
-curl http://localhost:8000/debug/kg-overview
+# Security
+SECRET_KEY=your_secret_key_here
 
-# List client folders
-curl http://localhost:8000/debug/client-folders
+# File Processing
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=52428800  # 50MB limit
+
+# AI Integration (Required)
+OPENAI_API_KEY=your_openai_api_key
+
+# Optional Services
+TAVILY_API_KEY=your_tavily_key  # For web research
+FIRECRAWL_API_KEY=your_firecrawl_key
+
+# Development Settings
+SKIP_KNOWLEDGE_GRAPH=True  # Skip KG processing for faster development
+LOG_LEVEL=INFO
 ```
 
-## 🧪 Testing
+## API Endpoints
 
-### Comprehensive Test Suite
+### WebSocket
+- **`WS /ws/{client_id}`**: Main WebSocket endpoint for real-time communication
 
-The backend includes a comprehensive test suite that covers all functionality:
+### HTTP API
+- **`GET /`**: Root endpoint with service information
+- **`GET /health`**: Health check endpoint
+- **`GET /docs`**: Interactive API documentation (Swagger UI)
+- **`GET /debug/*`**: Development and debugging endpoints
+- **`POST /api/*`**: Various API endpoints for specific operations
+
+### Development Endpoints
+- **`GET /debug/clients`**: List active WebSocket connections
+- **`GET /debug/kg-status/{client_id}`**: Knowledge graph processing status
+- **`POST /debug/force-clustering/{client_id}`**: Force knowledge graph clustering
+
+## Testing
+
+### Test Structure
 
 ```bash
-# Run all tests
-python tests/test_comprehensive_suite.py
+tests/
+├── test_comprehensive_suite.py     # Main test suite with all functionality
+├── test_phase1.py                  # Core service tests
+├── test_phase2_integration.py      # WebSocket integration tests
+├── test_phase3_performance.py      # Performance and load testing
+└── test-backend.sh                 # Shell script for backend testing
+```
 
-# Run specific test categories
-python -c "
-from tests.test_comprehensive_suite import ComprehensiveTestSuite
-suite = ComprehensiveTestSuite()
-suite.test_ai_integration()
-suite.test_websocket_components()
-"
+### Running Tests
+
+```bash
+# Full test suite
+uv run python -m pytest tests/
+
+# Specific test categories
+uv run python -m pytest tests/test_phase1.py          # Core functionality
+uv run python -m pytest tests/test_phase2_integration.py # WebSocket tests
+
+# Backend test script (includes server startup)
+cd backend && ./test-backend.sh
+
+# Agent-specific testing
+uv run python test_content_creator_agent.py
 ```
 
 ### Test Coverage
 
-The test suite covers:
+- **Unit Tests**: Individual service and component testing
+- **Integration Tests**: WebSocket message flow testing
+- **Performance Tests**: Concurrent client testing
+- **End-to-End Tests**: Complete workflow validation
 
-- ✅ Environment setup and configuration
-- ✅ Core service initialization
-- ✅ WebSocket components
-- ✅ Knowledge graph services
-- ✅ AI integration
-- ✅ Theme management
-- ✅ Research service
-- ✅ File processing
-- ✅ Slide generation
+## Deployment
 
-## 📡 WebSocket API
-
-### Complete 5-Step Workflow
-
-The backend now supports a complete 5-step workflow via WebSocket:
-
-1. **File Upload** → `file_upload` message
-2. **Theme Selection** → `theme_selection` message
-3. **Research Request** → `research_request` message
-4. **Content Planning** → `content_planning` message
-5. **Slide Generation** → `generate_slide` message
-
-### Message Types
-
-```python
-# Enhanced message models for all workflow steps
-class ResearchRequestMessage(BaseModel):
-    description: str
-    research_options: Dict[str, Any]
-    wants_research: bool
-    client_id: Optional[str]
-
-class ContentPlanningMessage(BaseModel):
-    description: str
-    research_data: Optional[str]
-    theme: str
-    client_id: Optional[str]
-
-class ContentPlanResponseMessage(BaseModel):
-    content_plan: str
-    suggestions: List[str]
-    estimated_slide_count: int
-```
-
-### Real-Time Progress Updates
-
-```python
-# Progress tracking for each step
-PROGRESS_STEPS = {
-    "file_processing": 20,
-    "research": 40,
-    "content_planning": 60,
-    "slide_generation": 80,
-    "finalization": 100
-}
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable         | Required | Default   | Description                    |
-| ---------------- | -------- | --------- | ------------------------------ |
-| `OPENAI_API_KEY` | ✅ Yes   | -         | OpenAI API key for AI features |
-| `UPLOAD_DIR`     | ❌ No    | `uploads` | Directory for file uploads     |
-| `TEMP_DIR`       | ❌ No    | `temp`    | Directory for temporary files  |
-| `OUTPUT_DIR`     | ❌ No    | `output`  | Directory for generated output |
-
-### Service Configuration
-
-```python
-# AI Service configuration
-from src.services.ai_service import AIService
-ai_service = AIService()
-
-# Theme Service configuration
-from src.services.theme_service import ThemeService
-theme_service = ThemeService()
-
-# Research Service configuration
-from src.services.research_service import ResearchService
-research_service = ResearchService()
-```
-
-## 📊 Performance & Monitoring
-
-### Health Checks
+### Development
 
 ```bash
-# Basic health check
-curl http://localhost:8000/api/health
+# Using uv (recommended)
+cd backend
+uv run python main.py
 
-# Detailed status with WebSocket stats
-curl http://localhost:8000/api/debug/connections
+# Traditional method
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
 ```
 
-### Performance Metrics
-
-- **Response Time**: <2 seconds for WebSocket messages
-- **Memory Usage**: Optimized for production load
-- **Concurrent Connections**: Tested with multiple clients
-- **File Processing**: Async processing for optimal performance
-
-### Monitoring Endpoints
+### Production
 
 ```bash
-# WebSocket connection statistics
-curl http://localhost:8000/debug/connections
+# Using uv
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 
-# Knowledge graph processing status
-curl http://localhost:8000/debug/kg-overview
+# Using uvicorn directly
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
-# Client folder information
-curl http://localhost:8000/debug/client-folders
+# Docker (if needed)
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-## 🔒 Security
+## Architecture Patterns
 
-### API Key Management
+### Design Principles
 
-```bash
-# Secure API key storage
-export OPENAI_API_KEY="your_key_here"
-# or use .env.local file (not committed to git)
-```
+1. **Content-First**: All slide content generated from uploaded documents
+2. **Theme-as-Styling**: Themes only affect visual presentation, not content
+3. **Service Separation**: Clear boundaries between file processing, AI generation, and output
+4. **Async-First**: Async/await throughout for better performance
+5. **Graceful Fallbacks**: Multiple fallback mechanisms for reliability
 
-### Input Validation
+### Key Architectural Decisions
 
-```python
-# Enhanced message validation
-from src.models.message_models import ClientMessage
+**WebSocket State Machine**: Prevents concurrent operations and ensures workflow integrity
 
-# All messages are validated against Pydantic models
-message = ClientMessage.model_validate(data)
-```
+**Content vs Theme Separation**: Content generated from files, themes only affect styling
 
-### File Upload Security
+**Optional Knowledge Graph**: Can be disabled for faster development cycles
 
-```python
-# Secure file handling
-allowed_types = ['text/plain', 'text/html', 'application/pdf']
-file_type = file.content_type
-if file_type not in allowed_types:
-    raise HTTPException(status_code=400, detail="File type not allowed")
-```
+**Prompt Template System**: YAML-based templates with Jinja2 for maintainable AI prompts
 
-## 🚨 Troubleshooting
+**Service Layer Architecture**: Clear separation of concerns with dependency injection
+
+## Performance & Monitoring
+
+### Performance Features
+- **Async Processing**: Non-blocking file and AI operations
+- **Connection Pooling**: Efficient WebSocket connection management
+- **Memory Management**: Streaming file processing for large documents
+- **Background Tasks**: Knowledge graph processing doesn't block main workflow
+
+### Monitoring
+- **Health Checks**: `/health` endpoint for service monitoring
+- **Connection Statistics**: Active WebSocket connection tracking
+- **AI Usage Metrics**: Token usage and cost tracking
+- **Performance Metrics**: Processing time measurement
+
+## Troubleshooting
 
 ### Common Issues
 
-#### 1. OpenAI API Key Issues
+**AI Service Errors**:
+- Check `OPENAI_API_KEY` is set and valid
+- Verify API quota and rate limits
+- Check network connectivity to OpenAI API
 
-```bash
-# Check API key configuration
-python -c "from src.core.config import Settings; s = Settings(); print(s.OPENAI_API_KEY[:10] if s.OPENAI_API_KEY else 'Not set')"
+**File Processing Issues**:
+- Ensure upload directory exists and is writable
+- Check file size limits (50MB default)
+- Verify file format is supported
 
-# Verify API key validity
-curl -H "Authorization: Bearer $OPENAI_API_KEY" https://api.openai.com/v1/models
-```
+**WebSocket Connection Issues**:
+- Check firewall settings for WebSocket connections
+- Verify frontend WebSocket URL configuration
+- Monitor connection health with heartbeat system
 
-#### 2. WebSocket Connection Issues
+**Knowledge Graph Processing**:
+- Set `SKIP_KNOWLEDGE_GRAPH=True` for development
+- Check background task processing status
+- Verify NetworkX and scikit-learn dependencies
 
-```bash
-# Check WebSocket endpoint
-curl -I http://localhost:8000/ws/test_client
+### Development Tips
 
-# Monitor WebSocket connections
-curl http://localhost:8000/debug/connections
-```
+**Fast Development**: Set `SKIP_KNOWLEDGE_GRAPH=True` to skip graph processing
 
-#### 3. File Processing Issues
+**Debugging**: Use `/debug/*` endpoints to inspect service state
 
-```bash
-# Check file permissions
-ls -la uploads/
-ls -la temp/
-ls -la output/
+**Testing**: Use `./test-backend.sh` for comprehensive backend testing
 
-# Verify file service
-curl http://localhost:8000/debug/client-folders
-```
-
-### Getting Help
-
-- **Documentation**: Check `MIGRATION_GUIDE.md` for detailed migration information
-- **Testing**: Run comprehensive test suite to identify issues
-- **Logs**: Review backend logs for error details
-- **Phase Documents**: Review implementation documents for specific features
-
-## 🔮 Future Enhancements
-
-### Planned Features
-
-- **Advanced Caching**: Redis integration for performance
-- **Load Balancing**: Multiple backend instances
-- **Advanced Monitoring**: Prometheus metrics and Grafana dashboards
-- **Auto-scaling**: Kubernetes deployment with HPA
-
-### Performance Optimizations
-
-- **Async Processing**: Background task queues
-- **Database Integration**: Persistent storage for production
-- **CDN Integration**: Static asset delivery optimization
-- **Rate Limiting**: API usage throttling
-
-## 📝 Migration Information
-
-### From Previous Versions
-
-If you're upgrading from a previous version, see the comprehensive `MIGRATION_GUIDE.md` for:
-
-- Complete upgrade instructions
-- Rollback procedures
-- Configuration changes
-- Performance improvements
-- Troubleshooting guides
-
-### What Changed
-
-- **Architecture**: Unified Python backend (was split Python + Next.js)
-- **Communication**: 100% WebSocket-based (was mixed WebSocket + HTTP)
-- **AI Integration**: OpenAI-powered slide generation
-- **Testing**: Consolidated test suite (was multiple test files)
-- **Documentation**: Comprehensive guides and migration documentation
-
-## 🤝 Contributing
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd slideflip/backend
-
-# Set up development environment
-uv sync
-uv run python tests/test_comprehensive_suite.py
-```
-
-### Code Quality
-
-- Run tests before committing: `python tests/test_comprehensive_suite.py`
-- Follow existing code style and patterns
-- Add tests for new features
-- Update documentation as needed
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🎉 **Project Complete!**
-
-The SlideFlip backend unification project has been successfully completed! The system now provides:
-
-- **Unified Architecture**: Single backend for all operations
-- **Real-Time Communication**: WebSocket-based progress updates
-- **AI Integration**: OpenAI-powered slide generation
-- **Professional Themes**: Comprehensive theme management
-- **Research Capabilities**: External API integration
-- **Production Ready**: Performance tested and optimized
-- **Clean Codebase**: Obsolete code removed and consolidated
-- **Comprehensive Documentation**: Complete guides and migration information
-
-The system is ready for production use with enhanced capabilities and improved maintainability.
-
----
-
-**Project Completion Date**: December 2024  
-**Version**: 1.0.0  
-**Status**: Complete ✅  
-**Next Steps**: Monitor performance and plan future enhancements
+**Logging**: Set `LOG_LEVEL=DEBUG` for detailed logging output

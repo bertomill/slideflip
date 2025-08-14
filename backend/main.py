@@ -17,6 +17,7 @@ from pathlib import Path
 
 # Import our custom modules
 from src.core.config import Settings
+from src.core.logger import setup_logging, get_logger
 from src.core.websocket_manager import WebSocketManager
 from src.services.file_service import FileService
 from src.services.slide_service import SlideService
@@ -29,13 +30,24 @@ from src.routers.api import router as api_router
 from src.routers.debug import router as debug_router, init_debug_endpoints
 from src.routers.monitoring import router as monitoring_router
 from src.routers.websocket import websocket_endpoint
+# Import improved WebSocket implementation
+from src.routers.improved_websocket import websocket_endpoint as improved_websocket_endpoint
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+
+# Setup logging first
+setup_logging(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    log_file="logs/slideo-backend.log",
+    enable_console=True,
+    structured=True
+)
+
+logger = get_logger("main")
 
 # Global settings
 settings = Settings()
@@ -168,12 +180,19 @@ app.include_router(api_router)
 app.include_router(debug_router)
 app.include_router(monitoring_router)
 
-# WebSocket endpoint
+# WebSocket endpoints
 
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint_route(websocket: WebSocket, client_id: str):
-    """WebSocket endpoint for real-time communication with frontend"""
+    """Primary WebSocket endpoint with improved error handling and type safety"""
+    await improved_websocket_endpoint(websocket, client_id)
+
+
+@app.websocket("/ws/legacy/{client_id}")
+async def legacy_websocket_endpoint_route(websocket: WebSocket, client_id: str):
+    """Legacy WebSocket endpoint (deprecated - use /ws/{client_id})"""
+    logger.warning(f"Client {client_id} using deprecated legacy WebSocket endpoint")
     await websocket_endpoint(websocket, client_id)
 
 if __name__ == "__main__":

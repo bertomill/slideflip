@@ -1,3 +1,8 @@
+/**
+ * Legacy WebSocket Service - DEPRECATED
+ * Use improved-websocket-service.ts instead
+ */
+
 interface WebSocketMessage {
   type: string;
   data: any;
@@ -11,6 +16,7 @@ interface WebSocketCallbacks {
   onProgressUpdate?: (step: string, progress: number, message: string, stepData?: any) => void;
 }
 
+/** @deprecated Use ImprovedWebSocketService instead */
 class WebSocketService {
   private static instance: WebSocketService;
   private socket: WebSocket | null = null;
