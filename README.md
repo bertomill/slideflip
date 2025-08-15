@@ -314,6 +314,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ## 🔄 Development Workflow
 
 ### Recent Updates
+- Build fix: added missing `lib/fabric-to-slide.ts` and corrected `lib/index.ts` imports for Next.js bundling on Vercel.
 - Invite acceptance flow: wrapped `useSearchParams` in a Suspense boundary for `/invite/accept` to satisfy Next.js requirements and ensure production builds succeed.
 - Rebranded visible UI text from "SlideFlip" to "Slideo" across pages and templates; PPTX metadata now uses "Slideo" and "Slideo AI".
 
