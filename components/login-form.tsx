@@ -29,7 +29,7 @@ export function LoginForm({
 
     try {
       // First attempt to sign in
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });

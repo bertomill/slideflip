@@ -1,10 +1,98 @@
 @tailwind base;
+
+@custom-variant dark (&:is(.dark *));
 @tailwind components;
 @tailwind utilities;
+
+/* Marquee animations */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+  }
+}
 
 /* Prevent horizontal scrolling globally */
 html, body {
   overflow-x: hidden;
+}
+
+/* 3D perspective utilities for CometCard */
+.perspective-distant {
+  perspective: 1200px;
+}
+
+.transform-3d {
+  transform-style: preserve-3d;
+}
+
+/* Background gradient animations */
+@keyframes moveHorizontal {
+  0% {
+    transform: translateX(-50%) translateY(-10%);
+  }
+  50% {
+    transform: translateX(50%) translateY(10%);
+  }
+  100% {
+    transform: translateX(-50%) translateY(-10%);
+  }
+}
+
+@keyframes moveInCircle {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes moveVertical {
+  0% {
+    transform: translateY(-50%);
+  }
+  50% {
+    transform: translateY(50%);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+/* Animation utility classes */
+.animate-first {
+  animation: moveVertical 30s ease infinite;
+}
+
+.animate-second {
+  animation: moveInCircle 20s reverse infinite;
+}
+
+.animate-third {
+  animation: moveInCircle 40s linear infinite;
+}
+
+.animate-fourth {
+  animation: moveHorizontal 40s ease infinite;
+}
+
+.animate-fifth {
+  animation: moveInCircle 20s ease infinite;
 }
 
 @layer base {
@@ -44,7 +132,7 @@ html, body {
     --ring: 0 0% 8%;
     /* Default radius for non-button components */
     --radius: 0.375rem;
-    
+
     /* Engineering-inspired accent colors - Subtle & Purposeful */
     --engineering-primary: 0 0% 8%;
     --engineering-secondary: 0 0% 40%;
@@ -53,7 +141,7 @@ html, body {
     --engineering-warning: 38 92% 50%;
     --engineering-error: 0 72% 51%;
   }
-  
+
   .dark {
     /* Muted palette mapped to theme tokens */
     --background: var(--woodsmoke);
@@ -95,22 +183,22 @@ html, body {
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
-  
+
   /* Premium scrollbar styling */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 3px;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
   }
@@ -125,52 +213,52 @@ html, body {
   .dark .glass {
     @apply bg-black;
   }
-  
+
   /* Engineering-inspired focus states - Precise & Clear */
   .focus-engineering {
     box-shadow: 0 0 0 2px hsl(var(--engineering-primary) / 0.1);
   }
-  
+
   /* Engineering-inspired gradients - Minimal & Purposeful */
   .gradient-engineering {
     background: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted) / 0.3));
   }
-  
+
   /* Primary engineering accent - Clean monochrome */
   .accent-engineering {
     background: hsl(var(--engineering-accent));
     color: hsl(var(--background));
   }
-  
+
   /* Smooth engineering transitions - Fast & Precise */
   .transition-engineering {
     @apply transition-all duration-150 ease-out;
   }
-  
+
   /* Engineering hover states - Subtle & Responsive */
   .hover-engineering {
     @apply hover:bg-muted/30 transition-engineering;
   }
-  
+
   /* Precision borders - Clean lines */
   .border-engineering {
     border: 1px solid hsl(var(--border));
   }
-  
+
   /* Premium transitions - Smooth & polished animations for interactive elements
      Provides longer, more elegant transitions compared to engineering variants
      Perfect for buttons, cards, and hover states that need refined feel */
   .transition-premium {
     @apply transition-all duration-300 ease-in-out;
   }
-  
+
   /* Premium gradients - Elegant diagonal gradient for sophisticated backgrounds
      Creates subtle depth with 135-degree angle from background to muted tones
      Ideal for hero sections, cards, and premium UI components */
   .gradient-premium {
     background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.5));
   }
-  
+
   /* Theme-responsive gradient - Adapts to light/dark mode
      Creates appropriate atmosphere for both light and dark themes
      Perfect for main app backgrounds and dashboard sections */
@@ -178,17 +266,17 @@ html, body {
     /* Plain background responsive to theme (keeps class name for compatibility) */
     background: rgb(248 248 248); /* off-white for light theme */
   }
-  
+
   .dark .gradient-dark-blue {
     background: rgb(15 15 15); /* dark grey for dark theme */
   }
-  
+
   /* Legacy dark blue gradient - For specific dark-only use cases */
   .gradient-dark-blue-legacy {
     /* Legacy kept, but neutralized to charcoal spectrum */
     background: linear-gradient(to bottom right, rgb(33 33 33), rgb(24 24 24), rgb(0 0 0));
   }
-  
+
   /* Subtle dark blue gradient for cards and components */
   .gradient-dark-blue-subtle {
     /* Subtle graphite gradient for cards */
@@ -263,17 +351,47 @@ html, body {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
-  
+
   .animate-float-slow {
     animation: floatY 10s ease-in-out infinite;
   }
-  
+
   .animate-float-medium {
     animation: floatY 8s ease-in-out infinite;
   }
-  
+
   .animate-float-delayed {
     animation: floatY 12s ease-in-out infinite;
     animation-delay: 1.5s;
+  }
+}
+
+@theme inline {
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  @keyframes marquee {
+  from {
+    transform: translateX(0);
+    }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+    }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

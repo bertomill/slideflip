@@ -160,14 +160,22 @@ export default function TemplatesPage() {
     const loadTemplates = async () => {
       const supabase = createClient();
       
-      // Load user templates from database
-      const { data: userTemplates } = await supabase
-        .from("slide_templates")
-        .select("id,name,description,theme,created_at,slide_json,html_content")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(24);
-      setTemplates((userTemplates as TemplateRow[]) || []);
+      // Get current user first
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      // Load user templates from database (only if user is authenticated)
+      if (currentUser) {
+        const { data: userTemplates } = await supabase
+          .from("slide_templates")
+          .select("id,name,description,theme,created_at,slide_json,html_content")
+          .eq("is_active", true)
+          .eq("user_id", currentUser.id) // Only fetch current user's templates
+          .order("created_at", { ascending: false })
+          .limit(24);
+        setTemplates((userTemplates as TemplateRow[]) || []);
+      } else {
+        setTemplates([]); // No templates if not authenticated
+      }
 
       // Load Slideo curated templates from filesystem via API
       try {
@@ -208,7 +216,8 @@ export default function TemplatesPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/convert-pptx', {
+      // Try image conversion first, fallback to text extraction
+      const response = await fetch('/api/convert-pptx-to-png', {
         method: 'POST',
         body: formData,
       });
@@ -224,6 +233,12 @@ export default function TemplatesPage() {
         const baseTemplateName = file.name.replace('.pptx', '');
         const supabase = createClient();
         
+        // Get current user for user_id
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) {
+          throw new Error('You must be logged in to create templates');
+        }
+        
         // Generate a unique template name by checking for existing names
         let templateName = baseTemplateName;
         let counter = 1;
@@ -234,6 +249,7 @@ export default function TemplatesPage() {
             .from('slide_templates')
             .select('id')
             .eq('name', templateName)
+            .eq('user_id', currentUser.id) // Check within user's templates only
             .single();
             
           if (!existingTemplate) {
@@ -255,6 +271,7 @@ export default function TemplatesPage() {
             html_content: '', // Required field, empty since we're using slide_json
             slide_json: result.slideJson,
             is_active: true,
+            user_id: currentUser.id, // Associate template with current user
           })
           .select()
           .single();
@@ -269,6 +286,7 @@ export default function TemplatesPage() {
           .from("slide_templates")
           .select("id,name,description,theme,created_at,slide_json,html_content")
           .eq("is_active", true)
+          .eq("user_id", currentUser.id) // Only fetch user's templates
           .order("created_at", { ascending: false })
           .limit(24);
         setTemplates((userTemplates as TemplateRow[]) || []);

@@ -24,6 +24,24 @@ import { useRef } from "react";
 import type { SlideDefinition } from "@/lib/slide-types";
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
+// Aceternity UI components
+import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
+import { TextHoverEffect } from "@/components/ui/text-hover-effect";
+// Magic UI components
+import { Marquee } from "@/components/magicui/marquee";
+
+// Slide card component for marquee
+const SlideCard = ({ slide }: { slide: { id: number; title: string; image: string; category: string } }) => {
+  return (
+    <Card className="relative w-64 aspect-[16/9] overflow-hidden hover:scale-105 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl border-0 bg-white/95 dark:bg-white/98 backdrop-blur-sm">
+      <img 
+        src={slide.image} 
+        alt={slide.title} 
+        className="w-full h-full object-contain" 
+      />
+    </Card>
+  );
+};
 
 // Mock data for presentation templates
 const presentationTemplates = [
@@ -73,18 +91,20 @@ const presentationTemplates = [
 
 // Demo slides pulled from public/samples/slides (used in landing page)
 const slideExamples = [
-  { id: 1, title: "Uber Problem", image: "/samples/slides/uber_slide_1.png" },
-  { id: 2, title: "DoorDash Performance", image: "/samples/slides/doordash_slide_1.png" },
-  { id: 3, title: "Facebook Platform", image: "/samples/slides/facebook_slide_1.png" },
-  { id: 4, title: "YouTube Purpose", image: "/samples/slides/youtube_side_1.png" },
-  { id: 5, title: "JPM Financial Highlights", image: "/samples/slides/jpm_slide_1.png" },
-  { id: 6, title: "RBC Client Assets", image: "/samples/slides/rbc_slide_1.png" },
-  { id: 7, title: "BMO Performance", image: "/samples/slides/bmo_slide_1.png" },
-  { id: 8, title: "P&G FY 2025", image: "/samples/slides/pg_slide_1.png" },
-  { id: 9, title: "Research Concrete", image: "/samples/slides/research-concrete.png" },
-  { id: 10, title: "Research Grey", image: "/samples/slides/research-grey.png" },
-  { id: 11, title: "Example Black", image: "/samples/slides/example-black.png" },
-  { id: 12, title: "Cat Slide", image: "/samples/slides/cat_slide_1.png" },
+  { id: 1, title: "Uber Problem", image: "/samples/slides/uber_slide_1.png", category: "Business Strategy" },
+  { id: 2, title: "DoorDash Performance", image: "/samples/slides/doordash_slide_1.png", category: "Analytics" },
+  { id: 3, title: "Facebook Platform", image: "/samples/slides/facebook_slide_1.png", category: "Product" },
+  { id: 4, title: "YouTube Content", image: "/samples/slides/youtube_side_1.png", category: "Content Strategy" },
+  { id: 5, title: "JPM Financial Highlights", image: "/samples/slides/jpm_slide_1.png", category: "Finance" },
+  { id: 6, title: "RBC Client Assets", image: "/samples/slides/rbc_slide_1.png", category: "Banking" },
+  { id: 7, title: "BMO Performance", image: "/samples/slides/bmo_slide_1.png", category: "Banking" },
+  { id: 8, title: "P&G FY 2025", image: "/samples/slides/pg_slide_1.png", category: "Corporate" },
+  { id: 9, title: "Research Concrete", image: "/samples/slides/research-concrete.png", category: "Research" },
+  { id: 10, title: "Research Grey", image: "/samples/slides/research-grey.png", category: "Research" },
+  { id: 11, title: "Example Black", image: "/samples/slides/example-black.png", category: "Template" },
+  { id: 12, title: "Cat Slide", image: "/samples/slides/cat_slide_1.png", category: "Creative" },
+  { id: 13, title: "Product Infographic", image: "/samples/slides/product-infographic.png", category: "Infographic" },
+  { id: 14, title: "McKinsey Analysis", image: "/samples/slides/mckinsey-example-1.png", category: "Consulting" },
 ];
 
 // Small Fabric.js preview for a template's slide_json
@@ -520,28 +540,32 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-6">
         {/* Hero Section */}
-        <div className="flex flex-col lg:flex-row items-center gap-12 py-20">
+        <div className="flex flex-col lg:flex-row items-center gap-12 py-12 lg:py-20">
           {/* Left Side - Content */}
           <div className="flex-1 text-center lg:text-left">
-            <div className="mb-6">
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-200 dark:bg-zinc-800/50 text-zinc-800 dark:text-zinc-200 text-sm font-medium mb-6">
+            <div className="mb-2">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-200 dark:bg-zinc-800/50 text-zinc-800 dark:text-zinc-200 text-sm font-medium">
                 <Sparkles className="h-4 w-4" />
                 The AI presentation maker for the workplace
               </span>
             </div>
 
-            <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight animate-in fade-in slide-in-from-bottom-2 duration-700">
-              It&apos;s{" "}
-              <span className="bg-gradient-to-r from-zinc-200 to-zinc-400 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">
-                stunning
-              </span>{" "}
-              what you can do with a little{" "}
-              <span className="bg-gradient-to-r from-zinc-200 to-zinc-400 dark:from-zinc-100 dark:to-zinc-300 bg-clip-text text-transparent">AI.</span>
-            </h1>
+            <div className="mb-2">
+               <div className="h-[120px] lg:h-[180px] flex items-center justify-start w-full">
+                 <div className="w-full max-w-fit">
+                   <TextHoverEffect text="Transform" duration={0.1} />
+                 </div>
+               </div>
+               <div className="text-2xl lg:text-3xl font-medium text-center lg:text-left leading-tight -mt-4">
+                 <h2>your documents into stunning slides.</h2>
+               </div>
+             </div>
 
-            <p className="text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-2xl mx-auto lg:mx-0">
-              Create professional presentations in minutes, not hours. Let AI transform your ideas into stunning slides that captivate your audience.
-            </p>
+            <div className="mb-8 max-w-2xl mx-auto lg:mx-0">
+              <p className="text-lg font-normal text-slate-600 dark:text-slate-300 text-center lg:text-left">
+                Upload your documents and watch AI transform them into professional presentations in minutes, not hours. Turn your ideas into stunning slides that captivate your audience.
+              </p>
+            </div>
 
             {/* CTA Section */}
             <div className="mb-8">
@@ -599,28 +623,26 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Side - Slide Grid */}
+          {/* Right Side - Infinite Scrolling Slides */}
           <div className="flex-1 max-w-2xl">
-            <div className="grid grid-cols-3 gap-3 transform rotate-3 hover:rotate-0 transition-transform duration-700">
-              {slideExamples.map((slide, index) => (
-                <Card
-                  key={slide.id}
-                  className={`aspect-[16/9] overflow-hidden hover:scale-105 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl ${index % 4 === 0 ? 'transform -rotate-2' :
-                    index % 4 === 1 ? 'transform rotate-1' :
-                      index % 4 === 2 ? 'transform -rotate-1' : 'transform rotate-2'
-                    } animate-in fade-in slide-in-from-bottom-4 duration-500`}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="h-full relative group bg-background/40 dark:bg-zinc-900/40">
-                    <img src={slide.image} alt={slide.title} className="w-full h-full object-contain" />
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="secondary" className="h-6 w-6 p-0">
-                        <Play className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+            <div className="relative flex w-full flex-col items-center justify-center overflow-hidden py-6">
+                             {/* First row - scrolling right */}
+               <Marquee pauseOnHover className="[--duration:50s] mb-3">
+                 {slideExamples.slice(0, 7).map((slide) => (
+                   <SlideCard key={`first-${slide.id}`} slide={slide} />
+                 ))}
+               </Marquee>
+               
+               {/* Second row - scrolling left */}
+               <Marquee reverse pauseOnHover className="[--duration:60s]">
+                {slideExamples.slice(7).map((slide) => (
+                  <SlideCard key={`second-${slide.id}`} slide={slide} />
+                ))}
+              </Marquee>
+              
+                             {/* Gradient overlays for smooth fade edges */}
+               <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#f8f8f8] dark:from-[#0f0f0f]"></div>
+               <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-[#f8f8f8] dark:from-[#0f0f0f]"></div>
             </div>
           </div>
         </div>

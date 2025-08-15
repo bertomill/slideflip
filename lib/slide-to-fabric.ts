@@ -1,4 +1,4 @@
-import { Canvas, Textbox, Rect, Ellipse, Line, Triangle } from 'fabric';
+import { Canvas, Textbox, Rect, Ellipse, Line, Triangle, FabricImage } from 'fabric';
 import { SlideDefinition, SlideObject, TextObject, ShapeObject, SlideColor } from './slide-types';
 
 /**
@@ -72,8 +72,9 @@ function renderTextObject(canvas: Canvas, obj: TextObject) {
     underline: options.underline || false,
     textAlign: options.align || 'left',
     lineHeight: options.lineSpacing ? (options.lineSpacing / (options.fontSize || 18)) : 1.2,
-    selectable: false,
-    evented: false
+    selectable: true,
+    evented: true,
+    editable: true
   });
   
   console.log('📝 Fabric text object created:', {
@@ -128,8 +129,8 @@ function renderShapeObject(canvas: Canvas, obj: ShapeObject) {
         rx: shape === 'roundRect' && options.rectRadius ? inchesToPixels(options.rectRadius) : 0,
         ry: shape === 'roundRect' && options.rectRadius ? inchesToPixels(options.rectRadius) : 0,
         opacity: options.fill?.transparency ? (1 - options.fill.transparency) : 1,
-        selectable: false,
-        evented: false
+        selectable: true,
+        evented: true
       });
       break;
       
@@ -143,8 +144,8 @@ function renderShapeObject(canvas: Canvas, obj: ShapeObject) {
         stroke: options.line ? convertColor(options.line.color) : undefined,
         strokeWidth: options.line?.width || 0,
         opacity: options.fill?.transparency ? (1 - options.fill.transparency) : 1,
-        selectable: false,
-        evented: false
+        selectable: true,
+        evented: true
       });
       break;
       
@@ -172,8 +173,8 @@ function renderShapeObject(canvas: Canvas, obj: ShapeObject) {
         stroke: options.line ? convertColor(options.line.color) : undefined,
         strokeWidth: options.line?.width || 0,
         opacity: options.fill?.transparency ? (1 - options.fill.transparency) : 1,
-        selectable: false,
-        evented: false
+        selectable: true,
+        evented: true
       });
       break;
   }
@@ -181,6 +182,75 @@ function renderShapeObject(canvas: Canvas, obj: ShapeObject) {
   if (fabricShape) {
     canvas.add(fabricShape);
   }
+}
+
+/**
+ * Render image object on canvas
+ */
+function renderImageObject(canvas: Canvas, obj: any) {
+  console.log('🖼️ Rendering image object:', obj);
+  const { path, options } = obj;
+  
+  // Convert position and size from inches to pixels
+  const left = inchesToPixels(options.x);
+  const top = inchesToPixels(options.y);
+  const width = inchesToPixels(options.w);
+  const height = inchesToPixels(options.h);
+  
+  console.log('📐 Image positioning:', {
+    original: { x: options.x, y: options.y, w: options.w, h: options.h },
+    pixels: { left, top, width, height }
+  });
+  
+  // Load and add image to canvas
+  console.log('🔗 Loading image from URL:', path);
+  
+  FabricImage.fromURL(path, {
+    crossOrigin: 'anonymous'
+  }).then((fabricImage) => {
+    fabricImage.set({
+      left: left,
+      top: top,
+      scaleX: width / (fabricImage.width || 1),
+      scaleY: height / (fabricImage.height || 1),
+      selectable: true,
+      evented: true
+    });
+    
+    console.log('🖼️ Fabric image created:', {
+      src: path.substring(0, 50) + '...',
+      position: { left, top },
+      size: { width, height },
+      scale: { 
+        x: width / (fabricImage.width || 1), 
+        y: height / (fabricImage.height || 1) 
+      }
+    });
+    
+    console.log('➕ Adding image to canvas...');
+    canvas.add(fabricImage);
+    console.log('✅ Image added to canvas');
+    canvas.renderAll();
+  }).catch((error) => {
+    console.error('❌ Failed to load image:', error);
+    
+    // Fallback: create a placeholder rectangle
+    const placeholder = new Rect({
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      fill: '#f0f0f0',
+      stroke: '#cccccc',
+      strokeWidth: 2,
+      selectable: true,
+      evented: true
+    });
+    
+    console.log('📦 Adding placeholder rectangle for failed image');
+    canvas.add(placeholder);
+    canvas.renderAll();
+  });
 }
 
 /**
@@ -261,8 +331,8 @@ export function renderSlideOnCanvas(
         console.log(`✅ Shape object ${index + 1} rendered`);
         break;
       case 'image':
-        // TODO: Implement image rendering
-        console.log('⚠️ Image rendering not yet implemented');
+        renderImageObject(canvas, obj as any);
+        console.log(`✅ Image object ${index + 1} rendered`);
         break;
       case 'chart':
         // TODO: Implement chart rendering (would need Chart.js or similar)
