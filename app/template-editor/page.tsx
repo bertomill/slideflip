@@ -29,8 +29,8 @@ import {
   Heart, Home, Settings, Search, Calendar, Clock,
   // Upload
   Upload, Image as ImageIcon,
-  // AI Chat
-  Bot, Loader2
+  // AI Builder
+  Bot, Loader2, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
