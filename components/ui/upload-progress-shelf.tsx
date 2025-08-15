@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { 
   Upload, 
   FileUp, 
@@ -11,7 +12,8 @@ import {
   CheckCircle2, 
   Loader2,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  X
 } from "lucide-react";
 
 interface UploadStep {
@@ -89,12 +91,12 @@ export function UploadProgressShelf({
 
   const shelfVariants = {
     hidden: { 
-      y: 100, 
+      x: 400, 
       opacity: 0,
       scale: 0.95
     },
     visible: { 
-      y: 0, 
+      x: 0, 
       opacity: 1,
       scale: 1,
       transition: {
@@ -105,7 +107,7 @@ export function UploadProgressShelf({
       }
     },
     exit: { 
-      y: 100, 
+      x: 400, 
       opacity: 0,
       scale: 0.95,
       transition: {
@@ -159,54 +161,52 @@ export function UploadProgressShelf({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
-
-          {/* Progress Shelf */}
-          <motion.div
-            variants={shelfVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed bottom-0 left-0 right-0 z-50 p-6"
-          >
-            <div className="max-w-3xl mx-auto">
-              <div className="bg-background/95 backdrop-blur-lg border border-border rounded-2xl shadow-2xl overflow-hidden">
+        <motion.div
+          variants={shelfVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="fixed bottom-6 right-6 z-50 w-96"
+        >
+          <div className="bg-background/95 backdrop-blur-lg border border-border rounded-2xl shadow-2xl overflow-hidden">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b border-border">
+                <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 border-b border-border">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <Upload className="h-5 w-5" />
-                        Importing PowerPoint
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Importing
                       </h3>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-1 truncate">
                         {fileName}
                       </p>
                     </div>
-                    {currentStep === 'save' && steps[3].status === 'completed' && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="flex items-center gap-2 text-green-600 dark:text-green-400"
+                    <div className="flex items-center gap-2 ml-2">
+                      {currentStep === 'save' && steps[3].status === 'completed' && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="flex items-center gap-1 text-green-600 dark:text-green-400"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="text-xs font-medium">Done!</span>
+                        </motion.div>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onClose}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                       >
-                        <CheckCircle2 className="h-5 w-5" />
-                        <span className="text-sm font-medium">Complete!</span>
-                      </motion.div>
-                    )}
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Progress Steps */}
-                <div className="p-6">
-                  <div className="space-y-4">
+                <div className="p-4">
+                  <div className="space-y-3">
                     {steps.map((step, index) => {
                       const Icon = step.icon;
                       const isActive = step.status === 'processing';
@@ -217,7 +217,7 @@ export function UploadProgressShelf({
                         <motion.div
                           key={step.id}
                           variants={stepVariants}
-                          className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
                             isActive ? 'bg-primary/10 border border-primary/20' : 
                             isCompleted ? 'bg-green-500/10 border border-green-500/20' :
                             isError ? 'bg-red-500/10 border border-red-500/20' :
@@ -313,7 +313,7 @@ export function UploadProgressShelf({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 }}
-                      className="mt-6 p-4 bg-green-500/10 border border-green-500/20 rounded-lg"
+                      className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg"
                     >
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-green-500 rounded-full flex items-center justify-center">
@@ -332,9 +332,7 @@ export function UploadProgressShelf({
                   )}
                 </div>
               </div>
-            </div>
           </motion.div>
-        </>
       )}
     </AnimatePresence>
   );
