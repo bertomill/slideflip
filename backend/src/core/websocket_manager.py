@@ -368,9 +368,9 @@ class WebSocketManager:
         stale_clients = []
         current_time = datetime.now()
 
-        # Find connections older than 2 minutes without activity
+        # Find connections older than 10 minutes without activity
         for client_id, connection_time in self.connection_times.items():
-            if (current_time - connection_time).total_seconds() > 120:
+            if (current_time - connection_time).total_seconds() > 600:  # 10 minutes (600 seconds) - increased from 2 minutes (120 seconds)
                 stale_clients.append(client_id)
 
         # Clean up stale connections

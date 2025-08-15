@@ -45,6 +45,19 @@ interface PreviewStepProps {
   updateSlideData: (updates: Partial<SlideData & { slideJson?: SlideDefinition }>) => void;
   onNext: () => void;
   onPrev: () => void;
+  // WebSocket props
+  isConnected?: boolean;
+  connectionStatus?: string;
+  sendGenerateSlideRequest?: (
+    description: string,
+    theme: string,
+    researchData?: string,
+    contentPlan?: string,
+    userFeedback?: string,
+    documents?: Array<{ filename: string; success?: boolean; content?: string }>,
+    model?: string
+  ) => boolean;
+  lastMessage?: any;
 }
 
 // Extend SlideData type to include JSON slide
@@ -54,7 +67,18 @@ interface ExtendedSlideData extends SlideData {
 
 type ModelAwareSlideData = SlideData & { selectedModel?: string };
 
-export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepProps) {
+export function PreviewStep({ 
+  slideData, 
+  updateSlideData, 
+  onNext, 
+  onPrev,
+  isConnected = false,
+  connectionStatus = 'disconnected',
+  sendGenerateSlideRequest,
+  lastMessage
+}: PreviewStepProps) {
+  type ModelAwareSlideData = SlideData & { selectedModel?: string };
+  const modelAwareSlideData = slideData as ModelAwareSlideData;
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -68,7 +92,30 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const containerRef = useRef<HTMLDivElement>(null);
   
   const extendedSlideData: ExtendedSlideData = slideData as ExtendedSlideData;
-  const modelAwareSlideData = slideData as ModelAwareSlideData;
+
+  // Debug logging when component mounts
+  useEffect(() => {
+    console.log('🔍 PreviewStepFabric mounted with props:', {
+      isConnected,
+      connectionStatus,
+      hasSendGenerateSlideRequest: !!sendGenerateSlideRequest,
+      hasDescription: !!slideData.description,
+      hasSlideHtml: !!slideData.slideHtml
+    });
+  }, [isConnected, connectionStatus, sendGenerateSlideRequest, slideData.description, slideData.slideHtml]);
+
+  // Add timeout to reset generating state if it gets stuck
+  useEffect(() => {
+    if (isGenerating) {
+      const timeout = setTimeout(() => {
+        console.log('🔍 ⚠️ Generating state stuck for 30 seconds, auto-resetting...');
+        setIsGenerating(false);
+        setIsRegenerating(false);
+      }, 60000); // 60 seconds timeout
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isGenerating]);
 
   // Build request body for slide generation API
   const buildRequestPayload = (overrideFeedback?: string) => {
@@ -96,29 +143,44 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Call API to generate slide JSON
   const generateSlide = async (overrideFeedback?: string) => {
-    console.log("🔄 Starting slide generation...");
-    console.log("📝 Slide data:", {
-      description: slideData.description,
-      theme: slideData.selectedTheme,
-      wantsResearch: slideData.wantsResearch,
-      hasDocuments: slideData.documents?.length > 0,
-      hasParsedDocs: slideData.parsedDocuments?.length > 0,
-      overrideFeedback
-    });
-
-    if (!slideData.description) {
-      console.warn("⚠️ No description provided, skipping API call");
+    console.log('🔍 generateSlide called with overrideFeedback:', overrideFeedback);
+    console.log('🔍 Current state - isGenerating:', isGenerating, 'description:', !!slideData.description);
+    console.log('🔍 WebSocket connection - isConnected:', isConnected, 'sendGenerateSlideRequest:', !!sendGenerateSlideRequest);
+    
+    if (!slideData.description || isGenerating) {
+      console.log('🔍 Skipping slide generation - no description or already generating');
       return;
     }
     
-    if (isGenerating) {
-      console.warn("⚠️ Already generating, skipping duplicate call");
-      return;
-    }
-
     setIsGenerating(true);
-
+    
     try {
+      // Try websocket first if connected
+      if (isConnected && sendGenerateSlideRequest) {
+        console.log('🔍 Using websocket for slide generation (Fabric)');
+        const success = sendGenerateSlideRequest(
+          slideData.description,
+          slideData.selectedTheme || "Professional",
+          slideData.wantsResearch ? slideData.researchData : undefined,
+          slideData.contentPlan,
+          typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
+          buildRequestPayload(overrideFeedback).documents,
+          modelAwareSlideData.selectedModel
+        );
+        
+        console.log('🔍 sendGenerateSlideRequest result (Fabric):', success);
+        
+        if (!success) {
+          throw new Error('Failed to send websocket message');
+        }
+        
+        console.log('🔍 WebSocket message sent successfully (Fabric), waiting for response');
+        // Don't set isGenerating to false here - wait for websocket response
+        return;
+      }
+      
+      // Fallback to existing API call if websocket not available
+      console.log('🔍 Using API fallback for slide generation (Fabric)');
       const payload = buildRequestPayload(overrideFeedback);
     
       // 🔍 DEBUG: Log what's being sent to backend
@@ -207,7 +269,11 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       });
       createFallbackSlide();
     } finally {
-      setIsGenerating(false);
+      // Only set isGenerating to false if we're not using websocket
+      // (websocket will handle this in the message handler)
+      if (!isConnected || !sendGenerateSlideRequest) {
+        setIsGenerating(false);
+      }
       console.log("🏁 Slide generation process complete");
     }
   };
@@ -297,21 +363,26 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       hasSlideJson: !!extendedSlideData.slideJson,
       slideJsonId: extendedSlideData.slideJson?.id,
       description: slideData.description,
-      isGenerating
+      isGenerating,
+      isConnected,
+      hasSendGenerateSlideRequest: !!sendGenerateSlideRequest
     });
 
     if (!extendedSlideData.slideJson) {
-      if (slideData.description) {
-        console.log("🚀 Triggering slide generation with description");
+      if (slideData.description && isConnected && sendGenerateSlideRequest) {
+        console.log("🚀 Triggering slide generation with description via websocket");
         generateSlide();
-      } else {
+      } else if (slideData.description && (!isConnected || !sendGenerateSlideRequest)) {
+        console.log("⚠️ Cannot generate via websocket - not connected or missing function, creating fallback slide");
+        createFallbackSlide();
+      } else if (!slideData.description) {
         console.log("⚠️ No description available, creating fallback slide");
         createFallbackSlide();
       }
     } else {
       console.log("✅ Slide JSON already exists, skipping generation");
     }
-  }, []);
+  }, [extendedSlideData.slideJson, slideData.description, isConnected, sendGenerateSlideRequest]);
 
   // Add this useEffect for cleanup - PUT IT HERE
   useEffect(() => {
@@ -322,6 +393,65 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       }
     };
   }, [canvas]);
+
+  // Handle websocket messages for slide generation
+  useEffect(() => {
+    console.log('🔍 useEffect triggered with lastMessage:', lastMessage);
+    console.log('🔍 Current isGenerating state:', isGenerating);
+    console.log('🔍 Current isRegenerating state:', isRegenerating);
+    
+    if (!lastMessage) {
+      console.log('🔍 No lastMessage, returning early');
+      return;
+    }
+    
+    console.log('🔍 Processing message type:', lastMessage.type);
+    console.log('🔍 Message data keys:', lastMessage.data ? Object.keys(lastMessage.data) : 'No data');
+    console.log('🔍 Full message data:', lastMessage.data);
+    
+    if (lastMessage.type === 'slide_generation_complete') {
+      console.log('🔍 ✅ RECEIVED SLIDE GENERATION COMPLETE MESSAGE!');
+      if (lastMessage.data?.slide_html) {
+        // Store the generated HTML content in slideData
+        const generatedHtml = lastMessage.data.slide_html;
+        console.log('🔍 Generated HTML content length:', generatedHtml.length);
+        console.log('🔍 Generated HTML content preview:', generatedHtml.substring(0, 200) + '...');
+        
+        console.log('🔍 About to call updateSlideData...');
+        // Update the slide data with the generated HTML
+        updateSlideData({ 
+          slideHtml: generatedHtml,
+          slideJson: undefined // Clear any existing JSON since we have HTML
+        });
+        console.log('🔍 updateSlideData called successfully');
+        
+        console.log('🔍 About to reset generation states...');
+        // Reset generation states
+        setIsGenerating(false);
+        setIsRegenerating(false);
+        console.log('🔍 Generation states reset to false');
+        
+        // Force canvas recreation to show the new content
+        setCanvasKey(prev => prev + 1);
+        
+        console.log('🔍 ✅ Slide data updated with generated HTML, canvas key incremented');
+      } else {
+        console.log('🔍 ❌ No slide_html in message data');
+        console.log('🔍 Message data content:', lastMessage.data);
+      }
+    } else if (lastMessage.type === 'slide_generation_error') {
+      console.error('🔍 ❌ Slide generation error:', lastMessage.data?.error);
+      // Fallback to placeholder so user can continue the flow
+      createFallbackSlide();
+      setIsGenerating(false);
+      setIsRegenerating(false);
+    } else if (lastMessage.type === 'progress_update') {
+      console.log('🔍 Progress update received:', lastMessage.data?.message, 'Progress:', lastMessage.data?.progress + '%');
+      // Don't reset isGenerating here - only reset on completion or error
+    } else {
+      console.log('🔍 Received other message type:', lastMessage.type);
+    }
+  }, [lastMessage, updateSlideData, slideData.description]);
 
   const regenerateWithFeedback = async () => {
   if (!feedback.trim()) return;
@@ -371,14 +501,65 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Export to PowerPoint
   const exportToPowerPoint = async () => {
-    if (!extendedSlideData.slideJson) {
-      console.error('No slide JSON available for export');
+    if (!extendedSlideData.slideJson && !slideData.slideHtml) {
+      console.error('No slide data available for export');
       alert('No slide data available to export');
       return;
     }
 
     try {
       console.log('Starting PPTX export...');
+      
+      // If we have HTML content, use the HTML-to-PPTX API
+      if (slideData.slideHtml) {
+        console.log('Using HTML content for export');
+        
+        const requestData = {
+          slideHtml: slideData.slideHtml,
+          theme: slideData.selectedTheme || 'Professional',
+          description: slideData.description || 'Generated Slide'
+        };
+        
+        console.log('Sending request data:', requestData);
+        
+        const response = await fetch('/api/generate-pptx', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('PPTX export failed:', response.status, errorText);
+          throw new Error(`PPTX export failed: ${response.status} - ${errorText}`);
+        }
+        
+        console.log('PPTX export response received, creating blob...');
+        const blob = await response.blob();
+        console.log('Blob created, size:', blob.size, 'bytes');
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `slide-${Date.now()}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('PPTX export completed from HTML');
+        return;
+      }
+      
+      // Fallback to JSON-based export
+      if (!extendedSlideData.slideJson) {
+        console.error('No slide JSON available for export');
+        alert('No slide data available to export');
+        return;
+      }
+
       const PptxGenJSImport = await ensurePptx();
       if (!PptxGenJSImport) {
         console.error('PptxGenJS library failed to load');
@@ -558,21 +739,20 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     }
   };
 
-  const canProceed = extendedSlideData.slideJson && !isGenerating && !isRegenerating;
+  const canProceed = (extendedSlideData.slideJson || slideData.slideHtml) && !isGenerating && !isRegenerating;
 
   return (
     <div className="space-y-6">
-
       <Card variant="glass">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg">Generated Slide</CardTitle>
               <CardDescription>
-                Rendered on canvas for exact PowerPoint representation
+                {slideData.slideHtml ? 'HTML preview with PowerPoint export' : 'Rendered on canvas for exact PowerPoint representation'}
               </CardDescription>
             </div>
-            {extendedSlideData.slideJson && (
+            {(extendedSlideData.slideJson || slideData.slideHtml) && (
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
@@ -624,16 +804,37 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                     <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                     <div>
                       <p className="font-medium text-gray-800">Generating your slide...</p>
-                      <p className="text-sm text-gray-600">Creating JSON structure for Fabric.js</p>
+                      <p className="text-sm text-gray-600">Creating HTML content for preview</p>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          ) : slideData.slideHtml ? (
+            // Show generated HTML content
+            <div className="border rounded-lg overflow-hidden shadow-lg bg-white">
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  srcDoc={slideData.slideHtml}
+                  className="absolute inset-0 w-full h-full border-0"
+                  title="Generated Slide Preview"
+                  sandbox="allow-scripts allow-same-origin"
+                />
+              </div>
+              <div className="p-4 bg-gray-50 border-t">
+                <p className="text-sm text-gray-600">
+                  <strong>HTML Content Generated:</strong> {slideData.slideHtml.length} characters
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  This is the AI-generated HTML slide content. You can export it as PowerPoint or save as a template.
+                </p>
+              </div>
+            </div>
           ) : (
+            // Show Fabric.js canvas (fallback)
             <div 
               ref={containerRef}
-              key={`canvas-container-${canvasKey}`} // Add this line
+              key={`canvas-container-${canvasKey}`}
               className="border rounded-lg overflow-hidden shadow-lg bg-gray-100"
               style={{ minHeight: '400px' }}
             >
@@ -641,7 +842,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                 <div className="absolute inset-0 flex items-center justify-center">
                   <canvas 
                     ref={canvasRef} 
-                    key={`canvas-${canvasKey}`} // Add this line
+                    key={`canvas-${canvasKey}`}
                     className="shadow-lg" 
                   />
                 </div>
@@ -651,7 +852,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
         </CardContent>
       </Card>
 
-      {extendedSlideData.slideJson && (
+      {extendedSlideData.slideJson || slideData.slideHtml ? (
         <>
           <Card variant="glass">
             <CardHeader>
@@ -693,39 +894,8 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
               </Button>
             </CardContent>
           </Card>
-
-          {/* Debug Section */}
-          <div className="space-y-2">
-            {/* JSON Preview for debugging */}
-            <details className="group">
-              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                View JSON Structure (Debug)
-              </summary>
-              <div className="mt-2">
-                <pre className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground font-mono">
-                  {JSON.stringify(extendedSlideData.slideJson, null, 2)}
-                </pre>
-              </div>
-            </details>
-
-            {/* Prompt Preview for debugging */}
-            {lastPrompt && (
-              <details className="group">
-                <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-                  View Prompt Sent to AI (Debug)
-                </summary>
-                <div className="mt-2">
-                  <div className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground">
-                    <div className="whitespace-pre-wrap font-mono">
-                      {lastPrompt}
-                    </div>
-                  </div>
-                </div>
-              </details>
-            )}
-          </div>
         </>
-      )}
+      ) : null}
 
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>

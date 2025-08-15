@@ -154,6 +154,7 @@ function BuildInner() {
     sendFileUpload,
     sendSlideDescription,
     sendGenerateSlide,
+    sendGenerateSlideRequest,
     sendThemeSelection,
     sendProcessSlide,
   } = useWebSocket({
@@ -508,6 +509,10 @@ function BuildInner() {
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
             onPrev={prevStep}
+            isConnected={isConnected}
+            connectionStatus={connectionStatus}
+            sendGenerateSlideRequest={sendGenerateSlideRequest}
+            lastMessage={lastMessage}
           />
         );
       // case 5: Content step removed - users go directly from Theme to Preview

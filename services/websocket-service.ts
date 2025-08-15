@@ -70,7 +70,7 @@ class WebSocketService {
             console.warn('WebSocket connection timeout');
             ws.close();
           }
-        }, 10000);
+        }, 300000); // 5 minutes (300 seconds) - increased from 10 seconds
         
         ws.onopen = () => {
           if (this.connectionTimeout) {
@@ -100,6 +100,9 @@ class WebSocketService {
         ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
+            console.log('🔍 WebSocket message received:', message);
+            console.log('🔍 Message type:', message.type);
+            console.log('🔍 Message data keys:', message.data ? Object.keys(message.data) : 'No data');
             
             // Handle heartbeat messages
             if (message.type === 'heartbeat') {
@@ -111,7 +114,9 @@ class WebSocketService {
               }));
             }
             
+            console.log('🔍 Forwarding message to frontend callbacks');
             this.callbacks.onMessage?.(message);
+            console.log('🔍 Message forwarded successfully');
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
           }
@@ -190,15 +195,24 @@ class WebSocketService {
   }
 
   sendMessage(message: WebSocketMessage): boolean {
+    console.log('🔍 sendMessage called with:', message);
+    console.log('🔍 Socket exists:', !!this.socket);
+    console.log('🔍 Socket ready state:', this.socket?.readyState);
+    console.log('🔍 WebSocket.OPEN:', WebSocket.OPEN);
+    
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       try {
-        this.socket.send(JSON.stringify(message));
+        const messageJson = JSON.stringify(message);
+        console.log('🔍 Sending message JSON:', messageJson);
+        this.socket.send(messageJson);
+        console.log('🔍 Message sent successfully');
         return true;
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.error('🔍 Error sending WebSocket message:', error);
         return false;
       }
     } else {
+      console.log('🔍 WebSocket not ready, queueing message');
       // Queue message if not connected
       this.messageQueue.push(message);
       return false;
@@ -229,7 +243,7 @@ class WebSocketService {
           this.callbacks.onMessage = originalOnMessage;
           this.callbacks.onError = originalOnError;
           reject(new Error('File upload timeout - no response from server'));
-        }, 60000); // 60 second timeout
+        }, 600000); // 10 minutes (600 seconds) - increased from 60 seconds
         
         const successHandler = (message: WebSocketMessage) => {
           console.log('File upload handler received message:', message);
@@ -270,7 +284,7 @@ class WebSocketService {
         this.callbacks.onError = errorHandler;
         
         // Send the file upload message
-        const success = this.sendMessage({
+        const messageData = {
           type: 'file_upload',
           data: {
             filename: file.name,
@@ -278,7 +292,16 @@ class WebSocketService {
             file_type: file.type,
             file_size: file.size
           }
+        };
+        
+        console.log('🔍 Sending file upload message:', {
+          type: messageData.type,
+          filename: messageData.data.filename,
+          file_type: messageData.data.file_type,
+          file_size: messageData.data.file_size
         });
+        
+        const success = this.sendMessage(messageData);
         
         if (!success) {
           clearTimeout(timeout);
@@ -310,6 +333,39 @@ class WebSocketService {
         wants_research: wantsResearch
       }
     });
+  }
+
+  sendGenerateSlideRequest(
+    description: string,
+    theme: string = "Professional",
+    researchData?: string,
+    contentPlan?: string,
+    userFeedback?: string,
+    documents?: Array<{ filename: string; success?: boolean; content?: string }>,
+    model?: string
+  ): boolean {
+    const message = {
+      type: 'generate_slide',
+      data: {
+        description,
+        theme,
+        wants_research: false, // This will be determined by whether researchData is provided
+        researchData,
+        contentPlan,
+        userFeedback,
+        documents,
+        model
+      }
+    };
+    
+    console.log('🔍 Sending generate slide websocket message:', message);
+    console.log('🔍 WebSocket connection status:', this.connectionStatus);
+    console.log('🔍 WebSocket ready state:', this.socket?.readyState);
+    
+    const success = this.sendMessage(message);
+    console.log('🔍 Message send result:', success);
+    
+    return success;
   }
 
   sendThemeSelection(themeData: any): boolean {

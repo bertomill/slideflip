@@ -35,8 +35,8 @@ async def process_file_for_knowledge_graph(
         
         # Check if we need to perform clustering
         if await kg_task_manager.is_clustering_needed(client_id):
-            # Wait a bit to see if more files are being processed
-            await asyncio.sleep(2)
+            # Wait longer to ensure all files are processed
+            await asyncio.sleep(5)
             
             # Check if there are still pending tasks
             pending_count = await kg_task_manager.get_pending_tasks_count(client_id)
@@ -53,6 +53,10 @@ async def process_file_for_knowledge_graph(
                 logger.info(f"Clustering completed for client {client_id}")
             else:
                 logger.info(f"Still {pending_count} pending tasks for client {client_id}, clustering will wait")
+                # Schedule clustering to happen later
+                asyncio.create_task(schedule_delayed_clustering(client_id, kg_service, kg_task_manager, delay=10))
+        else:
+            logger.info(f"Clustering not needed for client {client_id}")
         
     except Exception as e:
         logger.error(f"Error in knowledge graph extraction for file {file_info.filename}: {e}")
@@ -75,6 +79,9 @@ async def perform_final_clustering(
         # Get all file graphs from the service
         file_graphs = list(kg_service.file_graphs.values())
         
+        logger.info(f"Found {len(file_graphs)} file graphs for client {client_id}")
+        logger.info(f"File graph keys: {list(kg_service.file_graphs.keys())}")
+        
         if not file_graphs:
             logger.warning(f"No file graphs found for client {client_id}")
             return
@@ -84,22 +91,66 @@ async def perform_final_clustering(
             # Still save the single graph as clustered graph
             kg_service.graph = file_graphs[0]
             await kg_service._save_clustered_graph()
-            return
+            logger.info(f"Single graph saved with {len(kg_service.graph.nodes)} nodes and {len(kg_service.graph.edges)} edges")
+        else:
+            # Perform clustering of multiple graphs
+            logger.info(f"Clustering {len(file_graphs)} graphs for client {client_id}")
+            clustered_graph = await kg_service._cluster_networkx_graphs(file_graphs)
+            
+            # Update the main graph
+            kg_service.graph = clustered_graph
+            
+            # Save the clustered graph
+            await kg_service._save_clustered_graph()
+            
+            logger.info(f"Final clustering completed for client {client_id}: {len(clustered_graph.nodes)} nodes, {len(clustered_graph.edges)} edges")
         
-        # Perform clustering of multiple graphs
-        logger.info(f"Clustering {len(file_graphs)} graphs for client {client_id}")
-        clustered_graph = await kg_service._cluster_networkx_graphs(file_graphs)
+        # Generate embeddings for the clustered graph if they don't exist
+        if not kg_service.node_embeddings and not kg_service.edge_embeddings:
+            logger.info("Generating embeddings for clustered graph...")
+            embedding_result = kg_service.generate_graph_embeddings()
+            if embedding_result.get("success"):
+                logger.info(f"Generated embeddings: {embedding_result['node_embeddings_count']} nodes, {embedding_result['edge_embeddings_count']} edges")
+            else:
+                logger.warning(f"Failed to generate embeddings: {embedding_result.get('error', 'Unknown error')}")
+        else:
+            logger.info("Embeddings already exist for clustered graph")
         
-        # Update the main graph
-        kg_service.graph = clustered_graph
-        
-        # Save the clustered graph
-        await kg_service._save_clustered_graph()
-        
-        logger.info(f"Final clustering completed for client {client_id}: {len(clustered_graph.nodes)} nodes, {len(clustered_graph.edges)} edges")
+        # Log final status
+        logger.info(f"Final clustering and embedding generation completed for client {client_id}")
+        logger.info(f"Final graph has {len(kg_service.graph.nodes)} nodes and {len(kg_service.graph.edges)} edges")
+        logger.info(f"Node embeddings: {len(kg_service.node_embeddings) if kg_service.node_embeddings else 0}")
+        logger.info(f"Edge embeddings: {len(kg_service.edge_embeddings) if kg_service.edge_embeddings else 0}")
         
     except Exception as e:
         logger.error(f"Error in final clustering for client {client_id}: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+async def schedule_delayed_clustering(client_id: str, kg_service: KnowledgeGraphService, kg_task_manager: KnowledgeGraphTaskManager, delay: int = 10):
+    """Schedule clustering to happen after a delay"""
+    try:
+        logger.info(f"Scheduling delayed clustering for client {client_id} in {delay} seconds")
+        await asyncio.sleep(delay)
+        
+        # Check if clustering is still needed and no pending tasks
+        if await kg_task_manager.is_clustering_needed(client_id):
+            pending_count = await kg_task_manager.get_pending_tasks_count(client_id)
+            
+            if pending_count == 0:
+                logger.info(f"Performing delayed clustering for client {client_id}")
+                await perform_final_clustering(client_id, kg_service, kg_task_manager)
+                await kg_task_manager.mark_clustering_completed(client_id)
+                logger.info(f"Delayed clustering completed for client {client_id}")
+            else:
+                logger.info(f"Still {pending_count} pending tasks for client {client_id}, clustering will wait longer")
+                # Schedule another delayed clustering
+                asyncio.create_task(schedule_delayed_clustering(client_id, kg_service, kg_task_manager, delay=delay * 2))
+        else:
+            logger.info(f"Clustering no longer needed for client {client_id}")
+            
+    except Exception as e:
+        logger.error(f"Error in delayed clustering for client {client_id}: {e}")
 
 def get_current_timestamp() -> str:
     """Get current timestamp as string"""

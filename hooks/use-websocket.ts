@@ -50,7 +50,20 @@ export function useWebSocket({
     const connectToService = async () => {
       const success = await websocketService.connect(clientId, {
         onMessage: (message) => {
-          setLastMessage(message);
+          // Preserve important messages instead of letting progress updates overwrite them
+          if (message.type === 'slide_generation_complete' || message.type === 'slide_generation_error') {
+            setLastMessage(message);
+          } else if (message.type === 'progress_update') {
+            // Only update lastMessage for progress updates if we don't have a more important message
+            setLastMessage(prev => {
+              if (prev?.type === 'slide_generation_complete' || prev?.type === 'slide_generation_error') {
+                return prev; // Keep the important message
+              }
+              return message; // Update with progress
+            });
+          } else {
+            setLastMessage(message);
+          }
           onMessage?.(message);
         },
         onError: (error) => {
@@ -114,7 +127,20 @@ export function useWebSocket({
 
     const success = await websocketService.connect(clientId, {
       onMessage: (message) => {
-        setLastMessage(message);
+        // Preserve important messages instead of letting progress updates overwrite them
+        if (message.type === 'slide_generation_complete' || message.type === 'slide_generation_error') {
+          setLastMessage(message);
+        } else if (message.type === 'progress_update') {
+          // Only update lastMessage for progress updates if we don't have a more important message
+          setLastMessage(prev => {
+            if (prev?.type === 'slide_generation_complete' || prev?.type === 'slide_generation_error') {
+              return prev; // Keep the important message
+            }
+            return message; // Update with progress
+          });
+        } else {
+          setLastMessage(message);
+        }
         onMessage?.(message);
       },
       onError: (error) => {
@@ -157,6 +183,26 @@ export function useWebSocket({
     return websocketService.sendGenerateSlide(description, theme, wantsResearch);
   }, []);
 
+  const sendGenerateSlideRequest = useCallback((
+    description: string,
+    theme: string = "Professional",
+    researchData?: string,
+    contentPlan?: string,
+    userFeedback?: string,
+    documents?: Array<{ filename: string; success?: boolean; content?: string }>,
+    model?: string
+  ) => {
+    return websocketService.sendGenerateSlideRequest(
+      description,
+      theme,
+      researchData,
+      contentPlan,
+      userFeedback,
+      documents,
+      model
+    );
+  }, []);
+
   const sendThemeSelection = useCallback((themeData: any) => {
     return websocketService.sendThemeSelection(themeData);
   }, []);
@@ -177,6 +223,7 @@ export function useWebSocket({
     sendFileUpload,
     sendSlideDescription,
     sendGenerateSlide,
+    sendGenerateSlideRequest,
     sendThemeSelection,
     sendProcessSlide,
     ping
