@@ -4,28 +4,91 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Marquee animations */
-@keyframes marquee {
-  from {
+/* Marquee animations - Production Safe */
+@keyframes marquee-slow {
+  0% {
     transform: translateX(0);
   }
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
+  100% {
+    transform: translateX(-100%);
   }
 }
 
-@keyframes marquee-vertical {
-  from {
-    transform: translateY(0);
+@keyframes marquee-medium {
+  0% {
+    transform: translateX(0);
   }
-  to {
-    transform: translateY(calc(-100% - var(--gap)));
+  100% {
+    transform: translateX(-100%);
   }
+}
+
+@keyframes marquee-reverse-slow {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes marquee-reverse-medium {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Animation classes */
+.animate-marquee-slow {
+  animation: marquee-slow 50s linear infinite;
+}
+
+.animate-marquee-medium {
+  animation: marquee-medium 60s linear infinite;
+}
+
+.animate-marquee-reverse-slow {
+  animation: marquee-reverse-slow 50s linear infinite;
+}
+
+.animate-marquee-reverse-medium {
+  animation: marquee-reverse-medium 60s linear infinite;
+}
+
+.marquee-pause:hover .animate-marquee-slow,
+.marquee-pause:hover .animate-marquee-medium,
+.marquee-pause:hover .animate-marquee-reverse-slow,
+.marquee-pause:hover .animate-marquee-reverse-medium {
+  animation-play-state: paused;
 }
 
 /* Prevent horizontal scrolling globally */
 html, body {
   overflow-x: hidden;
+}
+
+/* Noise texture overlay */
+.noise-texture::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0),
+    radial-gradient(circle at 3px 3px, rgba(0,0,0,0.1) 1px, transparent 0),
+    radial-gradient(circle at 5px 5px, rgba(255,255,255,0.08) 1px, transparent 0);
+  background-size: 16px 16px, 24px 24px, 32px 32px;
+  background-position: 0 0, 8px 8px, 16px 16px;
+  mix-blend-mode: overlay;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 10;
+  border-radius: inherit;
 }
 
 /* 3D perspective utilities for CometCard */

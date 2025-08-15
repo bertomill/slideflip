@@ -24,6 +24,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { InviteMembersModal } from "@/components/ui/invite-members-modal";
+import { SlideoLogo } from "@/components/slideo-logo";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   user?: {
@@ -101,9 +102,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
             {/* Header */}
             <div className="p-6 border-b border-border relative">
               <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <div className="h-6 w-6 bg-foreground rounded-sm flex items-center justify-center">
-                  <div className="h-3 w-3 bg-background rounded-sm"></div>
-                </div>
+                <SlideoLogo size={24} />
                 {!collapsed && (
                   <span className="font-semibold text-foreground">Slideo</span>
                 )}
@@ -261,7 +260,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                   }}
                 >
                   <FileText className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                  {!collapsed && "My Presentations"}
+                  {!collapsed && "Presentations"}
                 </Button>
                 <Button
                   variant="ghost"
@@ -275,7 +274,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                   }}
                 >
                   <Layers className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                  {!collapsed && "My Templates"}
+                  {!collapsed && "Templates"}
                 </Button>
                 <Button
                   variant="ghost"

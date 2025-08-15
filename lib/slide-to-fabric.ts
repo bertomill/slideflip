@@ -271,9 +271,20 @@ export function renderSlideOnCanvas(
     return;
   }
   
-  // Check if canvas has required properties
+  // Check if canvas has required properties and context
   if (typeof canvas.clear !== 'function' || typeof canvas.setWidth !== 'function') {
     console.error('❌ Canvas not properly initialized - missing methods');
+    return;
+  }
+  
+  // Check if canvas context is ready (this is the critical check for the clearRect error)
+  // @ts-ignore - accessing internal properties
+  if (!canvas.contextContainer || !canvas.lowerCanvasEl || !canvas.getContext) {
+    console.error('❌ Canvas context not ready - deferring render');
+    // Defer the render until the canvas is ready
+    setTimeout(() => {
+      renderSlideOnCanvas(canvas, slide, scale);
+    }, 100);
     return;
   }
   
@@ -287,8 +298,11 @@ export function renderSlideOnCanvas(
     console.error('❌ Error clearing canvas:', error);
     // Try to manually clear by removing all objects
     try {
-      canvas.remove(...canvas.getObjects());
-      console.log('🧹 Canvas manually cleared');
+      const objects = canvas.getObjects();
+      if (objects && objects.length > 0) {
+        canvas.remove(...objects);
+        console.log('🧹 Canvas manually cleared');
+      }
     } catch (manualError) {
       console.error('❌ Manual clear also failed:', manualError);
       return;

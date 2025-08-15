@@ -29,6 +29,7 @@ import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 import { TextHoverEffect } from "@/components/ui/text-hover-effect";
 // Magic UI components
 import { Marquee } from "@/components/magicui/marquee";
+import { SimpleMarquee } from "@/components/simple-marquee";
 
 // Slide card component for marquee
 const SlideCard = ({ slide }: { slide: { id: number; title: string; image: string; category: string } }) => {
@@ -626,19 +627,27 @@ export default function Home() {
           {/* Right Side - Infinite Scrolling Slides */}
           <div className="flex-1 max-w-2xl">
             <div className="relative flex w-full flex-col items-center justify-center overflow-hidden py-6">
-                             {/* First row - scrolling right */}
-               <Marquee pauseOnHover className="[--duration:50s] mb-3">
+               {/* First row - scrolling right */}
+               <SimpleMarquee 
+                 speed="slow"
+                 pauseOnHover 
+                 className="mb-3"
+               >
                  {slideExamples.slice(0, 7).map((slide) => (
                    <SlideCard key={`first-${slide.id}`} slide={slide} />
                  ))}
-               </Marquee>
+               </SimpleMarquee>
                
                {/* Second row - scrolling left */}
-               <Marquee reverse pauseOnHover className="[--duration:60s]">
+               <SimpleMarquee 
+                 reverse 
+                 speed="medium"
+                 pauseOnHover
+               >
                 {slideExamples.slice(7).map((slide) => (
                   <SlideCard key={`second-${slide.id}`} slide={slide} />
                 ))}
-              </Marquee>
+              </SimpleMarquee>
               
                              {/* Gradient overlays for smooth fade edges */}
                <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-[#f8f8f8] dark:from-[#0f0f0f]"></div>

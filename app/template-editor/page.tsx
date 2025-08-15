@@ -131,8 +131,15 @@ function TemplateEditorInner() {
       });
 
       // Verify canvas is properly initialized before proceeding
-      if (!fabricCanvas.lowerCanvasEl || !fabricCanvas.getContext) {
-        console.error('Canvas not properly initialized');
+      // @ts-ignore - accessing internal properties
+      if (!fabricCanvas.lowerCanvasEl || !fabricCanvas.getContext || !fabricCanvas.contextContainer) {
+        console.error('Canvas not fully initialized, retrying...');
+        // Retry initialization after a short delay
+        setTimeout(() => {
+          if (canvasRef.current && !canvas) {
+            setCanvas(null); // Trigger re-initialization
+          }
+        }, 100);
         return;
       }
 
@@ -260,14 +267,28 @@ function TemplateEditorInner() {
             fabricCanvas.renderAll();
           });
         } else if (data.slide_json) {
-          // Add delay to ensure canvas is fully ready
-          setTimeout(() => {
-            try {
-              renderSlideOnCanvas(fabricCanvas, data.slide_json, 1);
-            } catch (renderError) {
-              console.error('Error rendering slide on canvas:', renderError);
+          // Ensure canvas is fully ready before rendering
+          const attemptRender = (retries = 3) => {
+            // @ts-ignore - accessing internal properties
+            if (fabricCanvas.contextContainer && fabricCanvas.lowerCanvasEl) {
+              try {
+                renderSlideOnCanvas(fabricCanvas, data.slide_json, 1);
+              } catch (renderError) {
+                console.error('Error rendering slide on canvas:', renderError);
+                if (retries > 0) {
+                  setTimeout(() => attemptRender(retries - 1), 200);
+                }
+              }
+            } else if (retries > 0) {
+              // Canvas not ready, retry
+              setTimeout(() => attemptRender(retries - 1), 200);
+            } else {
+              console.error('Failed to render slide after multiple attempts');
             }
-          }, 100);
+          };
+          
+          // Start render attempt after a short delay
+          setTimeout(() => attemptRender(), 100);
         }
       }
     } catch (error) {

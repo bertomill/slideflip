@@ -8,6 +8,17 @@ export default {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  safelist: [
+    "animate-marquee",
+    "animate-marquee-vertical",
+    "animate-marquee-slow",
+    "animate-marquee-medium", 
+    "animate-marquee-reverse-slow",
+    "animate-marquee-reverse-medium",
+    "marquee-pause",
+    "[animation-direction:reverse]",
+    "group-hover:[animation-play-state:paused]",
+  ],
   theme: {
     extend: {
       fontFamily: {
