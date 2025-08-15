@@ -49,15 +49,15 @@ export function UploadProgressShelf({
     },
     {
       id: 'convert',
-      label: 'Converting to PNG',
-      description: 'Using CloudConvert for perfect reproduction',
+      label: 'Analyzing Content',
+      description: 'Extracting schema, colors, fonts, and layout',
       icon: Cloud,
       status: 'waiting'
     },
     {
       id: 'process',
-      label: 'Processing Image',
-      description: 'Creating high-quality slide preview',
+      label: 'Processing Design',
+      description: 'Capturing slide structure and styling',
       icon: ImageIcon,
       status: 'waiting'
     },

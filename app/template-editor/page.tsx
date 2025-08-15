@@ -1204,7 +1204,7 @@ function TemplateEditorInner() {
                   onClick={() => setRightSidebarMode('ai')}
                   className="flex-1 h-9 justify-center"
                 >
-                  <div className="h-4 w-4 mr-2 rounded-full bg-gradient-to-br from-purple-400 via-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                  <div className="h-4 w-4 mr-2 rounded-full bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex items-center justify-center shadow-lg">
                     <Sparkles className="h-2.5 w-2.5 text-white drop-shadow-sm" />
                   </div>
                   <span className="text-sm font-medium">AI Builder</span>
@@ -1635,8 +1635,8 @@ function TemplateEditorInner() {
                       >
                         <div className="flex items-start gap-2">
                           {message.role === 'assistant' && (
-                            <div className="h-4 w-4 mt-0.5 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-400 via-purple-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                              <Bot className="h-2.5 w-2.5 text-white drop-shadow-sm" />
+                            <div className="h-4 w-4 mt-0.5 flex-shrink-0 rounded-full bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex items-center justify-center shadow-sm">
+                              <Sparkles className="h-2 w-2 text-white drop-shadow-sm" />
                             </div>
                           )}
                           <div className="flex-1">
@@ -1656,8 +1656,8 @@ function TemplateEditorInner() {
                   {/* Empty state */}
                   {chatMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                      <div className="h-12 w-12 mb-4 rounded-full bg-gradient-to-br from-purple-400 via-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                        <Bot className="h-7 w-7 text-white drop-shadow-sm" />
+                      <div className="h-12 w-12 mb-4 rounded-full bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex items-center justify-center shadow-lg">
+                        <Sparkles className="h-6 w-6 text-white drop-shadow-sm" />
                       </div>
                       <h3 className="text-lg font-medium text-muted-foreground mb-2">
                         AI Design Assistant
