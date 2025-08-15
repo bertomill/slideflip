@@ -1,0 +1,13 @@
+2025-08-14 15:24:55,290 - src.services.llm_service - INFO - OpenAI client initialized successfully
+2025-08-14 15:24:55,299 - src.services.ai_service - INFO - OpenAI client initialized successfully
+INFO:     Started server process [41844]
+INFO:     Waiting for application startup.
+2025-08-14 15:24:55,303 - main - INFO - Starting SlideFlip Backend...
+2025-08-14 15:24:55,303 - main - INFO - Backend started successfully
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8000): address already in use
+INFO:     Waiting for application shutdown.
+2025-08-14 15:24:55,305 - main - INFO - Waiting for knowledge graph tasks to complete...
+2025-08-14 15:24:55,305 - main - INFO - All knowledge graph tasks completed
+2025-08-14 15:24:55,305 - main - INFO - Shutting down SlideFlip Backend...
+INFO:     Application shutdown complete.

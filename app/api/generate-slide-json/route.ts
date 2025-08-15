@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { SlideDefinition } from '@/lib/slide-types';
 import { sampleThemes } from '@/lib/sample-slides-json';
 
@@ -88,8 +88,8 @@ function hexToRgb(hex: string) {
   } : null;
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 /**
@@ -97,7 +97,7 @@ const openai = new OpenAI({
  */
 export async function POST(request: NextRequest) {
   try {
-    const { description, theme, researchData, contentPlan, userFeedback, documents, model: requestedModel } = await request.json();
+    const { description, theme, customColors, researchData, contentPlan, userFeedback, documents, model: requestedModel } = await request.json();
 
     if (!description) {
       return NextResponse.json(
@@ -106,17 +106,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) {
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicApiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'Anthropic API key not configured' },
         { status: 500 }
       );
     }
 
-    // Get theme colors
+    // Get theme colors - use custom colors if provided, otherwise fall back to theme defaults
     const themeKey = theme?.toLowerCase() || 'professional';
-    const themeConfig = sampleThemes[themeKey] || sampleThemes.professional;
+    const baseThemeConfig = sampleThemes[themeKey] || sampleThemes.professional;
+    
+    // If custom colors are provided, use them instead of theme defaults
+    let themeConfig = baseThemeConfig;
+    if (customColors && Array.isArray(customColors) && customColors.length >= 5) {
+      console.log('Using custom colors:', customColors);
+      themeConfig = {
+        ...baseThemeConfig,
+        colors: {
+          background: customColors[0]?.replace('#', '') || baseThemeConfig.colors.background,
+          primary: customColors[1]?.replace('#', '') || baseThemeConfig.colors.primary,
+          text: customColors[2]?.replace('#', '') || baseThemeConfig.colors.text,
+          secondary: customColors[3]?.replace('#', '') || baseThemeConfig.colors.secondary,
+          textLight: customColors[4]?.replace('#', '') || baseThemeConfig.colors.textLight
+        }
+      };
+      console.log('Applied custom theme config:', themeConfig);
+    } else {
+      console.log('Using default theme colors for:', themeKey);
+    }
 
     // Build comprehensive prompt for JSON generation
     let prompt = `Create a professional slide in PptxGenJS JSON format based on the following requirements:
@@ -205,23 +224,20 @@ EXAMPLE JSON STRUCTURE:
 
 Return ONLY the JSON object, no markdown formatting or explanations.`;
 
-    const completion = await openai.chat.completions.create({
-      model: requestedModel || "gpt-4",
+    const completion = await anthropic.messages.create({
+      model: requestedModel || "claude-sonnet-4-20250514",
+      max_tokens: 1500,
+      temperature: 0.7,
+      system: "You are an expert presentation designer who creates slides in PptxGenJS JSON format. You return only valid JSON objects that can be directly parsed, with precise positioning and proper theme application. CRITICAL: You NEVER use light grey text colors (#cccccc, #999999, #aaaaaa) on white or light backgrounds. You always ensure high contrast for accessibility - use dark text (#333333, #1a1a1a) on light backgrounds and light text (#ffffff) on dark backgrounds. Always use the exact theme colors provided and ensure professional layout with excellent readability.",
       messages: [
-        {
-          role: "system",
-          content: "You are an expert presentation designer who creates slides in PptxGenJS JSON format. You return only valid JSON objects that can be directly parsed, with precise positioning and proper theme application. CRITICAL: You NEVER use light grey text colors (#cccccc, #999999, #aaaaaa) on white or light backgrounds. You always ensure high contrast for accessibility - use dark text (#333333, #1a1a1a) on light backgrounds and light text (#ffffff) on dark backgrounds. Always use the exact theme colors provided and ensure professional layout with excellent readability."
-        },
         {
           role: "user",
           content: prompt
         }
-      ],
-      max_tokens: 1500,
-      temperature: 0.7,
+      ]
     });
 
-    let slideJsonString = completion.choices[0]?.message?.content;
+    let slideJsonString = completion.content[0]?.text;
 
     if (!slideJsonString) {
       throw new Error('No slide content generated');
@@ -290,7 +306,12 @@ Return ONLY the JSON object, no markdown formatting or explanations.`;
     return NextResponse.json({
       success: true,
       slideJson: slideJson,
-      message: 'Slide generated successfully'
+      message: 'Slide generated successfully',
+      debugInfo: {
+        prompt: prompt,
+        themeConfig: themeConfig,
+        customColors: customColors
+      }
     });
 
   } catch (error) {

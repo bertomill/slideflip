@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { getTemplatesForAI } from '@/lib/local-templates';
 import { logEvent, savePreview } from '@/lib/flow-logging';
 
 // ============================================================================
-// OPENAI CLIENT INITIALIZATION
+// ANTHROPIC CLIENT INITIALIZATION
 // ============================================================================
-// Initialize OpenAI client with API key from environment variables
-// This client will be used to generate professional presentation slides using GPT-4
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Initialize Anthropic client with API key from environment variables
+// This client will be used to generate professional presentation slides using Claude Sonnet 4
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 /**
- * API endpoint for generating professional presentation slides using OpenAI GPT-4
+ * API endpoint for generating professional presentation slides using Anthropic Claude Sonnet 4
  * 
  * This endpoint takes user inputs (description, theme, research data, documents) and
  * generates a complete HTML slide with scoped CSS that can be safely embedded in
@@ -70,16 +70,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify OpenAI API key is configured in environment variables
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) {
+    // Verify Anthropic API key is configured in environment variables
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicApiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'Anthropic API key not configured' },
         { status: 500 }
       );
     }
 
-    // PROMPT CONSTRUCTION: Build the comprehensive prompt for OpenAI based on available data
+    // PROMPT CONSTRUCTION: Build the comprehensive prompt for Anthropic Claude based on available data
     // This prompt engineering approach ensures consistent, high-quality slide generation
     // by providing clear requirements, examples, and constraints to the AI model
     let prompt = `Create a professional PowerPoint slide in HTML format based on the following requirements:
@@ -139,7 +139,7 @@ ${researchData}
       }
     }
 
-    // TEMPLATE EXAMPLES: Fetch example templates (Supabase first, local fallback) to show OpenAI what good slides look like
+    // TEMPLATE EXAMPLES: Fetch example templates (Supabase first, local fallback) to show Claude what good slides look like
     // This significantly improves the quality and consistency of generated slides by providing concrete examples
     // of proper CSS scoping, 16:9 aspect ratio optimization, and professional styling patterns
     const templatesContent = await getTemplatesForAI(theme, 2);
@@ -242,28 +242,23 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
   <!-- Your slide content here -->
 </div>`;
 
-    // Make API call to OpenAI GPT-4 for slide generation
+    // Make API call to Anthropic Claude Sonnet 4 for slide generation
     // Using specific model, temperature, and token limits for optimal results
-    const completion = await openai.chat.completions.create({
-      model: requestedModel || "gpt-4",
+    const completion = await anthropic.messages.create({
+      model: requestedModel || "claude-sonnet-4-20250514",
+      max_tokens: 2000, // Sufficient tokens for complete HTML slide generation
+      temperature: 0.7, // Balanced creativity while maintaining consistency
+      system: "You are an expert presentation designer who creates professional, visually appealing PowerPoint slides with excellent accessibility and readability. You NEVER use light grey text on light backgrounds and always ensure high contrast ratios. You ALWAYS create complete, working HTML slides that render properly when embedded. You ALWAYS scope ALL CSS to prevent affecting parent page styles. You specialize in incorporating research data and creating clean, modern slide layouts with proper typography contrast. You return valid HTML that displays immediately without errors.",
       messages: [
-        {
-          role: "system",
-          // System prompt that defines the AI's role and critical constraints
-          // Emphasizes CSS scoping, accessibility, and professional design standards
-          content: "You are an expert presentation designer who creates professional, visually appealing PowerPoint slides with excellent accessibility and readability. You NEVER use light grey text on light backgrounds and always ensure high contrast ratios. You ALWAYS create complete, working HTML slides that render properly when embedded. You ALWAYS scope ALL CSS to prevent affecting parent page styles. You specialize in incorporating research data and creating clean, modern slide layouts with proper typography contrast. You return valid HTML that displays immediately without errors."
-        },
         {
           role: "user",
           content: prompt
         }
-      ],
-      max_tokens: 2000, // Sufficient tokens for complete HTML slide generation
-      temperature: 0.7, // Balanced creativity while maintaining consistency
+      ]
     });
 
-    // Extract the generated slide HTML content from OpenAI response
-    let slideHtml = completion.choices[0]?.message?.content;
+    // Extract the generated slide HTML content from Anthropic response
+    let slideHtml = completion.content[0]?.text;
 
     // Validate that content was actually generated
     if (!slideHtml) {
@@ -271,7 +266,7 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
     }
 
     // Clean up the response by extracting HTML from markdown code blocks
-    // OpenAI sometimes wraps HTML in markdown formatting that needs removal
+    // Claude sometimes wraps HTML in markdown formatting that needs removal
     if (slideHtml.includes('```html')) {
       // Extract content from HTML-specific code blocks
       const htmlMatch = slideHtml.match(/```html\n([\s\S]*?)\n```/);
@@ -286,14 +281,14 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
       }
     }
 
-    // RESPONSE VALIDATION: Debug logging to monitor OpenAI output quality and format
+    // RESPONSE VALIDATION: Debug logging to monitor Claude output quality and format
     // These logs help troubleshoot issues with slide generation and ensure we receive valid HTML
     console.log('Generated slide HTML length:', slideHtml.length);
     console.log('Generated slide HTML preview:', slideHtml.substring(0, 200) + '...');
 
-    // CONTENT VALIDATION: Verify that OpenAI returned actual HTML markup
+    // CONTENT VALIDATION: Verify that Claude returned actual HTML markup
     // Check for common HTML elements to ensure the response contains valid slide content
-    // This helps catch cases where OpenAI might return plain text or malformed responses
+    // This helps catch cases where Claude might return plain text or malformed responses
     if (!slideHtml.includes('<div') && !slideHtml.includes('<html')) {
       console.log('Warning: Generated content may not be valid HTML');
     }

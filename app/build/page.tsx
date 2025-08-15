@@ -5,7 +5,8 @@
 // ============================================================================
 
 // React hooks for component state management and lifecycle
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 // UI components for layout, navigation, and user interface elements
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,13 +17,13 @@ import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
 import { Button } from "@/components/ui/button";
 
 // Lucide icons for navigation and progress indicators
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Wifi, Database } from "lucide-react";
 
 // Step components that make up the slide builder workflow
 import { UploadStep } from "@/components/builder/upload-step";      // Step 1: Document upload and description
 import { ThemeStep } from "@/components/builder/theme-step";        // Step 2: Visual theme selection
 import { ResearchStep } from "@/components/builder/research-step";  // Step 3: Research options and data gathering
-import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback
+// import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback (removed)
 import { PreviewStep } from "@/components/builder/preview-step-fabric"; // Step 5: AI slide generation and preview with Fabric.js
 // import { DownloadStep } from "@/components/builder/download-step";  // Step 6: Removed - export now happens in Preview step
 
@@ -61,6 +62,7 @@ export type ParsedDocument = {
  * Accumulates user inputs and AI-generated content as user progresses
  */
 export type SlideData = {
+  title: string;            // Presentation title
   documents: File[];        // User-uploaded files for slide content
   parsedDocuments?: ParsedDocument[]; // Extracted text content from uploaded documents
   sessionId?: string;       // Session ID for tracking document uploads
@@ -79,20 +81,23 @@ export type SlideData = {
 // Configuration for the multi-step slide builder process
 const steps = [
   { id: 1, name: "Upload", description: "Upload & describe" },
-  { id: 2, name: "Theme", description: "Choose theme" },
-  { id: 3, name: "Research", description: "Research options" },
-  { id: 4, name: "Content", description: "Plan content" },
-  { id: 5, name: "Preview", description: "Review & export" },
+  { id: 2, name: "Research", description: "Research options" },
+  { id: 3, name: "Theme", description: "Choose theme" },
+  { id: 4, name: "Preview", description: "Review & export" },
 ];
 
 /**
  * Main SlideBuilder component that orchestrates the multi-step slide creation process
  * Manages state flow between upload, theme selection, research, preview, and download steps
  */
-export default function Build() {
+function BuildInner() {
   // ============================================================================
   // STATE MANAGEMENT: Core component state for workflow and UI control
   // ============================================================================
+
+  // Get URL parameters
+  const searchParams = useSearchParams();
+  const presentationId = searchParams.get('presentation_id');
 
   // Workflow state - tracks current position in the 6-step builder process
   const [currentStep, setCurrentStep] = useState(1);
@@ -128,6 +133,7 @@ export default function Build() {
   // 6. Download: Final PPTX export
 
   const [slideData, setSlideData] = useState<SlideData>({
+    title: "",               // Presentation title
     documents: [],           // User-uploaded files for slide content
     description: "",         // User's description of desired slide content
     selectedTheme: "",       // Visual theme choice (Professional, Modern, etc.)
@@ -203,14 +209,234 @@ export default function Build() {
       }
     );
 
+    // Test database connectivity
+    const checkDbConnection = async () => {
+      try {
+        // Simple query to test database connection
+        const { error } = await supabase
+          .from('presentations')
+          .select('id')
+          .limit(1);
+        setIsDbConnected(!error);
+      } catch (err) {
+        setIsDbConnected(false);
+      }
+    };
+    
+    checkDbConnection();
+    
+    // Check database connection periodically
+    const dbCheckInterval = setInterval(checkDbConnection, 30000); // Every 30 seconds
+
     // Cleanup: Remove auth listener when component unmounts to prevent memory leaks
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(dbCheckInterval);
+    };
   }, []);
 
+  // ============================================================================
+  // PRESENTATION MANAGEMENT: Load and update presentation data
+  // ============================================================================
+  // Load presentation data if presentation_id is provided
+  useEffect(() => {
+    if (presentationId) {
+      const loadPresentation = async () => {
+        const supabase = createClient();
+        
+        // Load presentation data
+        const { data: presentation, error } = await supabase
+          .from('presentations')
+          .select('*')
+          .eq('id', presentationId)
+          .single();
+          
+        if (error) {
+          console.error('Error loading presentation:', error);
+          return;
+        }
+          
+        if (presentation) {
+          console.log('✅ Loading presentation data from database:', presentation);
+          
+          // Restore documents from database (convert from serialized format back to File objects)
+          const restoredDocuments = presentation.documents ? 
+            presentation.documents.map((doc: any) => {
+              // Create a placeholder File object since we can't restore the actual File
+              const blob = new Blob(['[File content not available - original was uploaded]'], { 
+                type: doc.type || 'text/plain' 
+              });
+              return new File([blob], doc.name, {
+                type: doc.type,
+                lastModified: doc.lastModified || Date.now()
+              });
+            }) : [];
+          
+          // Update slideData with all restored data
+          setSlideData(prev => ({
+            ...prev,
+            title: presentation.title || '',
+            description: presentation.description || '',
+            documents: restoredDocuments,
+            parsedDocuments: presentation.parsed_documents || [],
+            selectedTheme: presentation.selected_theme || '',
+            selectedPalette: presentation.selected_palette || undefined,
+            wantsResearch: presentation.wants_research || false,
+            researchOptions: presentation.research_options || undefined,
+            researchData: presentation.research_data || undefined,
+            slideHtml: presentation.slide_html || undefined,
+            slideJson: presentation.slide_json || undefined,
+            selectedModel: presentation.selected_model || undefined
+          }));
+          
+          // Update current step if we're further along
+          if (presentation.current_step && presentation.current_step > 1) {
+            setCurrentStep(presentation.current_step);
+          }
+          
+          console.log('✅ Successfully restored presentation data');
+        }
+      };
+      
+      loadPresentation();
+    }
+  }, [presentationId]);
+
+  // Update presentation title in Supabase with debouncing
+  const updatePresentationTitle = useCallback(async (title: string) => {
+    if (!presentationId) return;
+    
+    const supabase = createClient();
+    await supabase
+      .from('presentations')
+      .update({ title, updated_at: new Date().toISOString() })
+      .eq('id', presentationId);
+  }, [presentationId]);
+
+  // Debounce title updates to avoid too many API calls
+  const [titleTimeout, setTitleTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  
+  // Connection status for database
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  
+  // Backend test state
+  const [backendTestResult, setBackendTestResult] = useState<string>('');
+  
+  const handleTitleChange = useCallback((title: string) => {
+    updateSlideData({ title });
+    
+    // Clear existing timeout
+    if (titleTimeout) {
+      clearTimeout(titleTimeout);
+    }
+    
+    // Show saving indicator when user starts typing
+    setIsSavingTitle(true);
+    
+    // Set new timeout to update after 1 second of no typing
+    const timeout = setTimeout(async () => {
+      await updatePresentationTitle(title);
+      setIsSavingTitle(false);
+    }, 1000);
+    
+    setTitleTimeout(timeout);
+  }, [titleTimeout, updatePresentationTitle]);
+
+  // Database saving state
+  const [isSavingData, setIsSavingData] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  
   // Data Flow: Helper function to update slide data from child step components
   // Uses partial updates to preserve existing data while adding new information
-  const updateSlideData = (updates: Partial<SlideData>) => {
+  // Now includes automatic database persistence
+  const updateSlideData = useCallback(async (updates: Partial<SlideData>) => {
     setSlideData(prev => ({ ...prev, ...updates }));
+    
+    // Save to database if we have a presentation ID
+    if (presentationId) {
+      try {
+        setIsSavingData(true);
+        
+        // Prepare the data for database
+        const dbUpdates: any = {};
+        
+        // Map slideData fields to database columns
+        if (updates.description !== undefined) dbUpdates.description = updates.description;
+        if (updates.title !== undefined) dbUpdates.title = updates.title;
+        if (updates.documents !== undefined) {
+          // Serialize File objects for database storage
+          dbUpdates.documents = updates.documents.map(file => ({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified
+          }));
+        }
+        if (updates.parsedDocuments !== undefined) dbUpdates.parsed_documents = updates.parsedDocuments;
+        if (updates.selectedTheme !== undefined) dbUpdates.selected_theme = updates.selectedTheme;
+        if (updates.selectedPalette !== undefined) dbUpdates.selected_palette = updates.selectedPalette;
+        if (updates.wantsResearch !== undefined) dbUpdates.wants_research = updates.wantsResearch;
+        if (updates.researchOptions !== undefined) dbUpdates.research_options = updates.researchOptions;
+        if (updates.researchData !== undefined) dbUpdates.research_data = updates.researchData;
+        if (updates.slideHtml !== undefined) dbUpdates.slide_html = updates.slideHtml;
+        if (updates.slideJson !== undefined) dbUpdates.slide_json = updates.slideJson;
+        if ((updates as any).selectedModel !== undefined) dbUpdates.selected_model = (updates as any).selectedModel;
+        
+        // Update step timestamps
+        const stepKey = `step_${currentStep}`;
+        dbUpdates.step_timestamps = { [stepKey]: new Date().toISOString() };
+        
+        // Update current step and status
+        dbUpdates.current_step = Math.max(currentStep, 1);
+        if (currentStep > 1) dbUpdates.builder_status = 'in_progress';
+        
+        // Save to database
+        const supabase = createClient();
+        const { error } = await supabase
+          .from('presentations')
+          .update(dbUpdates)
+          .eq('id', presentationId);
+          
+        if (error) {
+          console.error('Error saving to database:', error);
+        } else {
+          setLastSaved(new Date());
+          console.log('✅ Data saved to database:', Object.keys(dbUpdates));
+        }
+      } catch (error) {
+        console.error('Error in updateSlideData:', error);
+      } finally {
+        setIsSavingData(false);
+      }
+    }
+  }, [presentationId, currentStep]);
+
+  // Simple backend test function
+  const testBackendConnection = async () => {
+    try {
+      setBackendTestResult('Testing backend connection...');
+      
+      console.log('🧪 Backend Test Info:');
+      console.log('- WebSocket connected:', isConnected);
+      console.log('- Connection status:', connectionStatus);
+      console.log('- Client ID:', clientId);
+      console.log('- Expected WebSocket URL: ws://localhost:8000/ws/' + clientId);
+      
+      // Try sending a simple test message via WebSocket
+      if (isConnected) {
+        // If we have WebSocket connection, test it
+        setBackendTestResult('✅ WebSocket connected! Backend is reachable at ws://localhost:8000');
+        
+        // You can also try sending a test message if your WebSocket supports it
+        // sendTestMessage();
+        
+      } else {
+        setBackendTestResult('❌ WebSocket not connected. Make sure backend is running at ws://localhost:8000');
+      }
+    } catch (error) {
+      setBackendTestResult(`❌ Backend test failed: ${error}`);
+    }
   };
 
   // Navigation: Move forward to the next step in the builder sequence
@@ -257,16 +483,17 @@ export default function Build() {
         );
       case 2:
         return (
-          <ThemeStep 
+          <ResearchStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
              onPrev={prevStep}
+            sendGenerateSlide={sendGenerateSlide}
           />
         );
       case 3:
         return (
-          <ResearchStep 
+          <ThemeStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
             onNext={nextStep} 
@@ -275,15 +502,6 @@ export default function Build() {
         );
       case 4:
         return (
-          <ContentStep 
-            slideData={slideData} 
-            updateSlideData={updateSlideData} 
-            onNext={nextStep} 
-            onPrev={prevStep} 
-          />
-        );
-      case 5:
-        return (
           <PreviewStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
@@ -291,7 +509,7 @@ export default function Build() {
             onPrev={prevStep}
           />
         );
-      // case 6: Download step removed - export functionality moved to Preview step
+      // case 5: Content step removed - users go directly from Theme to Preview
       default:
         return null;
     }
@@ -300,7 +518,7 @@ export default function Build() {
   // Progress Sidebar Component - Collapsible right sidebar for step navigation
   const ProgressSidebar = () => (
     <div
-      className={`fixed right-0 top-0 z-30 h-screen transform bg-background border-l border-border transition-all duration-300 ease-in-out ${progressSidebarCollapsed ? "w-16" : "w-80"
+      className={`fixed right-0 top-0 z-30 h-screen transform bg-background border-l border-border transition-all duration-300 ease-in-out ${progressSidebarCollapsed ? "w-16" : "w-64"
         }`}
     >
       <div className="flex flex-col h-full">
@@ -447,14 +665,14 @@ export default function Build() {
           - Responsive design adapts to different screen sizes
           ======================================================================== */}
       <div className={`flex-1 transition-all duration-300 overflow-x-hidden ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'
-        } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-80'
+        } ${progressSidebarCollapsed ? 'lg:mr-16' : 'lg:mr-64'
         }`}>
         {/* ====================================================================
-            MINIMAL HEADER: Just theme toggle and mobile menu
+            MINIMAL HEADER: Mobile menu, connection status, and theme toggle
             ====================================================================
             - Mobile menu toggle for responsive navigation
+            - Connection status indicators for backend and database
             - Theme toggle for light/dark mode switching
-            - Company branding now handled by sidebar
             ==================================================================== */}
         <div className="flex justify-between items-center p-4">
           {/* Mobile menu toggle - only visible on small screens */}
@@ -463,13 +681,76 @@ export default function Build() {
             onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden"
           />
-          <div className="hidden md:block" /> {/* Spacer for desktop */}
+          
+          {/* Connection status indicators - center */}
+          <div className="flex items-center gap-3">
+            {/* Backend connection status */}
+            <div className="flex items-center gap-1.5" title={`Backend: ${isConnected ? 'Connected' : 'Disconnected'}`}>
+              <Wifi className={`h-3.5 w-3.5 ${isConnected ? 'text-green-500' : 'text-red-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            </div>
+            
+            {/* Database connection status */}
+            <div className="flex items-center gap-1.5" title={`Database: ${isDbConnected ? 'Connected' : 'Disconnected'}`}>
+              <Database className={`h-3.5 w-3.5 ${isDbConnected ? 'text-green-500' : 'text-red-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            </div>
+            
+            {/* Backend test button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={testBackendConnection}
+              className="text-xs px-2 py-1 h-6"
+            >
+              Test Backend
+            </Button>
+          </div>
+          
           {/* Theme toggle */}
           <ThemeToggle />
         </div>
 
         {/* MAIN CONTAINER: Full-width container with responsive padding */}
-        <div className="w-full px-2 sm:px-4 py-2 sm:py-8 min-h-screen">
+        <div className="w-full px-2 sm:px-4 py-2 sm:py-4 min-h-screen">
+          {/* ============================================================================
+              PRESENTATION TITLE INPUT: Notion-style title field
+              ============================================================================
+              - Appears at the top of the builder interface
+              - Allows users to name their presentation
+              - Transparent background with focus styling
+              ============================================================================ */}
+          <div className="w-full max-w-4xl mx-auto mb-6">
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={slideData.title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                placeholder="Untitled Presentation"
+                className="flex-1 px-4 py-4 text-3xl md:text-4xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground/50 focus:placeholder:text-muted-foreground/30 transition-colors leading-tight"
+                style={{
+                  caretColor: 'currentColor',
+                  lineHeight: '1.2',
+                }}
+              />
+              {isSavingTitle && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
+                  <div className="animate-spin w-3 h-3 border border-muted-foreground border-t-transparent rounded-full"></div>
+                  <span>Saving...</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Backend test result display */}
+          {backendTestResult && (
+            <div className="w-full max-w-4xl mx-auto mb-4">
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-sm font-mono">{backendTestResult}</p>
+              </div>
+            </div>
+          )}
+
           {/* ============================================================================
               MAIN LAYOUT: Single column layout with fixed sidebars
               ============================================================================
@@ -548,5 +829,13 @@ export default function Build() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Build() {
+  return (
+    <Suspense fallback={<div className="min-h-screen builder-background flex items-center justify-center">Loading...</div>}>
+      <BuildInner />
+    </Suspense>
   );
 }

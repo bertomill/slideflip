@@ -1,11 +1,11 @@
 """
-LLM service for slide generation using OpenAI GPT
+LLM service for slide generation using Anthropic Claude
 """
 
 import logging
 import json
 from typing import Dict, List, Optional, Any
-from openai import OpenAI
+from anthropic import Anthropic
 from src.core.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -19,22 +19,22 @@ class LLMService:
         self._initialize_client()
     
     def _initialize_client(self):
-        """Initialize OpenAI client"""
+        """Initialize Anthropic client"""
         try:
             # Check if API key is available
-            api_key = self.settings.OPENAI_API_KEY
+            api_key = self.settings.ANTHROPIC_API_KEY
             if api_key:
-                self.client = OpenAI(api_key=api_key)
-                logger.info("OpenAI client initialized successfully")
+                self.client = Anthropic(api_key=api_key)
+                logger.info("Anthropic client initialized successfully")
             else:
-                logger.warning("OpenAI API key not found. LLM features will be disabled.")
+                logger.warning("Anthropic API key not found. LLM features will be disabled.")
                 logger.info("Please check:")
                 logger.info("1. .env file exists in backend directory")
-                logger.info("2. OPENAI_API_KEY is set in .env file")
-                logger.info("3. File format: OPENAI_API_KEY=your_api_key_here")
+                logger.info("2. ANTHROPIC_API_KEY is set in .env file")
+                logger.info("3. File format: ANTHROPIC_API_KEY=your_api_key_here")
                 self.client = None
         except Exception as e:
-            logger.error(f"Error initializing OpenAI client: {e}")
+            logger.error(f"Error initializing Anthropic client: {e}")
             self.client = None
     
     async def generate_slide_layout(
@@ -142,17 +142,17 @@ Consider the content type and create appropriate sections:
 
 Design a layout that transforms this content into a compelling, professional presentation slide."""
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
-                temperature=0.8
+                temperature=0.8,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ]
             )
             
-            layout_text = response.choices[0].message.content.strip()
+            layout_text = response.content[0].text.strip()
             
             # Log the raw response for debugging
             logger.info(f"LLM Layout Response (first 500 chars): {layout_text[:500]}...")
@@ -288,17 +288,17 @@ For each section in the layout, create comprehensive content that:
 
 Generate detailed, comprehensive content for each section."""
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
                 max_tokens=2500,
-                temperature=0.8
+                temperature=0.8,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ]
             )
             
-            content_text = response.choices[0].message.content.strip()
+            content_text = response.content[0].text.strip()
             
             # Log the raw response for debugging
             logger.info(f"LLM Content Response (first 500 chars): {content_text[:500]}...")
@@ -367,19 +367,19 @@ Generate detailed, comprehensive content for each section."""
                 system_prompt = """You are a helpful AI assistant that provides clear, concise, and accurate responses. 
                 Follow the user's instructions carefully and format your response appropriately."""
             
-            # Create the chat completion request
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
+            # Create the message request
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
                 max_tokens=max_tokens,
-                temperature=0.7
+                temperature=0.7,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
             )
             
             # Extract the generated content
-            generated_content = response.choices[0].message.content.strip()
+            generated_content = response.content[0].text.strip()
             logger.info(f"Successfully generated content with {len(generated_content)} characters")
             
             return generated_content
@@ -465,17 +465,17 @@ Extract ONLY:
 
 Return the JSON structure as specified in the system prompt. Be thorough but accurate."""
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            response = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
-                temperature=0.1  # Low temperature for more consistent extraction
+                temperature=0.1,  # Low temperature for more consistent extraction
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_prompt}
+                ]
             )
             
-            extraction_text = response.choices[0].message.content.strip()
+            extraction_text = response.content[0].text.strip()
             
             # Clean up markdown code blocks if present
             if extraction_text.startswith("```json"):

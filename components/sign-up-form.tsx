@@ -47,29 +47,83 @@ export function SignUpForm({
     setIsLoading(true);
     
     const supabase = createClient();
+    
+    // Debug: Check if Supabase client is created properly
+    console.log('Supabase client created:', !!supabase);
+    console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('Supabase auth object:', !!supabase.auth);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log('Attempting to sign up user:', email);
+      
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            email_confirmed: true, // Try to bypass email confirmation
+          }
         },
       });
-      if (error) throw error;
       
-      // Sign in the user immediately after sign up (bypassing email confirmation)
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      if (signUpError) {
+        console.error('Sign up error raw:', signUpError);
+        console.error('Sign up error stringified:', JSON.stringify(signUpError, null, 2));
+        console.error('Sign up error details:', {
+          message: signUpError.message || 'No message',
+          status: signUpError.status || 'No status',
+          name: signUpError.name || 'No name',
+          stack: signUpError.stack || 'No stack',
+        });
+        
+        // Check for specific error types
+        if (signUpError.message && signUpError.message.includes('Database error')) {
+          setError("Database error saving new user. This might be a configuration issue. Please check the console for details.");
+          console.error('Database configuration issue. Run the debug SQL commands to diagnose.');
+        } else if (signUpError.message && signUpError.message.includes('User already registered')) {
+          setError("This email is already registered. Please sign in instead.");
+        } else if (signUpError.message && signUpError.message.includes('Failed to fetch')) {
+          setError("Network error: Unable to connect to authentication service. Please check your internet connection.");
+        } else {
+          setError(signUpError.message || "An unknown error occurred during sign up");
+        }
+        return;
+      }
       
-      if (signInError) throw signInError;
+      console.log('Sign up response:', signUpData);
       
-      // Redirect to home page instead of sign-up success
-      router.push("/");
+      // If we have a session, user is logged in
+      if (signUpData.session) {
+        console.log('User signed up and logged in successfully');
+        router.push("/");
+        return;
+      }
+      
+      // If no session but user was created, try to sign in
+      if (signUpData.user) {
+        console.log('User created but no session, attempting sign in...');
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (signInError) {
+          console.error('Sign in after sign up failed:', signInError);
+          // Don't throw error - user was created successfully
+          setError("Account created successfully! Please check your email to verify your account, then sign in.");
+          return;
+        }
+        
+        if (signInData.session) {
+          console.log('Successfully signed in after sign up');
+          router.push("/");
+        }
+      }
+      
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      console.error('Unexpected error during sign up:', error);
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }

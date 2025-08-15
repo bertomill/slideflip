@@ -59,7 +59,10 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [canvas, setCanvas] = useState<Canvas | null>(null);
-  const [canvasKey, setCanvasKey] = useState(0); // Add this line
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [lastPrompt, setLastPrompt] = useState<string>("");
+  const [canvasKey, setCanvasKey] = useState(0);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,6 +86,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     return {
       description: slideData.description,
       theme: slideData.selectedTheme || "Professional",
+      customColors: slideData.selectedPalette, // Include custom color palette
       researchData: slideData.wantsResearch ? slideData.researchData : undefined,
       contentPlan: slideData.contentPlan,
       userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
@@ -94,93 +98,143 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Call API to generate slide JSON
   const generateSlide = async (overrideFeedback?: string) => {
-    if (!slideData.description || isGenerating) return;
+    console.log("🔄 Starting slide generation...");
+    console.log("📝 Slide data:", {
+      description: slideData.description,
+      theme: slideData.selectedTheme,
+      wantsResearch: slideData.wantsResearch,
+      hasDocuments: slideData.documents?.length > 0,
+      hasParsedDocs: slideData.parsedDocuments?.length > 0,
+      overrideFeedback
+    });
+
+    if (!slideData.description) {
+      console.warn("⚠️ No description provided, skipping API call");
+      return;
+    }
+    
+    if (isGenerating) {
+      console.warn("⚠️ Already generating, skipping duplicate call");
+      return;
+    }
+
     setIsGenerating(true);
+    
     try {
+      const payload = buildRequestPayload(overrideFeedback);
+      console.log("📦 Request payload:", payload);
+
+      console.log("🌐 Making API call to /api/generate-slide-json...");
       const response = await fetch("/api/generate-slide-json", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildRequestPayload(overrideFeedback)),
+        body: JSON.stringify(payload),
       });
+
+      console.log("📡 API Response status:", response.status, response.statusText);
 
       if (response.ok) {
         const data = await response.json();
+        console.log("📄 API Response data:", data);
+        
         if (data?.success && data?.slideJson) {
-           updateSlideData({ slideJson: data.slideJson });
+          console.log("✅ Slide generation successful!");
+          console.log("🎨 Generated slide JSON:", data.slideJson);
+          
+          // Capture the prompt for debugging
+          if (data.debugInfo?.prompt) {
+            setLastPrompt(data.debugInfo.prompt);
+            console.log("📝 Prompt used:", data.debugInfo.prompt);
+          }
+          
+          updateSlideData({ slideJson: data.slideJson });
           return;
+        } else {
+          console.error("❌ API returned success=false or no slideJson");
+          console.error("🔍 Response details:", data);
+        }
+      } else {
+        // Try to get error details from response
+        try {
+          const errorData = await response.json();
+          console.error("❌ API request failed with error data:", errorData);
+        } catch (parseErr) {
+          console.error("❌ API request failed and couldn't parse error response");
         }
       }
       
-      // Fallback to a sample slide if API fails
-      const sampleSlide: SlideDefinition = {
-        id: 'generated-slide',
-        background: { color: 'ffffff' },
-        objects: [
-          {
-            type: 'text',
-            text: slideData.description || 'Your Presentation Title',
-            options: {
-              x: 0.5,
-              y: 2.0,
-              w: 9,
-              h: 1.5,
-              fontSize: 44,
-              fontFace: 'Arial',
-              color: '003366',
-              bold: true,
-              align: 'center',
-              valign: 'middle'
-            }
-          },
-          {
-            type: 'text',
-            text: 'Generated from your content',
-            options: {
-              x: 0.5,
-              y: 3.5,
-              w: 9,
-              h: 0.75,
-              fontSize: 24,
-              fontFace: 'Arial',
-              color: '666666',
-              align: 'center'
-            }
-          }
-        ]
-      };
-      updateSlideData({ slideJson: sampleSlide });
+      // If we get here, API didn't return expected data, use fallback
+      console.log("🔄 API response not successful, using fallback slide");
+      createFallbackSlide();
+      
     } catch (err) {
-      console.error("Slide generation error:", err);
-      // Create a basic slide as fallback
-      const fallbackSlide: SlideDefinition = {
-        id: 'fallback-slide',
-        background: { color: 'f5f5f5' },
-        objects: [
-          {
-            type: 'text',
-            text: 'Slide Generation in Progress',
-            options: {
-              x: 1,
-              y: 2,
-              w: 8,
-              h: 1,
-              fontSize: 36,
-              fontFace: 'Arial',
-              color: '333333',
-              align: 'center'
-            }
-          }
-        ]
-      };
-      updateSlideData({ slideJson: fallbackSlide });
+      console.error("💥 Slide generation network/parsing error:", err);
+      console.error("🔍 Error details:", {
+        name: err instanceof Error ? err.name : 'Unknown',
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      });
+      createFallbackSlide();
     } finally {
       setIsGenerating(false);
+      console.log("🏁 Slide generation process complete");
     }
+  };
+
+  // Create a fallback slide when generation fails
+  const createFallbackSlide = () => {
+    console.log("🔧 Creating fallback slide...");
+    const fallbackSlide: SlideDefinition = {
+      id: 'fallback-slide',
+      background: { color: 'ffffff' },
+      objects: [
+        {
+          type: 'text',
+          text: slideData.description || 'Your Presentation Title',
+          options: {
+            x: 0.5,
+            y: 2.0,
+            w: 9,
+            h: 1.5,
+            fontSize: 44,
+            fontFace: 'Arial',
+            color: '003366',
+            bold: true,
+            align: 'center',
+            valign: 'middle'
+          }
+        },
+        {
+          type: 'text',
+          text: 'Content generated from your documents',
+          options: {
+            x: 0.5,
+            y: 3.5,
+            w: 9,
+            h: 0.75,
+            fontSize: 24,
+            fontFace: 'Arial',
+            color: '666666',
+            align: 'center'
+          }
+        }
+      ]
+    };
+    console.log("📋 Fallback slide created:", fallbackSlide);
+    updateSlideData({ slideJson: fallbackSlide });
+    console.log("✅ Fallback slide updated in state");
   };
 
   // Initialize and update canvas when slide JSON changes
   useEffect(() => {
-    if (!canvasRef.current || !containerRef.current || !extendedSlideData.slideJson) return;
+    if (!canvasRef.current || !containerRef.current || !extendedSlideData.slideJson) {
+      console.log('Canvas initialization prerequisites not met:', {
+        hasCanvasRef: !!canvasRef.current,
+        hasContainerRef: !!containerRef.current,
+        hasSlideJson: !!extendedSlideData.slideJson
+      });
+      return;
+    }
 
     // Calculate scale based on container size
     const containerWidth = containerRef.current.offsetWidth;
@@ -207,8 +261,24 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Auto-generate on first entry if we don't have JSON yet
   useEffect(() => {
-    if (!extendedSlideData.slideJson && slideData.description) {
-      generateSlide();
+    console.log("🎯 Preview step useEffect triggered");
+    console.log("🔍 Current state:", {
+      hasSlideJson: !!extendedSlideData.slideJson,
+      slideJsonId: extendedSlideData.slideJson?.id,
+      description: slideData.description,
+      isGenerating
+    });
+
+    if (!extendedSlideData.slideJson) {
+      if (slideData.description) {
+        console.log("🚀 Triggering slide generation with description");
+        generateSlide();
+      } else {
+        console.log("⚠️ No description available, creating fallback slide");
+        createFallbackSlide();
+      }
+    } else {
+      console.log("✅ Slide JSON already exists, skipping generation");
     }
   }, []);
 
@@ -270,70 +340,147 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   // Export to PowerPoint
   const exportToPowerPoint = async () => {
-    if (!extendedSlideData.slideJson) return;
-    const PptxGenJSImport = await ensurePptx();
-    if (!PptxGenJSImport) return;
-    const PptxCtor = PptxGenJSImport as unknown as new () => {
-      layout: string;
-      author: string;
-      title: string;
-      addSlide: () => unknown;
-      writeFile: (opts: { fileName: string }) => Promise<unknown>;
-    };
-    const pptx = new PptxCtor();
-    pptx.layout = 'LAYOUT_16x9';
-    pptx.author = 'SlideFlip';
-    pptx.title = slideData.description || 'Presentation';
-    
-    const slide = pptx.addSlide() as unknown as {
-      background?: { color?: string };
-      addText: (text: string, opts: Record<string, unknown>) => void;
-      addShape: (shape: string, opts: Record<string, unknown>) => void;
-    };
-    
-    // Set background
-    if (extendedSlideData.slideJson.background?.color) {
-      const bgColor = extendedSlideData.slideJson.background.color;
-      slide.background = { color: typeof bgColor === 'string' ? bgColor : undefined };
+    if (!extendedSlideData.slideJson) {
+      console.error('No slide JSON available for export');
+      alert('No slide data available to export');
+      return;
     }
-    
-    // Add objects
-    extendedSlideData.slideJson.objects.forEach(obj => {
-      switch (obj.type) {
-        case 'text':
-          slide.addText(obj.text, {
-            x: obj.options.x,
-            y: obj.options.y,
-            w: obj.options.w,
-            h: obj.options.h,
-            fontSize: obj.options.fontSize,
-            fontFace: obj.options.fontFace,
-            color: typeof obj.options.color === 'string' ? obj.options.color : undefined,
-            bold: obj.options.bold,
-            italic: obj.options.italic,
-            underline: obj.options.underline,
-            align: obj.options.align,
-            valign: obj.options.valign
-          });
-          break;
-        case 'shape':
-          if (obj.shape === 'rect' || obj.shape === 'roundRect') {
-            slide.addShape(obj.shape === 'roundRect' ? 'roundRect' : 'rect', {
-              x: obj.options.x,
-              y: obj.options.y,
-              w: obj.options.w,
-              h: obj.options.h,
-              fill: obj.options.fill ? 
-                { color: typeof obj.options.fill.color === 'string' ? obj.options.fill.color : 'ffffff' } : 
-                undefined,
-              rectRadius: obj.options.rectRadius
-            });
-          }
-          break;
+
+    try {
+      console.log('Starting PPTX export...');
+      const PptxGenJSImport = await ensurePptx();
+      if (!PptxGenJSImport) {
+        console.error('PptxGenJS library failed to load');
+        alert('Failed to load PowerPoint export library');
+        return;
       }
-    });
-    
-    await pptx.writeFile({ fileName: 'slide-export.pptx' });
+
+      console.log('PptxGenJS loaded successfully');
+      const PptxCtor = PptxGenJSImport as unknown as new () => {
+        layout: string;
+        author: string;
+        title: string;
+        addSlide: () => unknown;
+        writeFile: (opts: { fileName: string }) => Promise<unknown>;
+      };
+      
+      const pptx = new PptxCtor();
+      pptx.layout = 'LAYOUT_16x9';
+      pptx.author = 'SlideFlip';
+      pptx.title = slideData.description || 'Presentation';
+      
+      console.log('Creating slide...');
+      const slide = pptx.addSlide() as unknown as {
+        background?: { color?: string };
+        addText: (text: string, opts: Record<string, unknown>) => void;
+        addShape: (shape: string, opts: Record<string, unknown>) => void;
+      };
+      
+      // Set background - ensure color format is correct
+      if (extendedSlideData.slideJson.background?.color) {
+        let bgColor = extendedSlideData.slideJson.background.color;
+        // Ensure color has # prefix if it's a hex color
+        if (typeof bgColor === 'string' && bgColor.match(/^[0-9A-Fa-f]{6}$/)) {
+          bgColor = `#${bgColor}`;
+        }
+        console.log('Setting background color:', bgColor);
+        slide.background = { color: bgColor };
+      }
+      
+      // Add objects
+      console.log(`Adding ${extendedSlideData.slideJson.objects.length} objects to slide...`);
+      extendedSlideData.slideJson.objects.forEach((obj, index) => {
+        console.log(`Processing object ${index + 1}:`, obj.type);
+        try {
+          switch (obj.type) {
+            case 'text':
+              let textColor = obj.options.color;
+              // Ensure text color has # prefix if it's a hex color
+              if (typeof textColor === 'string' && textColor.match(/^[0-9A-Fa-f]{6}$/)) {
+                textColor = `#${textColor}`;
+              }
+              
+              slide.addText(obj.text, {
+                x: obj.options.x,
+                y: obj.options.y,
+                w: obj.options.w,
+                h: obj.options.h,
+                fontSize: obj.options.fontSize,
+                fontFace: obj.options.fontFace,
+                color: textColor,
+                bold: obj.options.bold,
+                italic: obj.options.italic,
+                underline: obj.options.underline,
+                align: obj.options.align,
+                valign: obj.options.valign
+              });
+              console.log(`Text object added: "${obj.text.substring(0, 50)}..."`);
+              break;
+              
+            case 'shape':
+              const shapeObj = obj as any; // Type assertion for shape objects
+              if (shapeObj.shape === 'rect' || shapeObj.shape === 'roundRect') {
+                let fillColor = undefined;
+                if (shapeObj.options.fill?.color) {
+                  fillColor = shapeObj.options.fill.color;
+                  // Ensure fill color has # prefix if it's a hex color
+                  if (typeof fillColor === 'string' && fillColor.match(/^[0-9A-Fa-f]{6}$/)) {
+                    fillColor = `#${fillColor}`;
+                  }
+                }
+                
+                slide.addShape(shapeObj.shape === 'roundRect' ? 'roundRect' : 'rect', {
+                  x: shapeObj.options.x,
+                  y: shapeObj.options.y,
+                  w: shapeObj.options.w,
+                  h: shapeObj.options.h,
+                  fill: fillColor ? { color: fillColor } : undefined,
+                  rectRadius: shapeObj.options.rectRadius
+                });
+                console.log(`Shape object added: ${shapeObj.shape}`);
+              }
+              break;
+              
+            case 'rect':
+              // Handle rect objects that might be stored as type 'rect' instead of 'shape'
+              let rectFillColor = undefined;
+              if (obj.options.fill?.color) {
+                rectFillColor = obj.options.fill.color;
+                if (typeof rectFillColor === 'string' && rectFillColor.match(/^[0-9A-Fa-f]{6}$/)) {
+                  rectFillColor = `#${rectFillColor}`;
+                }
+              }
+              
+              slide.addShape('rect', {
+                x: obj.options.x,
+                y: obj.options.y,
+                w: obj.options.w,
+                h: obj.options.h,
+                fill: rectFillColor ? { color: rectFillColor } : undefined
+              });
+              console.log('Rect object added');
+              break;
+              
+            default:
+              console.warn(`Unsupported object type: ${obj.type}`);
+          }
+        } catch (objError) {
+          console.error(`Error processing object ${index + 1}:`, objError);
+        }
+      });
+      
+      console.log('Writing PPTX file...');
+      const fileName = `${slideData.description || 'presentation'}.pptx`.replace(/[^a-zA-Z0-9\-_]/g, '-');
+      await pptx.writeFile({ fileName });
+      console.log('PPTX export completed successfully');
+      
+      // Show success message
+      alert('PowerPoint file downloaded successfully!');
+      
+    } catch (error) {
+      console.error('PPTX export failed:', error);
+      alert('Failed to export PowerPoint file. Please try again.');
+    }
   };
 
   // Save current slide as a template
@@ -384,17 +531,6 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
 
   return (
     <div className="space-y-6">
-      <Card variant="elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5 text-primary" />
-            Preview Your Slide
-          </CardTitle>
-          <CardDescription>
-            Review your AI-generated slide rendered with Fabric.js
-          </CardDescription>
-        </CardHeader>
-      </Card>
 
       <Card variant="glass">
         <CardHeader>
@@ -405,12 +541,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                 Rendered on canvas for exact PowerPoint representation
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Badge variant="secondary">
-                <Sparkles className="h-3 w-3 mr-1" />
-                AI Generated
-              </Badge>
-              {extendedSlideData.slideJson && (
+            {extendedSlideData.slideJson && (
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
@@ -450,8 +581,7 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
                     Copy Share Link
                   </Button>
                 </div>
-              )}
-            </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -533,26 +663,43 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
             </CardContent>
           </Card>
 
-          {/* JSON Preview for debugging */}
-          <details className="group">
-            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-              View JSON Structure (Debug)
-            </summary>
-            <Card className="mt-2">
-              <CardContent className="pt-4">
-                <pre className="bg-gray-100 p-4 rounded-lg overflow-auto max-h-64 text-xs">
+          {/* Debug Section */}
+          <div className="space-y-2">
+            {/* JSON Preview for debugging */}
+            <details className="group">
+              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                View JSON Structure (Debug)
+              </summary>
+              <div className="mt-2">
+                <pre className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground font-mono">
                   {JSON.stringify(extendedSlideData.slideJson, null, 2)}
                 </pre>
-              </CardContent>
-            </Card>
-          </details>
+              </div>
+            </details>
+
+            {/* Prompt Preview for debugging */}
+            {lastPrompt && (
+              <details className="group">
+                <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  View Prompt Sent to AI (Debug)
+                </summary>
+                <div className="mt-2">
+                  <div className="bg-background border border-border p-4 rounded-lg overflow-auto max-h-64 text-xs text-foreground">
+                    <div className="whitespace-pre-wrap font-mono">
+                      {lastPrompt}
+                    </div>
+                  </div>
+                </div>
+              </details>
+            )}
+          </div>
         </>
       )}
 
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Content Planning
+          Back to Themes
         </Button>
         <div className="flex gap-2">
           <Button 

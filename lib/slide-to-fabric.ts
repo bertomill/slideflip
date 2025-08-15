@@ -41,6 +41,7 @@ function convertColor(color: SlideColor | undefined): string {
  * Render text object on canvas
  */
 function renderTextObject(canvas: Canvas, obj: TextObject) {
+  console.log('📝 Rendering text object:', obj);
   const { text, options } = obj;
   
   // Convert position and size from inches to pixels
@@ -48,6 +49,14 @@ function renderTextObject(canvas: Canvas, obj: TextObject) {
   const top = inchesToPixels(options.y);
   const width = inchesToPixels(options.w);
   const height = inchesToPixels(options.h);
+  
+  console.log('📐 Text positioning:', {
+    original: { x: options.x, y: options.y, w: options.w, h: options.h },
+    pixels: { left, top, width, height }
+  });
+  
+  const color = convertColor(options.color);
+  console.log(`🎨 Text color: ${options.color} → ${color}`);
   
   // Create fabric text object
   const fabricText = new Textbox(text, {
@@ -57,7 +66,7 @@ function renderTextObject(canvas: Canvas, obj: TextObject) {
     height: height,
     fontSize: options.fontSize || 18,
     fontFamily: options.fontFace || 'Arial',
-    fill: convertColor(options.color),
+    fill: color,
     fontWeight: options.bold ? 'bold' : 'normal',
     fontStyle: options.italic ? 'italic' : 'normal',
     underline: options.underline || false,
@@ -67,16 +76,28 @@ function renderTextObject(canvas: Canvas, obj: TextObject) {
     evented: false
   });
   
+  console.log('📝 Fabric text object created:', {
+    text,
+    fontSize: options.fontSize,
+    fontFamily: options.fontFace,
+    fill: color,
+    position: { left, top, width, height }
+  });
+  
   // Handle vertical alignment
   if (options.valign === 'middle') {
     fabricText.set('originY', 'center');
     fabricText.set('top', top + height / 2);
+    console.log('📐 Applied middle vertical alignment');
   } else if (options.valign === 'bottom') {
     fabricText.set('originY', 'bottom');
     fabricText.set('top', top + height);
+    console.log('📐 Applied bottom vertical alignment');
   }
   
+  console.log('➕ Adding text to canvas...');
   canvas.add(fabricText);
+  console.log('✅ Text added to canvas');
 }
 
 /**
@@ -170,52 +191,95 @@ export function renderSlideOnCanvas(
   slide: SlideDefinition,
   scale: number = 1
 ) {
-  // Clear existing content
-  canvas.clear();
+  console.log('🎨 Starting canvas rendering...');
+  console.log('📋 Slide to render:', slide);
+  console.log('🔍 Scale factor:', scale);
+  
+  // Check if canvas is properly initialized
+  if (!canvas) {
+    console.error('❌ Canvas not provided');
+    return;
+  }
+  
+  // Check if canvas has required properties
+  if (typeof canvas.clear !== 'function' || typeof canvas.setWidth !== 'function') {
+    console.error('❌ Canvas not properly initialized - missing methods');
+    return;
+  }
+  
+  console.log('✅ Canvas is properly initialized');
+  
+  // Clear existing content safely
+  try {
+    canvas.clear();
+    console.log('🧹 Canvas cleared');
+  } catch (error) {
+    console.error('❌ Error clearing canvas:', error);
+    // Try to manually clear by removing all objects
+    try {
+      canvas.remove(...canvas.getObjects());
+      console.log('🧹 Canvas manually cleared');
+    } catch (manualError) {
+      console.error('❌ Manual clear also failed:', manualError);
+      return;
+    }
+  }
   
   // Set canvas dimensions (scaled for display)
   canvas.setWidth(SLIDE_WIDTH_PX * scale);
   canvas.setHeight(SLIDE_HEIGHT_PX * scale);
+  console.log(`📐 Canvas dimensions set: ${SLIDE_WIDTH_PX * scale} x ${SLIDE_HEIGHT_PX * scale}`);
   
   // Set zoom for scaling
   canvas.setZoom(scale);
+  console.log(`🔍 Canvas zoom set to: ${scale}`);
   
   // Set background
   if (slide.background) {
     if (slide.background.color) {
-      canvas.backgroundColor = convertColor(slide.background.color);
+      const bgColor = convertColor(slide.background.color);
+      canvas.backgroundColor = bgColor;
+      console.log(`🎨 Background color set to: ${bgColor}`);
     }
     // Note: background images would need additional handling
   } else {
     canvas.backgroundColor = '#ffffff';
+    console.log('🎨 Default white background set');
   }
   
   // Render each object
-  slide.objects.forEach(obj => {
+  console.log(`📝 Rendering ${slide.objects.length} objects...`);
+  slide.objects.forEach((obj, index) => {
+    console.log(`🔄 Rendering object ${index + 1}:`, obj);
     switch (obj.type) {
       case 'text':
         renderTextObject(canvas, obj as TextObject);
+        console.log(`✅ Text object ${index + 1} rendered`);
         break;
       case 'shape':
         renderShapeObject(canvas, obj as ShapeObject);
+        console.log(`✅ Shape object ${index + 1} rendered`);
         break;
       case 'image':
         // TODO: Implement image rendering
-        console.log('Image rendering not yet implemented');
+        console.log('⚠️ Image rendering not yet implemented');
         break;
       case 'chart':
         // TODO: Implement chart rendering (would need Chart.js or similar)
-        console.log('Chart rendering not yet implemented');
+        console.log('⚠️ Chart rendering not yet implemented');
         break;
       case 'table':
         // TODO: Implement table rendering
-        console.log('Table rendering not yet implemented');
+        console.log('⚠️ Table rendering not yet implemented');
         break;
     }
   });
   
   // Render the canvas
+  console.log('🎨 Calling canvas.renderAll()...');
   canvas.renderAll();
+  console.log('✅ Canvas rendering complete!');
+  console.log('📊 Canvas object count:', canvas.getObjects().length);
 }
 
 /**
@@ -226,14 +290,51 @@ export function createSlideCanvas(
   slide: SlideDefinition,
   scale: number = 1
 ): Canvas {
-  const canvas = new Canvas(canvasElement, {
-    selection: false,
-    preserveObjectStacking: true
-  });
+  if (!canvasElement) {
+    throw new Error('Canvas element is required');
+  }
   
-  renderSlideOnCanvas(canvas, slide, scale);
+  console.log('🏗️ Creating Fabric canvas...');
+  console.log('📄 Canvas element:', canvasElement);
+  console.log('📋 Slide:', slide);
+  console.log('🔍 Scale:', scale);
   
-  return canvas;
+  try {
+    const canvas = new Canvas(canvasElement, {
+      selection: false,
+      preserveObjectStacking: true
+    });
+    
+    console.log('✅ Fabric canvas created');
+    console.log('🔧 Canvas properties:', {
+      width: canvas.width,
+      height: canvas.height,
+      lowerCanvasEl: !!canvas.lowerCanvasEl,
+      upperCanvasEl: !!canvas.upperCanvasEl
+    });
+    
+    // Immediately render - the canvas should be ready
+    try {
+      console.log('🔄 Rendering slide immediately...');
+      renderSlideOnCanvas(canvas, slide, scale);
+    } catch (error) {
+      console.error('❌ Error rendering slide on canvas:', error);
+      // Try once more after a short delay
+      setTimeout(() => {
+        try {
+          console.log('🔄 Retrying slide render after delay...');
+          renderSlideOnCanvas(canvas, slide, scale);
+        } catch (retryError) {
+          console.error('❌ Retry failed:', retryError);
+        }
+      }, 100);
+    }
+    
+    return canvas;
+  } catch (error) {
+    console.error('❌ Error creating Fabric canvas:', error);
+    throw error;
+  }
 }
 
 /**

@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Settings, 
   FileText, 
-  History, 
   Crown, 
   LogOut,
   QrCode,
@@ -291,17 +290,6 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                 >
                   <QrCode className={cn("h-4 w-4", !collapsed && "mr-3")} />
                   {!collapsed && "Waitlist QR Code"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full text-left",
-                    collapsed ? "justify-center px-2" : "justify-start"
-                  )}
-                  onClick={() => onToggle?.()}
-                >
-                  <History className={cn("h-4 w-4", !collapsed && "mr-3")} />
-                  {!collapsed && "Recent"}
                 </Button>
               </div>
             </nav>

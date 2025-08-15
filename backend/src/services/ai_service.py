@@ -1,39 +1,39 @@
 """
-AI Service for OpenAI integration and AI-powered operations
+AI Service for Anthropic integration and AI-powered operations
 """
 
 import logging
 import asyncio
 from typing import Dict, Any, Optional, List
-from openai import OpenAI
+from anthropic import Anthropic
 from src.core.config import Settings
 
 logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """Service for AI-powered operations using OpenAI"""
+    """Service for AI-powered operations using Anthropic Claude"""
 
     def __init__(self):
         self.settings = Settings()
-        self.openai_client = None
-        self._initialize_openai()
+        self.anthropic_client = None
+        self._initialize_anthropic()
 
-    def _initialize_openai(self):
-        """Initialize OpenAI client if API key is available"""
+    def _initialize_anthropic(self):
+        """Initialize Anthropic client if API key is available"""
         try:
-            if self.settings.OPENAI_API_KEY:
-                self.openai_client = OpenAI(
-                    api_key=self.settings.OPENAI_API_KEY)
-                logger.info("OpenAI client initialized successfully")
+            if self.settings.ANTHROPIC_API_KEY:
+                self.anthropic_client = Anthropic(
+                    api_key=self.settings.ANTHROPIC_API_KEY)
+                logger.info("Anthropic client initialized successfully")
             else:
-                logger.warning("OpenAI API key not configured")
+                logger.warning("Anthropic API key not configured")
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
+            logger.error(f"Failed to initialize Anthropic client: {e}")
 
     def is_available(self) -> bool:
-        """Check if OpenAI service is available"""
-        return self.openai_client is not None and self.settings.OPENAI_API_KEY is not None
+        """Check if Anthropic service is available"""
+        return self.anthropic_client is not None and self.settings.ANTHROPIC_API_KEY is not None
 
     async def generate_slide_html(
         self,
@@ -45,7 +45,7 @@ class AIService:
         color_palette: Optional[List[str]] = None
     ) -> str:
         """
-        Generate slide HTML using OpenAI GPT-4
+        Generate slide HTML using Anthropic Claude
 
         Args:
             description: User's slide description
@@ -59,37 +59,34 @@ class AIService:
             Generated HTML content for the slide
         """
         if not self.is_available():
-            raise Exception("OpenAI service not available")
+            raise Exception("Anthropic service not available")
 
         try:
             prompt = self._build_slide_prompt(
                 description, theme, research_data, content_plan, user_feedback, color_palette
             )
 
-            logger.info("Generating slide HTML with OpenAI...")
+            logger.info("Generating slide HTML with Anthropic Claude...")
 
-            # Use asyncio to run the synchronous OpenAI call
+            # Use asyncio to run the synchronous Anthropic call
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: self.openai_client.chat.completions.create(
-                    model="gpt-4",
+                lambda: self.anthropic_client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=4000,
+                    temperature=0.7,
+                    system="You are a senior frontend developer and UI/UX expert specializing in creating stunning, professional slide presentations in HTML and CSS.",
                     messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a senior frontend developer and UI/UX expert specializing in creating stunning, professional slide presentations in HTML and CSS."
-                        },
                         {
                             "role": "user",
                             "content": prompt
                         }
-                    ],
-                    temperature=0.7,
-                    max_tokens=4000
+                    ]
                 )
             )
 
-            html_content = response.choices[0].message.content
+            html_content = response.content[0].text
             logger.info("Slide HTML generated successfully")
 
             return html_content
@@ -106,7 +103,7 @@ class AIService:
         parsed_documents: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
-        Generate content plan using OpenAI
+        Generate content plan using Anthropic Claude
 
         Args:
             description: User's slide description
@@ -118,36 +115,33 @@ class AIService:
             Dictionary containing content plan and suggestions
         """
         if not self.is_available():
-            raise Exception("OpenAI service not available")
+            raise Exception("Anthropic service not available")
 
         try:
             prompt = self._build_content_plan_prompt(
                 description, research_data, theme, parsed_documents
             )
 
-            logger.info("Generating content plan with OpenAI...")
+            logger.info("Generating content plan with Anthropic Claude...")
 
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: self.openai_client.chat.completions.create(
-                    model="gpt-4",
+                lambda: self.anthropic_client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=2000,
+                    temperature=0.7,
+                    system="You are a presentation content strategist with expertise in creating compelling slide content plans.",
                     messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a presentation content strategist with expertise in creating compelling slide content plans."
-                        },
                         {
                             "role": "user",
                             "content": prompt
                         }
-                    ],
-                    temperature=0.7,
-                    max_tokens=2000
+                    ]
                 )
             )
 
-            content_plan = response.choices[0].message.content
+            content_plan = response.content[0].text
 
             # Parse the response to extract structured information
             result = self._parse_content_plan_response(content_plan)
@@ -177,7 +171,7 @@ class AIService:
             Refined content plan
         """
         if not self.is_available():
-            raise Exception("OpenAI service not available")
+            raise Exception("Anthropic service not available")
 
         try:
             prompt = f"""
@@ -195,29 +189,26 @@ class AIService:
             Please provide a refined content plan that addresses the user's feedback while maintaining the core structure and objectives.
             """
 
-            logger.info("Refining content plan with OpenAI...")
+            logger.info("Refining content plan with Anthropic Claude...")
 
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: self.openai_client.chat.completions.create(
-                    model="gpt-4",
+                lambda: self.anthropic_client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=2000,
+                    temperature=0.7,
+                    system="You are a presentation content strategist helping to refine content plans based on user feedback.",
                     messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a presentation content strategist helping to refine content plans based on user feedback."
-                        },
                         {
                             "role": "user",
                             "content": prompt
                         }
-                    ],
-                    temperature=0.7,
-                    max_tokens=2000
+                    ]
                 )
             )
 
-            refined_plan = response.choices[0].message.content
+            refined_plan = response.content[0].text
             result = self._parse_content_plan_response(refined_plan)
             logger.info("Content plan refined successfully")
 
