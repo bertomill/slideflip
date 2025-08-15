@@ -86,3 +86,6 @@ class Settings(BaseSettings):
     
     # Anthropic settings - Required for AI-powered slide generation
     ANTHROPIC_API_KEY: Optional[str] = None       # Set this in .env.local or .env
+    
+    # OpenAI settings - Alternative AI service for knowledge graph generation
+    OPENAI_API_KEY: Optional[str] = None          # Set this in .env.local or .env

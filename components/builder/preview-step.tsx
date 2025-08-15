@@ -14,9 +14,31 @@ interface PreviewStepProps {
   updateSlideData: (updates: Partial<SlideData>) => void;
   onNext: () => void;
   onPrev: () => void;
+  // WebSocket props
+  isConnected?: boolean;
+  connectionStatus?: string;
+  sendGenerateSlideRequest?: (
+    description: string,
+    theme: string,
+    researchData?: string,
+    contentPlan?: string,
+    userFeedback?: string,
+    documents?: Array<{ filename: string; success?: boolean; content?: string }>,
+    model?: string
+  ) => boolean;
+  lastMessage?: any;
 }
 
-export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: PreviewStepProps) {
+export function PreviewStep({ 
+  slideData, 
+  updateSlideData, 
+  onNext, 
+  onPrev,
+  isConnected = false,
+  connectionStatus = 'disconnected',
+  sendGenerateSlideRequest,
+  lastMessage
+}: PreviewStepProps) {
   type ModelAwareSlideData = SlideData & { selectedModel?: string };
   const modelAwareSlideData = slideData as ModelAwareSlideData;
   const [isGenerating, setIsGenerating] = useState(false);
@@ -25,6 +47,17 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
 
   const [containerWidth, setContainerWidth] = useState(800);
   const slideContainerRef = useRef<HTMLDivElement>(null);
+
+  // Debug logging when component mounts
+  useEffect(() => {
+    console.log('🔍 PreviewStep mounted with props:', {
+      isConnected,
+      connectionStatus,
+      hasSendGenerateSlideRequest: !!sendGenerateSlideRequest,
+      hasDescription: !!slideData.description,
+      hasSlideHtml: !!slideData.slideHtml
+    });
+  }, [isConnected, connectionStatus, sendGenerateSlideRequest, slideData.description, slideData.slideHtml]);
 
   useEffect(() => {
     if (!slideData.slideHtml) {
@@ -68,9 +101,44 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
 
   // Call API to generate slide HTML
   const generateSlide = async (overrideFeedback?: string) => {
-    if (!slideData.description || isGenerating) return;
+    console.log('🔍 generateSlide called with overrideFeedback:', overrideFeedback);
+    console.log('🔍 Current state - isGenerating:', isGenerating, 'description:', !!slideData.description);
+    console.log('🔍 WebSocket connection - isConnected:', isConnected, 'sendGenerateSlideRequest:', !!sendGenerateSlideRequest);
+    
+    if (!slideData.description || isGenerating) {
+      console.log('🔍 Skipping slide generation - no description or already generating');
+      return;
+    }
+    
     setIsGenerating(true);
+    
     try {
+      // Try websocket first if connected
+      if (isConnected && sendGenerateSlideRequest) {
+        console.log('🔍 Using websocket for slide generation');
+        const success = sendGenerateSlideRequest(
+          slideData.description,
+          slideData.selectedTheme || "Professional",
+          slideData.wantsResearch ? slideData.researchData : undefined,
+          slideData.contentPlan,
+          typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
+          buildRequestPayload(overrideFeedback).documents,
+          modelAwareSlideData.selectedModel
+        );
+        
+        console.log('🔍 sendGenerateSlideRequest result:', success);
+        
+        if (!success) {
+          throw new Error('Failed to send websocket message');
+        }
+        
+        console.log('🔍 WebSocket message sent successfully, waiting for response');
+        // Don't set isGenerating to false here - wait for websocket response
+        return;
+      }
+      
+      // Fallback to API call if websocket not available
+      console.log('🔍 Using API fallback for slide generation');
       const response = await fetch("/api/generate-slide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,18 +166,40 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
       console.error("Slide generation error:", err);
       // Fallback to placeholder so user can continue the flow
       updateSlideData({ slideHtml: "cat-slide-placeholder" });
-    } finally {
       setIsGenerating(false);
     }
   };
 
   // Auto-generate on first entry to this step if we don't have HTML yet
   useEffect(() => {
-    if (!slideData.slideHtml && slideData.description) {
+    if (!slideData.slideHtml && slideData.description && isConnected) {
+      console.log('🔍 Auto-generating slide - websocket connected, description available');
       generateSlide();
+    } else if (!slideData.slideHtml && slideData.description && !isConnected) {
+      console.log('🔍 Cannot auto-generate slide - websocket not connected');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slideData.slideHtml, slideData.description, slideData.selectedTheme, slideData.contentPlan, slideData.userFeedback, slideData.researchData, slideData.wantsResearch]);
+  }, [slideData.slideHtml, slideData.description, slideData.selectedTheme, slideData.contentPlan, slideData.userFeedback, slideData.researchData, slideData.wantsResearch, isConnected]);
+
+  // Handle websocket messages for slide generation
+  useEffect(() => {
+    if (!lastMessage) return;
+    
+    if (lastMessage.type === 'slide_generation_complete') {
+      console.log('Received slide generation complete message:', lastMessage);
+      if (lastMessage.data?.slide_html) {
+        updateSlideData({ slideHtml: lastMessage.data.slide_html });
+        setIsGenerating(false);
+        setIsRegenerating(false);
+      }
+    } else if (lastMessage.type === 'slide_generation_error') {
+      console.error('Slide generation error:', lastMessage.data?.error);
+      // Fallback to placeholder so user can continue the flow
+      updateSlideData({ slideHtml: "cat-slide-placeholder" });
+      setIsGenerating(false);
+      setIsRegenerating(false);
+    }
+  }, [lastMessage, updateSlideData]);
 
   const regenerateWithFeedback = async () => {
     if (!feedback.trim()) return;
@@ -126,6 +216,49 @@ export function PreviewStep({ slideData, updateSlideData, onNext, onPrev }: Prev
 
   return (
     <div className="space-y-6">
+      {/* Debug information */}
+      <Card variant="glass" className="border-orange-200 bg-orange-50/50">
+        <CardContent className="p-4">
+          <div className="text-sm space-y-2">
+            <div className="font-semibold text-orange-800">🔍 Debug Info</div>
+            <div>WebSocket Connected: <span className={isConnected ? 'text-green-600' : 'text-red-600'}>{isConnected ? 'Yes' : 'No'}</span></div>
+            <div>Connection Status: <span className="font-mono">{connectionStatus}</span></div>
+            <div>Has sendGenerateSlideRequest: <span className={sendGenerateSlideRequest ? 'text-green-600' : 'text-red-600'}>{sendGenerateSlideRequest ? 'Yes' : 'No'}</span></div>
+            <div>Has Description: <span className={slideData.description ? 'text-green-600' : 'text-red-600'}>{slideData.description ? 'Yes' : 'No'}</span></div>
+            <div>Has Slide HTML: <span className={slideData.slideHtml ? 'text-green-600' : 'text-red-600'}>{slideData.slideHtml ? 'Yes' : 'No'}</span></div>
+            <div>Is Generating: <span className={isGenerating ? 'text-orange-600' : 'text-gray-600'}>{isGenerating ? 'Yes' : 'No'}</span></div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-orange-200">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                console.log('🔍 Manual test button clicked');
+                if (isConnected && sendGenerateSlideRequest && slideData.description) {
+                  console.log('🔍 Sending manual test message');
+                  const success = sendGenerateSlideRequest(
+                    slideData.description,
+                    slideData.selectedTheme || "Professional",
+                    slideData.wantsResearch ? slideData.researchData : undefined,
+                    slideData.contentPlan,
+                    slideData.userFeedback,
+                    [],
+                    "gpt-4o"
+                  );
+                  console.log('🔍 Manual test result:', success);
+                } else {
+                  console.log('🔍 Cannot send test message - missing requirements');
+                }
+              }}
+              disabled={!isConnected || !sendGenerateSlideRequest || !slideData.description}
+              className="w-full"
+            >
+              Test WebSocket Message
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card variant="elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -50,9 +50,14 @@ class ThemeMessage(BaseModel):
 class SlideGenerationMessage(BaseModel):
     """Model for slide generation requests"""
     description: str = Field(..., description="User's description of the slide")
-    theme: Optional[str] = Field("default", description="Selected theme")
+    theme: Optional[str] = Field("Professional", description="Selected theme")
     theme_details: Optional[Dict[str, Any]] = Field(None, description="Detailed theme information")
     wants_research: Optional[bool] = Field(False, description="Whether to include research")
+    researchData: Optional[str] = Field(None, description="Research insights to incorporate")
+    contentPlan: Optional[str] = Field(None, description="AI-generated content plan from content planning step")
+    userFeedback: Optional[str] = Field(None, description="User's additional requirements and modifications")
+    documents: Optional[List[Dict[str, Any]]] = Field(None, description="Optional uploaded files for additional context")
+    model: Optional[str] = Field("gpt-4o", description="AI model to use for generation")
     client_id: Optional[str] = Field(None, description="Client identifier")
 
 class ResearchRequestMessage(BaseModel):

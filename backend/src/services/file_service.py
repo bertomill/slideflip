@@ -99,60 +99,46 @@ class FileService:
         client_id: Optional[str] = None
     ) -> Path:
         """
-        Save an uploaded file to disk with client-specific organization
+        Save an uploaded file to the filesystem
         
         Frontend Usage:
-        - Send files as base64 encoded content
-        - Always include client_id to associate files with specific users
-        - Supported file types are defined in settings.ALLOWED_FILE_TYPES
-        - Maximum file size is defined in settings.MAX_FILE_SIZE
+        - Use this to save files uploaded by users
+        - Files are automatically organized by client_id
+        - Supports base64 encoded content from frontend
         
         Args:
-            filename: Original filename from frontend
-            content: Base64 encoded file content
+            filename: Name of the file to save
+            content: File content (base64 encoded string)
             file_type: MIME type of the file
-            client_id: Unique identifier for the client/user
+            client_id: Optional client identifier for organization
             
         Returns:
-            Path: Path to the saved file
-            
-        Raises:
-            ValueError: If file size exceeds limit or file type not allowed
+            Path: Path where the file was saved
         """
         try:
-            # Decode base64 content from frontend
-            file_content = base64.b64decode(content)
+            # Decode base64 content
+            if content.startswith('data:'):
+                # Handle data URL format: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+                header, encoded_content = content.split(',', 1)
+                file_content = base64.b64decode(encoded_content)
+            else:
+                # Handle plain base64 content
+                file_content = base64.b64decode(content)
             
-            # Validate file size against configured limits
-            if len(file_content) > self.settings.MAX_FILE_SIZE:
-                raise ValueError(f"File size exceeds maximum allowed size of {self.settings.MAX_FILE_SIZE} bytes")
-            
-            # Validate file type against allowed types
-            if file_type not in self.settings.ALLOWED_FILE_TYPES:
-                raise ValueError(f"File type {file_type} is not allowed")
-            
-            # Create client-specific folder for file organization
+            # Create client-specific folder if client_id provided
             if client_id:
                 client_folder = Path(self.settings.UPLOAD_DIR) / f"client_{client_id}"
                 client_folder.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Created/accessed folder for client {client_id}: {client_folder}")
+                file_path = client_folder / self._sanitize_filename(filename)
+                logger.info(f"Creating file in client folder: {client_folder}")
             else:
-                client_folder = Path(self.settings.UPLOAD_DIR)
+                file_path = Path(self.settings.UPLOAD_DIR) / self._sanitize_filename(filename)
             
-            # Generate unique filename to prevent conflicts
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_hash = hashlib.md5(file_content).hexdigest()[:8]
-            safe_filename = self._sanitize_filename(filename)
-            unique_filename = f"{timestamp}_{file_hash}_{safe_filename}"
-            
-            # Create file path within client folder
-            file_path = client_folder / unique_filename
-            
-            # Save file to disk asynchronously
+            # Save file to disk
             async with aiofiles.open(file_path, 'wb') as f:
                 await f.write(file_content)
             
-            # Create file info object for tracking
+            # Create FileInfo object
             file_info = FileInfo(
                 filename=filename,
                 file_path=str(file_path),
@@ -166,7 +152,7 @@ class FileService:
                 if client_id not in self.client_files:
                     self.client_files[client_id] = []
                 self.client_files[client_id].append(file_info)
-                logger.info(f"Associated file {filename} with client {client_id}")
+                logger.info(f"Associated file {filename} with client {client_id} in memory. Total files for client: {len(self.client_files[client_id])}")
             
             logger.info(f"File saved successfully: {file_path}")
             return file_path
@@ -202,7 +188,86 @@ class FileService:
         - Use this to display a list of uploaded files for a user
         - Returns FileInfo objects with metadata about each file
         """
-        return self.client_files.get(client_id, [])
+        # First check in-memory storage
+        if client_id in self.client_files and self.client_files[client_id]:
+            return self.client_files[client_id]
+        
+        # If not in memory, reconstruct from filesystem
+        try:
+            logger.info(f"Reconstructing file associations for client {client_id} from filesystem")
+            client_folder = Path(self.settings.UPLOAD_DIR) / f"client_{client_id}"
+            
+            if not client_folder.exists():
+                logger.info(f"Client folder {client_folder} does not exist for client {client_id}")
+                return []
+            
+            # Scan filesystem and reconstruct FileInfo objects
+            reconstructed_files = []
+            for file_path in client_folder.iterdir():
+                if file_path.is_file():
+                    try:
+                        stat = file_path.stat()
+                        file_info = FileInfo(
+                            filename=file_path.name,
+                            file_path=str(file_path),
+                            file_size=stat.st_size,
+                            file_type=mimetypes.guess_type(str(file_path))[0] or "application/octet-stream",
+                            upload_time=datetime.fromtimestamp(stat.st_ctime).isoformat()
+                        )
+                        reconstructed_files.append(file_info)
+                        logger.info(f"Reconstructed file info for {file_path.name}")
+                    except Exception as e:
+                        logger.warning(f"Error reconstructing file info for {file_path.name}: {e}")
+                        continue
+            
+            # Store in memory for future use
+            if reconstructed_files:
+                self.client_files[client_id] = reconstructed_files
+                logger.info(f"Reconstructed {len(reconstructed_files)} files for client {client_id}")
+            
+            return reconstructed_files
+            
+        except Exception as e:
+            logger.error(f"Error reconstructing files for client {client_id}: {e}")
+            return []
+    
+    async def debug_client_files(self, client_id: str) -> Dict:
+        """
+        Debug method to troubleshoot file association issues
+        
+        Returns detailed information about file storage for a client
+        """
+        try:
+            debug_info = {
+                "client_id": client_id,
+                "in_memory_files": len(self.client_files.get(client_id, [])),
+                "memory_files": [f.filename for f in self.client_files.get(client_id, [])],
+                "client_folder_exists": False,
+                "filesystem_files": [],
+                "reconstruction_attempted": False
+            }
+            
+            # Check filesystem
+            client_folder = Path(self.settings.UPLOAD_DIR) / f"client_{client_id}"
+            debug_info["client_folder_exists"] = client_folder.exists()
+            
+            if client_folder.exists():
+                filesystem_files = list(client_folder.iterdir())
+                debug_info["filesystem_files"] = [f.name for f in filesystem_files if f.is_file()]
+                debug_info["filesystem_count"] = len(debug_info["filesystem_files"])
+            
+            # Try reconstruction
+            if not debug_info["in_memory_files"] and debug_info["client_folder_exists"]:
+                debug_info["reconstruction_attempted"] = True
+                reconstructed = await self.get_client_files(client_id)
+                debug_info["after_reconstruction"] = len(reconstructed)
+                debug_info["reconstructed_files"] = [f.filename for f in reconstructed]
+            
+            return debug_info
+            
+        except Exception as e:
+            logger.error(f"Error in debug_client_files for {client_id}: {e}")
+            return {"error": str(e)}
     
     async def delete_client_files(self, client_id: str) -> bool:
         """

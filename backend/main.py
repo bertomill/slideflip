@@ -56,7 +56,7 @@ async def cleanup_stale_connections():
     """Periodically clean up stale WebSocket connections"""
     while True:
         try:
-            await asyncio.sleep(30)  # Run every 30 seconds instead of 60
+            await asyncio.sleep(600)  # Run every 5 minutes (120 seconds) instead of 30 seconds
             await websocket_manager.cleanup_stale_connections()
 
             # Log connection statistics

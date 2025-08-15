@@ -12,6 +12,7 @@ aiohttp
 asyncio-mqtt
 beautifulsoup4
 anthropic
+openai
 python-pptx
 Pillow
 networkx

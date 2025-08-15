@@ -1,11 +1,11 @@
 """
-LLM service for slide generation using Anthropic Claude
+LLM service for slide generation using OpenAI GPT
 """
 
 import logging
 import json
 from typing import Dict, List, Optional, Any
-from anthropic import Anthropic
+import openai
 from src.core.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -19,22 +19,22 @@ class LLMService:
         self._initialize_client()
     
     def _initialize_client(self):
-        """Initialize Anthropic client"""
+        """Initialize OpenAI client"""
         try:
             # Check if API key is available
-            api_key = self.settings.ANTHROPIC_API_KEY
+            api_key = self.settings.OPENAI_API_KEY
             if api_key:
-                self.client = Anthropic(api_key=api_key)
-                logger.info("Anthropic client initialized successfully")
+                self.client = openai.OpenAI(api_key=api_key)
+                logger.info("OpenAI client initialized successfully")
             else:
-                logger.warning("Anthropic API key not found. LLM features will be disabled.")
+                logger.warning("OpenAI API key not found. LLM features will be disabled.")
                 logger.info("Please check:")
                 logger.info("1. .env file exists in backend directory")
-                logger.info("2. ANTHROPIC_API_KEY is set in .env file")
-                logger.info("3. File format: ANTHROPIC_API_KEY=your_api_key_here")
+                logger.info("2. OPENAI_API_KEY is set in .env file")
+                logger.info("3. File format: OPENAI_API_KEY=your_api_key_here")
                 self.client = None
         except Exception as e:
-            logger.error(f"Error initializing Anthropic client: {e}")
+            logger.error(f"Error initializing OpenAI client: {e}")
             self.client = None
     
     async def generate_slide_layout(
@@ -142,17 +142,17 @@ Consider the content type and create appropriate sections:
 
 Design a layout that transforms this content into a compelling, professional presentation slide."""
 
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
                 max_tokens=2000,
                 temperature=0.8,
-                system=system_prompt,
                 messages=[
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
             )
             
-            layout_text = response.content[0].text.strip()
+            layout_text = response.choices[0].message.content.strip()
             
             # Log the raw response for debugging
             logger.info(f"LLM Layout Response (first 500 chars): {layout_text[:500]}...")
@@ -288,17 +288,17 @@ For each section in the layout, create comprehensive content that:
 
 Generate detailed, comprehensive content for each section."""
 
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
                 max_tokens=2500,
                 temperature=0.8,
-                system=system_prompt,
                 messages=[
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
             )
             
-            content_text = response.content[0].text.strip()
+            content_text = response.choices[0].message.content.strip()
             
             # Log the raw response for debugging
             logger.info(f"LLM Content Response (first 500 chars): {content_text[:500]}...")
@@ -368,18 +368,18 @@ Generate detailed, comprehensive content for each section."""
                 Follow the user's instructions carefully and format your response appropriately."""
             
             # Create the message request
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
                 max_tokens=max_tokens,
                 temperature=0.7,
-                system=system_prompt,
                 messages=[
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ]
             )
             
             # Extract the generated content
-            generated_content = response.content[0].text.strip()
+            generated_content = response.choices[0].message.content.strip()
             logger.info(f"Successfully generated content with {len(generated_content)} characters")
             
             return generated_content
@@ -465,17 +465,17 @@ Extract ONLY:
 
 Return the JSON structure as specified in the system prompt. Be thorough but accurate."""
 
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
                 max_tokens=2000,
                 temperature=0.1,  # Low temperature for more consistent extraction
-                system=system_prompt,
                 messages=[
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
             )
             
-            extraction_text = response.content[0].text.strip()
+            extraction_text = response.choices[0].message.content.strip()
             
             # Clean up markdown code blocks if present
             if extraction_text.startswith("```json"):
@@ -638,3 +638,255 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
     def is_available(self) -> bool:
         """Check if LLM service is available"""
         return self.client is not None 
+
+    async def generate_slide_html(
+        self,
+        description: str,
+        theme: str = "Professional",
+        researchData: Optional[str] = None,
+        contentPlan: Optional[str] = None,
+        userFeedback: Optional[str] = None,
+        documents: Optional[List[Dict[str, Any]]] = None,
+        model: str = "gpt-4o"
+    ) -> str:
+        """
+        Generate professional PowerPoint slide in HTML format using the same prompt engineering as frontend
+        
+        This method replicates the exact logic from the frontend /api/generate-slide endpoint
+        """
+        if not self.client:
+            raise Exception("LLM service not available")
+        
+        try:
+            # PROMPT CONSTRUCTION: Build the comprehensive prompt for OpenAI GPT based on available data
+            # This prompt engineering approach ensures consistent, high-quality slide generation
+            # by providing clear requirements, examples, and constraints to the AI model
+            prompt = f"""Create a professional PowerPoint slide in HTML format based on the following requirements:
+
+SLIDE DESCRIPTION: {description}
+
+THEME: {theme}
+
+"""
+
+            # Add content plan from content planning step if available
+            # This provides structured guidance for what should be included on the slide
+            if contentPlan:
+                prompt += f"""CONTENT PLAN:
+{contentPlan}
+
+"""
+
+            # Add user feedback and additional requirements if provided
+            # This allows for iterative improvements and specific user requests
+            if userFeedback:
+                prompt += f"""USER FEEDBACK & ADDITIONAL REQUIREMENTS:
+{userFeedback}
+
+"""
+
+            # Append research data to prompt if provided by user
+            # This allows AI to incorporate relevant insights and statistics
+            if researchData:
+                prompt += f"""RESEARCH DATA TO INCORPORATE:
+{researchData}
+
+"""
+
+            # Add parsed document content if available
+            # This provides the actual content from uploaded documents for AI to use
+            if documents and len(documents) > 0:
+                prompt += "DOCUMENT CONTENT:\n"
+
+                # If we have parsed document content, include the actual text
+                if len(documents) > 0 and isinstance(documents[0], dict) and 'content' in documents[0]:
+                    # documents contains parsed content
+                    for index, doc in enumerate(documents):
+                        if doc.get('success') and doc.get('content'):
+                            prompt += f"Document {index + 1} ({doc.get('filename', 'unknown')}):\n{doc['content']}\n\n"
+                        else:
+                            prompt += f"Document {index + 1} ({doc.get('filename', 'unknown')}): [Content extraction failed]\n\n"
+                else:
+                    # Fallback: just mention document count if no parsed content available
+                    prompt += f"User has uploaded {len(documents)} document(s) for reference.\n\n"
+
+            # TEMPLATE EXAMPLES: For now, we'll use a basic template example
+            # TODO: Integrate with template service to fetch actual examples
+            templatesContent = f"""EXAMPLE TEMPLATE TO FOLLOW:
+Here is an example of a well-designed slide that you should use as inspiration for structure, styling, and layout:
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.slide-main {{ 
+  width: 100%; 
+  height: 100%; 
+  background: white; 
+  padding: 40px; 
+  box-sizing: border-box; 
+  font-family: Arial, sans-serif;
+  display: flex;                    /* Enable flexbox layout for vertical centering */
+  flex-direction: column;           /* Stack content vertically */
+  justify-content: center;          /* Center content vertically in 16:9 container */
+}}
+.slide-main h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+.slide-main p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+</style>
+</head>
+<body>
+<div class="slide-main">
+  <!-- Your slide content here -->
+</div>
+</body>
+</html>
+
+Please create a slide that follows similar structural patterns, CSS scoping practices, and professional styling as shown in the example above.
+
+"""
+
+            prompt += templatesContent
+
+            # SLIDE GENERATION REQUIREMENTS: Complete the prompt with detailed requirements and style guidelines
+            # This section emphasizes accessibility, readability, and professional appearance
+            # Key focus areas: CSS scoping, accessibility compliance, and embeddable HTML output
+            prompt += f"""REQUIREMENTS:
+1. Create a complete HTML slide that looks professional and presentation-ready
+2. Use modern CSS styling with the {theme} theme
+3. Incorporate the research data naturally into the slide content
+4. Make it visually appealing with proper typography, spacing, and layout
+5. Include relevant data points, statistics, or insights from the research
+6. Use a clean, readable design suitable for presentations
+7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
+8. Make it responsive and well-structured
+9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
+
+ASPECT RATIO REQUIREMENTS:
+// ============================================================================
+// 16:9 ASPECT RATIO OPTIMIZATION: Critical design constraints for slide display
+// ============================================================================
+// The generated slide must work perfectly within a 16:9 aspect ratio container
+// This ensures consistency between web preview and PowerPoint export formats
+- Design the slide content to work optimally in a 16:9 aspect ratio container
+- This matches standard PowerPoint slide dimensions (1920x1080, 1280x720, etc.)
+- Content should be well-proportioned and not cramped when displayed in this format
+- Use appropriate font sizes and spacing that work well in the 16:9 format
+- Consider that the slide will be viewed at various sizes but always maintain 16:9 proportions
+
+OUTPUT FORMAT:
+Return a complete, self-contained HTML slide that can be embedded safely. You can choose either:
+1. A complete HTML document with scoped CSS in the <head> (recommended for complex layouts)
+2. A single container div with inline <style> tag containing scoped CSS (simpler embedding)
+
+CRITICAL CSS SCOPING REQUIREMENTS:
+- ALL CSS must be scoped to prevent affecting the parent page
+- If using a complete HTML document, scope all styles to a main container class
+- If using a div container, scope all styles to that container class
+- NEVER use global selectors like body, html, *, or unscoped element selectors
+- Example: Use ".slide-container h1" instead of just "h1"
+- Example: Use ".slide-container .title" instead of just ".title"
+
+STYLE GUIDELINES:
+- Use professional fonts (Arial, Helvetica, or similar)
+- CRITICAL: Ensure high contrast text - use dark text (#333333 or darker) on light backgrounds, never light grey text
+- Main headings should be #1a1a1a or #000000 for maximum readability
+- Body text should be #333333 minimum, never lighter than #555555
+- Background colors should provide strong contrast with text
+- Include appropriate margins, padding, and spacing optimized for 16:9 viewing
+- Use bullet points, headings, and visual hierarchy effectively
+- Incorporate any statistics or data points from the research prominently
+- Make the layout clean and uncluttered, suitable for 16:9 presentation format
+- Test color combinations for WCAG accessibility standards
+
+PREFERRED STRUCTURE (Option 1 - Complete HTML):
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.slide-main {{ 
+  width: 100%; 
+  height: 100%; 
+  background: white; 
+  padding: 40px; 
+  box-sizing: border-box; 
+  font-family: Arial, sans-serif;
+  display: flex;                    /* Enable flexbox layout for vertical centering */
+  flex-direction: column;           /* Stack content vertically */
+  justify-content: center;          /* Center content vertically in 16:9 container */
+}}
+.slide-main h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+.slide-main p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+</style>
+</head>
+<body>
+<div class="slide-main">
+  <!-- Your slide content here -->
+</div>
+</body>
+</html>
+
+ALTERNATIVE STRUCTURE (Option 2 - Container div):
+<div class="slide-container" style="width: 100%; height: 100%; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center;">
+  <style>
+    .slide-container h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+    .slide-container p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+  </style>
+  <!-- Your slide content here -->
+</div>"""
+
+            # Make API call to OpenAI GPT for slide generation
+            # Using specific model, temperature, and token limits for optimal results
+            completion = self.client.chat.completions.create(
+                model=model,
+                max_tokens=2000,  # Sufficient tokens for complete HTML slide generation
+                temperature=0.7,  # Balanced creativity while maintaining consistency
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert presentation designer who creates professional, visually appealing PowerPoint slides with excellent accessibility and readability. You NEVER use light grey text on light backgrounds and always ensure high contrast ratios. You ALWAYS create complete, working HTML slides that render properly when embedded. You ALWAYS scope ALL CSS to prevent affecting parent page styles. You specialize in incorporating research data and creating clean, modern slide layouts with proper typography contrast. You return valid HTML that displays immediately without errors."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+
+            # Extract the generated slide HTML content from OpenAI response
+            slide_html = completion.choices[0].message.content
+
+            # Validate that content was actually generated
+            if not slide_html:
+                raise Exception('No slide content generated')
+
+            # Clean up the response by extracting HTML from markdown code blocks
+            # OpenAI sometimes wraps HTML in markdown formatting that needs removal
+            if '```html' in slide_html:
+                # Extract content from HTML-specific code blocks
+                import re
+                html_match = re.search(r'```html\n([\s\S]*?)\n```', slide_html)
+                if html_match:
+                    slide_html = html_match.group(1)
+            elif '```' in slide_html:
+                # Extract content from generic code blocks
+                import re
+                code_match = re.search(r'```[a-zA-Z]*\n([\s\S]*?)\n```', slide_html)
+                if code_match:
+                    slide_html = code_match.group(1)
+
+            # RESPONSE VALIDATION: Debug logging to monitor OpenAI output quality and format
+            # These logs help troubleshoot issues with slide generation and ensure we receive valid HTML
+            logger.info(f'Generated slide HTML length: {len(slide_html)}')
+            logger.info(f'Generated slide HTML preview: {slide_html[:200]}...')
+
+            # CONTENT VALIDATION: Verify that OpenAI returned actual HTML markup
+            # Check for common HTML elements to ensure the response contains valid slide content
+            # This helps catch cases where OpenAI might return plain text or malformed responses
+            if not ('<div' in slide_html or '<html' in slide_html):
+                logger.warning('Warning: Generated content may not be valid HTML')
+
+            return slide_html.strip()  # Remove any leading/trailing whitespace
+
+        except Exception as e:
+            logger.error(f"Error generating slide HTML: {e}")
+            raise Exception(f"Failed to generate slide: {str(e)}") 

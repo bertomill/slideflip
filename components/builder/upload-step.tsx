@@ -36,6 +36,9 @@ type BackendMessage = {
     file_size?: number;
     file_type?: string;
     content_info?: { text?: string; text_length?: number };
+    status?: string;
+    message?: string;
+    note?: string;
   };
 };
 
@@ -86,10 +89,10 @@ export function UploadStep({
     descriptionRef.current = slideData.description;
   }, [slideData.description]);
 
-  // Handle backend messages
+  // Handle incoming WebSocket messages
   useEffect(() => {
     if (!lastMessage) return;
-    
+
     // Create a unique message ID to prevent processing the same message multiple times
     const messageId = `${lastMessage.type}_${Date.now()}_${JSON.stringify(lastMessage.data).slice(0, 50)}`;
     
@@ -265,17 +268,14 @@ export function UploadStep({
       if (isConnected && sendFileUpload) {
         for (const file of files) {
           try {
-            console.log('Uploading file to backend:', file.name);
-            setUploadStatus(`Uploading ${file.name}...`);
-            setParsingFiles(prev => {
-              const next = new Set(prev);
-              next.add(file.name);
-              console.log('Added file to parsing:', file.name);
-              return next;
-            });
-            await sendFileUpload(file);
+            console.log('🔍 Starting file upload for:', file.name);
+            console.log('🔍 File size:', file.size, 'bytes');
+            console.log('🔍 File type:', file.type);
+            
+            const success = await sendFileUpload(file);
+            console.log('🔍 sendFileUpload result for', file.name, ':', success);
           } catch (error) {
-            console.error('Failed to upload file:', error);
+            console.error('🔍 Error in sendFileUpload for', file.name, ':', error);
             setUploadStatus(`Failed to upload ${file.name}`);
             setParsingFiles(prev => {
               const next = new Set(prev);
@@ -289,9 +289,11 @@ export function UploadStep({
   }, [slideData.documents, updateSlideData, sendFileUpload, isConnected]);
 
   // Handle file selection through input element
-  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+  const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
       const files = Array.from(e.target.files);
+      
+      console.log('🔍 handleFileInput called with files:', files.map(f => f.name));
       
       // Update local state
       updateSlideData({ documents: [...slideData.documents, ...files] });
@@ -300,17 +302,14 @@ export function UploadStep({
       if (isConnected && sendFileUpload) {
         for (const file of files) {
           try {
-            console.log('Uploading file to backend:', file.name);
-            setUploadStatus(`Uploading ${file.name}...`);
-            setParsingFiles(prev => {
-              const next = new Set(prev);
-              next.add(file.name);
-              console.log('Added file to parsing:', file.name);
-              return next;
-            });
-            await sendFileUpload(file);
+            console.log('🔍 Starting file upload for:', file.name);
+            console.log('🔍 File size:', file.size, 'bytes');
+            console.log('🔍 File type:', file.type);
+            
+            const success = await sendFileUpload(file);
+            console.log('🔍 sendFileUpload result for', file.name, ':', success);
           } catch (error) {
-            console.error('Failed to upload file:', error);
+            console.error('🔍 Error in sendFileUpload for', file.name, ':', error);
             setUploadStatus(`Failed to upload ${file.name}`);
             setParsingFiles(prev => {
               const next = new Set(prev);
@@ -321,7 +320,7 @@ export function UploadStep({
         }
       }
     }
-  };
+  }, [slideData.documents, updateSlideData, sendFileUpload, isConnected]);
 
   // Remove a file from the uploaded documents list
   const removeFile = (index: number) => {
@@ -330,33 +329,39 @@ export function UploadStep({
   };
 
   // Convert pasted text into a virtual file and add to documents
-  const handlePasteText = async () => {
-    if (pastedText.trim()) {
-      const textFile = new File([pastedText], "pasted-text.txt", { type: "text/plain" });
-      updateSlideData({ documents: [...slideData.documents, textFile] });
-      
-      // Upload to backend if connected
-      if (isConnected && sendFileUpload) {
-        try {
-          console.log('Uploading pasted text to backend');
-          setUploadStatus('Uploading pasted text...');
-          setParsingFiles(prev => new Set(prev).add(textFile.name));
-          await sendFileUpload(textFile);
-        } catch (error) {
-          console.error('Failed to upload pasted text:', error);
-          setUploadStatus('Failed to upload pasted text');
-          setParsingFiles(prev => {
-            const next = new Set(prev);
-            next.delete(textFile.name);
-            return next;
-          });
-        }
+  const handlePasteText = useCallback(async (text: string) => {
+    console.log('🔍 handlePasteText called with text length:', text.length);
+    
+    // Create a virtual file from the pasted text
+    const file = new File([text], 'pasted-text.txt', { type: 'text/plain' });
+    
+    // Update local state
+    updateSlideData({ documents: [...slideData.documents, file] });
+    
+    // Upload to backend if connected
+    if (isConnected && sendFileUpload) {
+      try {
+        console.log('🔍 Calling sendFileUpload for pasted text');
+        setUploadStatus('Uploading pasted text...');
+        setParsingFiles(prev => {
+          const next = new Set(prev);
+          next.add('pasted-text.txt');
+          console.log('🔍 Added pasted-text.txt to parsing files');
+          return next;
+        });
+        const success = await sendFileUpload(file);
+        console.log('🔍 sendFileUpload result for pasted text:', success);
+      } catch (error) {
+        console.error('🔍 Error in sendFileUpload for pasted text:', error);
+        setUploadStatus('Failed to upload pasted text');
+        setParsingFiles(prev => {
+          const next = new Set(prev);
+          next.delete('pasted-text.txt');
+          return next;
+        });
       }
-      
-      setPastedText("");
-      setShowTextInput(false);
     }
-  };
+  }, [slideData.documents, updateSlideData, sendFileUpload, isConnected]);
 
   // Generate an example description using AI or fallback to static examples
   const generateExampleDescription = async () => {
@@ -503,7 +508,7 @@ export function UploadStep({
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={handlePasteText}
+                  onClick={() => handlePasteText(pastedText)}
                   disabled={!pastedText.trim()}
                 >
                   Add Text
@@ -530,14 +535,7 @@ export function UploadStep({
                   const parsedDoc = (slideData as any).parsedDocuments?.find((d: any) => d.filename === file.name);
                   const hasContent = parsedDoc && parsedDoc.success;
                   const hasFailed = parsedDoc && !parsedDoc.success;
-                  
-                  console.log('🔍 File display debug for:', file.name);
-                  console.log('🔍 isCurrentlyParsing:', isCurrentlyParsing);
-                  console.log('🔍 parsedDoc:', parsedDoc);
-                  console.log('🔍 hasContent:', hasContent);
-                  console.log('🔍 hasFailed:', hasFailed);
-                  console.log('🔍 slideData.parsedDocuments:', (slideData as any).parsedDocuments);
-                  
+                                   
                   return (
                     <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3 flex-1">

@@ -47,7 +47,7 @@ export default function TestBackendPage() {
     if (file) {
       try {
         setUploadStatus(`Uploading ${file.name}...`);
-        await sendFileUpload(file);
+        await sendFileUpload(file, true); // Always use knowledge graph for testing
         setUploadStatus(`Successfully uploaded ${file.name}`);
       } catch (error) {
         setUploadStatus(`Failed to upload ${file.name}: ${error}`);
