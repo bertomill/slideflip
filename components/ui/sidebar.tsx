@@ -55,6 +55,38 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
     const router = useRouter();
     const [showUserMenu, setShowUserMenu] = React.useState(false);
     const userMenuRef = React.useRef<HTMLDivElement>(null);
+    const [recentPresentations, setRecentPresentations] = React.useState<RecentPresentation[]>([]);
+    const [loadingRecent, setLoadingRecent] = React.useState(false);
+
+    // Fetch recent presentations
+    React.useEffect(() => {
+      const fetchRecentPresentations = async () => {
+        if (!user) return;
+        
+        setLoadingRecent(true);
+        try {
+          const supabase = createClient();
+          const { data, error } = await supabase
+            .from('presentations')
+            .select('id, title, current_step, status, updated_at, builder_status')
+            .order('updated_at', { ascending: false })
+            .limit(5);
+            
+          if (error) {
+            console.error('Error fetching recent presentations:', error);
+            return;
+          }
+          
+          setRecentPresentations(data || []);
+        } catch (error) {
+          console.error('Error fetching recent presentations:', error);
+        } finally {
+          setLoadingRecent(false);
+        }
+      };
+      
+      fetchRecentPresentations();
+    }, [user]);
 
     // Close dropdown when clicking outside
     React.useEffect(() => {

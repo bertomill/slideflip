@@ -693,7 +693,7 @@ export default function TemplatesPage() {
                   </Button>
                 </Link>
               </div>
-                )
+                )}
               </div>
             )}
           </div>
