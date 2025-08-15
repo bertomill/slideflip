@@ -18,13 +18,23 @@ import {
   User,
   UserPlus,
   Plus,
-  Edit
+  Edit,
+  Clock
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { InviteMembersModal } from "@/components/ui/invite-members-modal";
 import { SlideoLogo } from "@/components/slideo-logo";
+
+interface RecentPresentation {
+  id: string;
+  title: string;
+  current_step: number;
+  status: string;
+  updated_at: string;
+  builder_status?: string;
+}
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   user?: {

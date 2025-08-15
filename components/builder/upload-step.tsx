@@ -390,28 +390,51 @@ export function UploadStep({
     setArticleUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Process URLs and fetch content
+  // Process URLs and fetch content using ScrapingBee
   const handleProcessUrls = async () => {
     if (articleUrls.length === 0) return;
 
     setUploadStatus(`Processing ${articleUrls.length} article${articleUrls.length > 1 ? 's' : ''}...`);
     
-    // For now, create virtual files from URLs
-    // In production, this would call your web scraping API
-    for (const url of articleUrls) {
-      try {
-        const urlFile = new File([`Article URL: ${url}`], `article-${Date.now()}.txt`, { type: 'text/plain' });
-        updateSlideData({ documents: [...slideData.documents, urlFile] });
-        
-        if (isConnected && sendFileUpload) {
-          await sendFileUpload(urlFile);
-        }
-      } catch (error) {
-        console.error('Error processing URL:', url, error);
+    try {
+      // Send URLs to backend for processing with ScrapingBee
+      const response = await fetch('/api/scrape-articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ urls: articleUrls }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process articles');
       }
+
+      const data = await response.json();
+      
+      // Create files from scraped content
+      for (const article of data.articles) {
+        try {
+          const content = `Title: ${article.title}\nURL: ${article.url}\n\n${article.content}`;
+          const filename = `article-${article.title.slice(0, 30).replace(/[^a-zA-Z0-9]/g, '-')}.txt`;
+          const articleFile = new File([content], filename, { type: 'text/plain' });
+          
+          updateSlideData({ documents: [...slideData.documents, articleFile] });
+          
+          if (isConnected && sendFileUpload) {
+            await sendFileUpload(articleFile);
+          }
+        } catch (error) {
+          console.error('Error processing article:', article.url, error);
+        }
+      }
+      
+      setUploadStatus(`Successfully processed ${data.articles.length} article${data.articles.length > 1 ? 's' : ''}`);
+    } catch (error) {
+      console.error('Error processing URLs:', error);
+      setUploadStatus('Failed to process articles. Please try again.');
     }
     
-    setUploadStatus(`Successfully processed ${articleUrls.length} article URLs`);
     setTimeout(() => setUploadStatus(""), 3000);
     setArticleUrls([]);
     setShowUrlInput(false);

@@ -22,10 +22,10 @@ import { ChevronLeft, ChevronRight, Wifi, Database } from "lucide-react";
 // Step components that make up the slide builder workflow
 import { UploadStep } from "@/components/builder/upload-step";      // Step 1: Document upload and description
 import { ThemeStep } from "@/components/builder/theme-step";        // Step 2: Visual theme selection
-import { ResearchStep } from "@/components/builder/research-step";  // Step 3: Research options and data gathering
+// import { ResearchStep } from "@/components/builder/research-step";  // Step 3: Research options and data gathering (removed)
 // import { ContentStep } from "@/components/builder/content-step";    // Step 4: Content planning and user feedback (removed)
-import { PreviewStep } from "@/components/builder/preview-step-fabric"; // Step 5: AI slide generation and preview with Fabric.js
-// import { DownloadStep } from "@/components/builder/download-step";  // Step 6: Removed - export now happens in Preview step
+import { PreviewStep } from "@/components/builder/preview-step-fabric"; // Step 3: AI slide generation and preview with Fabric.js
+// import { DownloadStep } from "@/components/builder/download-step";  // Step 4: Removed - export now happens in Preview step
 
 // Supabase client for user authentication and session management
 import { createClient } from "@/lib/supabase/client";
@@ -37,17 +37,6 @@ import { useWebSocket } from "@/hooks/use-websocket";
 // TYPE DEFINITIONS: Data structures for the slide builder workflow
 // ============================================================================
 
-/**
- * Research configuration options that users can customize
- * Controls how external research is conducted via Tavily API
- */
-export type ResearchOptions = {
-  maxResults: number;       // Number of search results to return (1-10)
-  includeImages: boolean;   // Whether to include images in results
-  includeAnswer: 'basic' | 'advanced'; // Level of AI-generated answer
-  timeRange: 'day' | 'week' | 'month' | 'year' | 'all'; // Time range for search
-  excludeSocial: boolean;   // Whether to exclude social media sites
-};
 
 // Type definition for parsed document content
 export type ParsedDocument = {
@@ -69,9 +58,6 @@ export type SlideData = {
   description: string;      // User's description of what the slide should contain
   selectedTheme: string;    // Visual theme choice for the presentation
   selectedPalette?: string[]; // Hex colors chosen/generated for this slide
-  wantsResearch: boolean;   // Whether user wants additional research performed
-  researchOptions?: ResearchOptions; // Customizable research parameters
-  researchData?: string;    // Optional research results from external sources
   contentPlan?: string;     // AI-generated content plan for user review
   userFeedback?: string;    // User's feedback and additional requirements
   slideHtml?: string;       // Generated HTML content for the slide (legacy)
@@ -81,14 +67,13 @@ export type SlideData = {
 // Configuration for the multi-step slide builder process
 const steps = [
   { id: 1, name: "Upload", description: "Upload & describe" },
-  { id: 2, name: "Research", description: "Research options" },
-  { id: 3, name: "Theme", description: "Choose theme" },
-  { id: 4, name: "Preview", description: "Review & export" },
+  { id: 2, name: "Theme", description: "Choose theme" },
+  { id: 3, name: "Preview", description: "Review & export" },
 ];
 
 /**
  * Main SlideBuilder component that orchestrates the multi-step slide creation process
- * Manages state flow between upload, theme selection, research, preview, and download steps
+ * Manages state flow between upload, theme selection, and preview steps
  */
 function BuildInner() {
   // ============================================================================
@@ -124,20 +109,16 @@ function BuildInner() {
   // ============================================================================
   // SLIDE DATA MANAGEMENT: Centralized storage for all user inputs and AI outputs
   // ============================================================================
-  // This state object accumulates data as users progress through the 6-step workflow:
+  // This state object accumulates data as users progress through the 3-step workflow:
   // 1. Upload: documents[], description
-  // 2. Theme: selectedTheme
-  // 3. Research: wantsResearch, researchOptions, researchData
-  // 4. Content: contentPlan, userFeedback
-  // 5. Preview: slideHtml (AI-generated)
-  // 6. Download: Final PPTX export
+  // 2. Theme: selectedTheme, selectedPalette
+  // 3. Preview: slideHtml/slideJson (AI-generated), Final PPTX export
 
   const [slideData, setSlideData] = useState<SlideData>({
     title: "",               // Presentation title
     documents: [],           // User-uploaded files for slide content
     description: "",         // User's description of desired slide content
     selectedTheme: "",       // Visual theme choice (Professional, Modern, etc.)
-    wantsResearch: false,    // Whether to include external research data
   });
 
   // ============================================================================
@@ -282,9 +263,6 @@ function BuildInner() {
             parsedDocuments: presentation.parsed_documents || [],
             selectedTheme: presentation.selected_theme || '',
             selectedPalette: presentation.selected_palette || undefined,
-            wantsResearch: presentation.wants_research || false,
-            researchOptions: presentation.research_options || undefined,
-            researchData: presentation.research_data || undefined,
             slideHtml: presentation.slide_html || undefined,
             slideJson: presentation.slide_json || undefined,
             selectedModel: presentation.selected_model || undefined
@@ -377,9 +355,6 @@ function BuildInner() {
         if (updates.parsedDocuments !== undefined) dbUpdates.parsed_documents = updates.parsedDocuments;
         if (updates.selectedTheme !== undefined) dbUpdates.selected_theme = updates.selectedTheme;
         if (updates.selectedPalette !== undefined) dbUpdates.selected_palette = updates.selectedPalette;
-        if (updates.wantsResearch !== undefined) dbUpdates.wants_research = updates.wantsResearch;
-        if (updates.researchOptions !== undefined) dbUpdates.research_options = updates.researchOptions;
-        if (updates.researchData !== undefined) dbUpdates.research_data = updates.researchData;
         if (updates.slideHtml !== undefined) dbUpdates.slide_html = updates.slideHtml;
         if (updates.slideJson !== undefined) dbUpdates.slide_json = updates.slideJson;
         if ((updates as any).selectedModel !== undefined) dbUpdates.selected_model = (updates as any).selectedModel;
@@ -484,16 +459,6 @@ function BuildInner() {
         );
       case 2:
         return (
-          <ResearchStep 
-            slideData={slideData} 
-            updateSlideData={updateSlideData} 
-            onNext={nextStep} 
-             onPrev={prevStep}
-            sendGenerateSlide={sendGenerateSlide}
-          />
-        );
-      case 3:
-        return (
           <ThemeStep 
             slideData={slideData} 
             updateSlideData={updateSlideData} 
@@ -502,7 +467,7 @@ function BuildInner() {
             sendGenerateSlide={sendGenerateSlide}
           />
         );
-      case 4:
+      case 3:
         return (
           <PreviewStep 
             slideData={slideData} 
@@ -515,7 +480,6 @@ function BuildInner() {
             lastMessage={lastMessage}
           />
         );
-      // case 5: Content step removed - users go directly from Theme to Preview
       default:
         return null;
     }

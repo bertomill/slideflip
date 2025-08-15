@@ -9,6 +9,7 @@ import { PrivacyAgreementModal } from "@/components/privacy-agreement-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
 
 export function SignUpForm({
   className,
@@ -126,11 +127,15 @@ export function SignUpForm({
   return (
     <div className={cn("flex flex-col gap-6 text-foreground", className)} {...props}>
       {/* Logo and title */}
-      <div className="text-center mb-4">
+      <div className="text-center mb-6">
         <div className="flex justify-center mb-4">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-            <span className="text-primary font-bold text-lg">S</span>
-          </div>
+          <Image
+            src="/slideo-logo-white.svg"
+            alt="Slideo"
+            width={40}
+            height={40}
+            className="w-10 h-10"
+          />
         </div>
         <h1 className="text-2xl font-bold text-foreground mb-1">Sign up</h1>
         <p className="text-sm text-muted-foreground">Create a new account</p>

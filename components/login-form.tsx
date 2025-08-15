@@ -14,7 +14,7 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail]  = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,8 +70,12 @@ export function LoginForm({
       {/* Logo and title */}
       <div className="text-center mb-6">
         <div className="flex justify-center mb-4">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-            <span className="text-primary font-bold text-lg">S</span>
+          <div className="w-10 h-10 flex items-center justify-center">
+            <img 
+              src="/slideo-logo-white.svg" 
+              alt="Slideo Logo" 
+              className="w-10 h-10"
+            />
           </div>
         </div>
         <h1 className="text-2xl font-bold text-foreground mb-1">Sign in</h1>

@@ -41,6 +41,7 @@ export default function Page() {
                 pixelFadeInDuration={800}
                 maxAnimationDelay={1000}
                 colorRevealDelay={1200}
+                className="w-full h-full"
               />
             </div>
 
@@ -53,6 +54,7 @@ export default function Page() {
                 pixelFadeInDuration={900}
                 maxAnimationDelay={1100}
                 colorRevealDelay={1400}
+                className="w-full h-full"
               />
             </div>
 
@@ -65,6 +67,7 @@ export default function Page() {
                 pixelFadeInDuration={1000}
                 maxAnimationDelay={1200}
                 colorRevealDelay={1600}
+                className="w-full h-full"
               />
             </div>
           </div>

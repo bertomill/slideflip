@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Sidebar } from "@/components/ui/sidebar";
 import { MobileMenuButton } from "@/components/ui/mobile-menu-button";
-import { Layers, Sun, Moon, Plus, Edit2, Upload, FileText, MoreVertical, Trash2 } from "lucide-react";
+import { Layers, Sun, Moon, Plus, Edit2, Upload, FileText, MoreVertical, Trash2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { SlideDefinition } from "@/lib/slide-types";
 import { Canvas } from "fabric";
@@ -147,6 +147,10 @@ export default function TemplatesPage() {
   
   // Success notification state
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // Section collapse state
+  const [slideoTemplatesCollapsed, setSlideoTemplatesCollapsed] = useState(false);
+  const [myTemplatesCollapsed, setMyTemplatesCollapsed] = useState(false);
   
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -515,7 +519,18 @@ export default function TemplatesPage() {
           {/* Slideo Curated Templates Section - Only shown if templates exist */}
           {slideoTemplates.length > 0 && (
             <div className="mt-8">
-              <div className="flex items-center gap-2 mb-4">
+              <div 
+                className="flex items-center gap-2 mb-4 group/header cursor-pointer"
+                onClick={() => setSlideoTemplatesCollapsed(!slideoTemplatesCollapsed)}
+              >
+                {/* Collapsible triangle - shows on hover */}
+                <div className="opacity-0 group-hover/header:opacity-100 transition-opacity duration-200">
+                  <ChevronRight 
+                    className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                      slideoTemplatesCollapsed ? 'transform rotate-0' : 'transform rotate-90'
+                    }`} 
+                  />
+                </div>
                 {/* Visual icon to distinguish section */}
                 <div className="h-6 w-6 bg-primary/10 rounded-sm flex items-center justify-center">
                   <div className="h-3 w-3 bg-primary rounded-sm" />
@@ -523,9 +538,10 @@ export default function TemplatesPage() {
                 <h2 className="text-xl font-semibold text-foreground">Slideo Templates</h2>
                 <Badge variant="secondary" className="text-xs">Curated</Badge>
               </div>
-              {/* Responsive grid layout for template cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {slideoTemplates.map((t) => (
+              {/* Responsive grid layout for template cards - collapsible */}
+              {!slideoTemplatesCollapsed && (
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 animate-in slide-in-from-top-2 duration-300">
+                  {slideoTemplates.map((t) => (
                   <Card key={t.id} className="group hover:shadow-md transition-all duration-200 border-0 shadow-sm bg-card/50 backdrop-blur-sm">
                     <div className="p-0">
                       {/* Template preview thumbnail */}
@@ -559,15 +575,27 @@ export default function TemplatesPage() {
                         <p className="text-[10px] text-muted-foreground/60 line-clamp-2 leading-tight mb-2">{t.description}</p>
                       </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* User Templates Section */}
           <div className="mt-8">
-            <div className="flex items-center gap-2 mb-4">
+            <div 
+              className="flex items-center gap-2 mb-4 group/header cursor-pointer"
+              onClick={() => setMyTemplatesCollapsed(!myTemplatesCollapsed)}
+            >
+              {/* Collapsible triangle - shows on hover */}
+              <div className="opacity-0 group-hover/header:opacity-100 transition-opacity duration-200">
+                <ChevronRight 
+                  className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                    myTemplatesCollapsed ? 'transform rotate-0' : 'transform rotate-90'
+                  }`} 
+                />
+              </div>
               {/* Visual icon to distinguish from curated templates */}
               <div className="h-6 w-6 bg-secondary/10 rounded-sm flex items-center justify-center">
                 <div className="h-3 w-3 bg-secondary rounded-sm" />
@@ -576,9 +604,11 @@ export default function TemplatesPage() {
               <Badge variant="outline" className="text-xs">{templates.length}</Badge>
             </div>
             
-            {templates.length > 0 ? (
-              /* Grid of user templates */
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {!myTemplatesCollapsed && (
+              <div className="animate-in slide-in-from-top-2 duration-300">
+                {templates.length > 0 ? (
+                  /* Grid of user templates */
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {templates.map((t) => (
                   <Card key={t.id} className="group hover:shadow-md transition-all duration-200 border-0 shadow-sm bg-card/50 backdrop-blur-sm">
                     <div className="p-0">
@@ -662,6 +692,8 @@ export default function TemplatesPage() {
                     Create Template
                   </Button>
                 </Link>
+              </div>
+                )
               </div>
             )}
           </div>
