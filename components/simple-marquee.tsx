@@ -33,16 +33,16 @@ export function SimpleMarquee({
         className
       )}
     >
-      <div className={cn("flex shrink-0 gap-4", animationClass)}>
+      <div className={cn("flex shrink-0 gap-6", animationClass)}>
         {children}
       </div>
-      <div className={cn("flex shrink-0 gap-4", animationClass)}>
+      <div className={cn("flex shrink-0 gap-6 ml-6", animationClass)}>
         {children}
       </div>
-      <div className={cn("flex shrink-0 gap-4", animationClass)}>
+      <div className={cn("flex shrink-0 gap-6 ml-6", animationClass)}>
         {children}
       </div>
-      <div className={cn("flex shrink-0 gap-4", animationClass)}>
+      <div className={cn("flex shrink-0 gap-6 ml-6", animationClass)}>
         {children}
       </div>
     </div>

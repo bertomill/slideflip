@@ -635,40 +635,176 @@ function TemplateEditorInner() {
     }, 1000);
   };
   
-  // Generate AI response (placeholder - in real app would use actual AI)
+  // Generate AI response with enhanced canvas manipulation
   const generateAIResponse = (userInput: string): string => {
     const input = userInput.toLowerCase();
     
-    if (input.includes('text') || input.includes('title')) {
+    // Text-related commands
+    if (input.includes('text') || input.includes('title') || input.includes('heading')) {
+      if (input.includes('title') || input.includes('heading')) {
+        return 'I\'ve added a title text element to your slide. You can edit it by double-clicking. Would you like me to make it larger, center it, or change its style?';
+      }
       return 'I\'ve added a text element to your slide. You can edit it by clicking on it and typing. Would you like me to change the font, size, or color?';
-    } else if (input.includes('circle') || input.includes('round')) {
+    }
+    // Shape commands
+    else if (input.includes('circle') || input.includes('round')) {
       return 'I\'ve added a circle shape to your slide. You can resize it by dragging the corners or change its color in the Properties panel.';
-    } else if (input.includes('rectangle') || input.includes('box')) {
+    } 
+    else if (input.includes('rectangle') || input.includes('box') || input.includes('square')) {
       return 'I\'ve added a rectangle to your slide. You can move and resize it as needed. Would you like me to change its color or add a border?';
-    } else if (input.includes('icon')) {
+    }
+    else if (input.includes('triangle')) {
+      return 'I\'ve added a triangle shape to your slide. You can adjust its size and color as needed.';
+    }
+    else if (input.includes('line')) {
+      return 'I\'ve added a line to your slide. You can rotate and resize it to create dividers or arrows.';
+    }
+    // Icon commands
+    else if (input.includes('icon')) {
       return 'I\'ve added an icon to your slide. You can find more icons in the Icon Library section, organized by categories like Business, Communication, and Technology.';
-    } else if (input.includes('color') || input.includes('background')) {
-      return 'I can help you change colors! Select any element and use the Properties panel to adjust its fill and stroke colors. What specific color changes would you like?';
-    } else {
-      return 'I can help you add text, shapes, icons, or modify existing elements. Try asking me to &quot;add a title&quot;, &quot;create a circle&quot;, or &quot;add a business icon&quot;. What would you like to create?';
+    }
+    // Color and styling commands
+    else if (input.includes('color') || input.includes('background')) {
+      if (input.includes('background')) {
+        return 'I can help you change the background color! What color would you like? You can say things like "make it blue" or "change to red".';
+      }
+      return 'I can help you change colors! Select any element and I can modify its fill and stroke colors. What specific color changes would you like?';
+    }
+    // Layout commands
+    else if (input.includes('center') || input.includes('align')) {
+      return 'I can help you align and center elements on your slide. Select an element first, or tell me what you\'d like to center.';
+    }
+    // Size commands
+    else if (input.includes('larger') || input.includes('bigger') || input.includes('smaller') || input.includes('size')) {
+      return 'I can help you resize elements! Select an element first, then tell me if you want it larger or smaller.';
+    }
+    // Delete/remove commands
+    else if (input.includes('delete') || input.includes('remove') || input.includes('clear')) {
+      return 'I can help you remove elements! Select an element first, or tell me what type of element you\'d like to remove.';
+    }
+    // Default response
+    else {
+      return 'I can help you add text, shapes, icons, or modify existing elements. Try asking me to "add a title", "create a circle", "change the background color", or "make it larger". What would you like to create?';
     }
   };
   
-  // Apply AI-suggested changes to canvas
+  // Apply AI-suggested changes to canvas with enhanced functionality
   const applyAIChanges = (userInput: string) => {
+    if (!canvas) return;
+    
     const input = userInput.toLowerCase();
     
-    if (input.includes('text') || input.includes('title')) {
-      addText();
-    } else if (input.includes('circle') || input.includes('round')) {
-      addCircle();
-    } else if (input.includes('rectangle') || input.includes('box')) {
-      addRectangle();
-    } else if (input.includes('icon') && input.includes('business')) {
-      addIcon(Briefcase, 'Briefcase');
-    } else if (input.includes('icon')) {
-      addIcon(Star, 'Star');
+    // Text commands
+    if (input.includes('text') || input.includes('title') || input.includes('heading')) {
+      if (input.includes('title') || input.includes('heading')) {
+        // Add a larger, centered title
+        const title = new Textbox('Your Title Here', {
+          left: canvas.width! / 2 - 150,
+          top: 50,
+          width: 300,
+          fontSize: 32,
+          fill: '#333333',
+          fontFamily: 'Arial',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          editable: true,
+        });
+        canvas.add(title);
+        canvas.setActiveObject(title);
+      } else {
+        addText();
+      }
     }
+    // Shape commands
+    else if (input.includes('circle') || input.includes('round')) {
+      addCircle();
+    } 
+    else if (input.includes('rectangle') || input.includes('box') || input.includes('square')) {
+      addRectangle();
+    }
+    else if (input.includes('triangle')) {
+      addTriangle();
+    }
+    else if (input.includes('line')) {
+      addLine();
+    }
+    // Icon commands with better detection
+    else if (input.includes('icon')) {
+      if (input.includes('business') || input.includes('briefcase')) {
+        addIcon(Briefcase, 'Briefcase');
+      } else if (input.includes('target') || input.includes('goal')) {
+        addIcon(Target, 'Target');
+      } else if (input.includes('chart') || input.includes('graph')) {
+        addIcon(BarChart, 'Bar Chart');
+      } else if (input.includes('mail') || input.includes('email')) {
+        addIcon(Mail, 'Mail');
+      } else if (input.includes('phone')) {
+        addIcon(Phone, 'Phone');
+      } else if (input.includes('user') || input.includes('people')) {
+        addIcon(Users, 'Users');
+      } else if (input.includes('heart')) {
+        addIcon(Heart, 'Heart');
+      } else if (input.includes('star')) {
+        addIcon(Star, 'Star');
+      } else {
+        // Default to star icon
+        addIcon(Star, 'Star');
+      }
+    }
+    // Background color changes
+    else if (input.includes('background')) {
+      let color = '#ffffff'; // default
+      if (input.includes('blue')) color = '#e3f2fd';
+      else if (input.includes('red')) color = '#ffebee';
+      else if (input.includes('green')) color = '#e8f5e8';
+      else if (input.includes('yellow')) color = '#fffde7';
+      else if (input.includes('purple')) color = '#f3e5f5';
+      else if (input.includes('orange')) color = '#fff3e0';
+      else if (input.includes('gray') || input.includes('grey')) color = '#f5f5f5';
+      else if (input.includes('black')) color = '#000000';
+      
+      canvas.backgroundColor = color;
+    }
+    // Element modifications
+    else if (selectedObject) {
+      // Color changes for selected object
+      if (input.includes('color') || input.includes('blue') || input.includes('red') || input.includes('green')) {
+        let color = '#333333'; // default
+        if (input.includes('blue')) color = '#1976d2';
+        else if (input.includes('red')) color = '#d32f2f';
+        else if (input.includes('green')) color = '#388e3c';
+        else if (input.includes('yellow')) color = '#f57c00';
+        else if (input.includes('purple')) color = '#7b1fa2';
+        else if (input.includes('orange')) color = '#f57c00';
+        else if (input.includes('black')) color = '#000000';
+        else if (input.includes('white')) color = '#ffffff';
+        
+        selectedObject.set('fill', color);
+      }
+      // Size changes
+      else if (input.includes('larger') || input.includes('bigger')) {
+        const currentScale = selectedObject.scaleX || 1;
+        selectedObject.set({ scaleX: currentScale * 1.2, scaleY: currentScale * 1.2 });
+      }
+      else if (input.includes('smaller')) {
+        const currentScale = selectedObject.scaleX || 1;
+        selectedObject.set({ scaleX: currentScale * 0.8, scaleY: currentScale * 0.8 });
+      }
+      // Alignment
+      else if (input.includes('center')) {
+        selectedObject.set({
+          left: canvas.width! / 2 - (selectedObject.width! * (selectedObject.scaleX || 1)) / 2,
+          top: canvas.height! / 2 - (selectedObject.height! * (selectedObject.scaleY || 1)) / 2
+        });
+      }
+      // Delete
+      else if (input.includes('delete') || input.includes('remove')) {
+        canvas.remove(selectedObject);
+        setSelectedObject(null);
+      }
+    }
+    
+    canvas.renderAll();
   };
 
   // Zoom functions - scale the canvas dimensions themselves

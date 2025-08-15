@@ -9,6 +9,7 @@ import { PrivacyAgreementModal } from "@/components/privacy-agreement-modal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
 
 export function SignUpForm({
   className,
@@ -125,9 +126,18 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6 text-foreground", className)} {...props}>
-      {/* Main title */}
-      <div className="text-center mb-2">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Sign up</h1>
+      {/* Logo and title */}
+      <div className="text-center mb-4">
+        <div className="flex justify-center mb-4">
+          <Image
+            src="/slideo-logo-white.svg"
+            alt="Slideo Logo"
+            width={40}
+            height={40}
+            className="w-10 h-10"
+          />
+        </div>
+        <h1 className="text-2xl font-bold text-foreground mb-1">Sign up</h1>
         <p className="text-sm text-muted-foreground">Create a new account</p>
       </div>
 
@@ -135,7 +145,7 @@ export function SignUpForm({
       <Button 
         type="button"
         variant="outline" 
-        className="w-full h-12 rounded-full bg-background text-foreground border border-border hover:bg-muted font-medium"
+        className="w-full h-10 rounded-full bg-background text-foreground border border-border hover:bg-muted font-medium"
         disabled={isLoading}
         onClick={async () => {
           setIsLoading(true);
@@ -171,7 +181,7 @@ export function SignUpForm({
       </Button>
 
       {/* Separator */}
-      <div className="relative my-6">
+      <div className="relative my-4">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border"></div>
         </div>
@@ -181,7 +191,7 @@ export function SignUpForm({
       </div>
 
       <form onSubmit={handleSignUpSubmit}>
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -191,7 +201,7 @@ export function SignUpForm({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-12 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
+              className="h-10 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
             />
           </div>
           <div className="space-y-2">
@@ -202,7 +212,7 @@ export function SignUpForm({
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-12 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
+              className="h-10 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
             />
           </div>
           <div className="space-y-2">
@@ -213,15 +223,15 @@ export function SignUpForm({
               required
               value={repeatPassword}
               onChange={(e) => setRepeatPassword(e.target.value)}
-              className="h-12 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
+              className="h-10 rounded-full border-border focus:border-[hsl(var(--old-lavender))] focus:ring-[hsl(var(--old-lavender))] bg-background text-foreground"
             />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" className="w-full h-12 rounded-full text-white bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 disabled:opacity-50" disabled={isLoading}>
+          <Button type="submit" className="w-full h-10 rounded-full text-white bg-gradient-to-r from-[hsl(var(--old-lavender-light))] to-[hsl(var(--old-lavender))] hover:from-[hsl(var(--old-lavender))] hover:to-[hsl(var(--old-lavender))] border-0 disabled:opacity-50" disabled={isLoading}>
             {isLoading ? "Creating an account..." : "Sign up"}
           </Button>
         </div>
-        <div className="mt-4 text-center text-sm">
+        <div className="mt-3 text-center text-sm">
           Already have an account?{" "}
           <Link href="/auth/login" className="text-[hsl(var(--old-lavender))] hover:text-[hsl(var(--old-lavender))]/90 underline-offset-4 hover:underline font-medium">
             Login

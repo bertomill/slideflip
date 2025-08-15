@@ -319,7 +319,7 @@ export default function Home() {
               {/* Welcome Header - personalized greeting for authenticated users */}
               <div className="mb-8">
                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                  Welcome! 👋
+                  Welcome back, {user.user_metadata?.full_name ? user.user_metadata.full_name.split(' ')[0] : user.email?.split('@')[0]}! 👋
                 </h1>
                     <p className="text-muted-foreground">
                       This is your Slideo dashboard. Explore tools to build your presentations & create stunning slides.
