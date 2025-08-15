@@ -1,18 +1,36 @@
 "use client";
 
 import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
-import { Canvas, Textbox, Rect, Circle, Line, Triangle, FabricObject } from 'fabric';
+import ReactDOM from 'react-dom/client';
+import { Canvas, Textbox, Rect, Circle, Line, Triangle, FabricObject, fabric } from 'fabric';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sidebar } from '@/components/ui/sidebar';
 import { 
   Type, Square, Circle as CircleIcon, Minus, Triangle as TriangleIcon,
   Save, Download, Trash2, Copy, Bold, Italic, Underline,
   AlignLeft, AlignCenter, AlignRight, Eye, EyeOff, Menu,
-  ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight
+  ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight,
+  // Business Icons
+  Briefcase, Target, TrendingUp, BarChart, PieChart, DollarSign,
+  // Communication Icons  
+  Mail, Phone, MessageCircle, Users, UserCheck, Send,
+  // Technology Icons
+  Monitor, Smartphone, Wifi, Database, Cloud, Cpu,
+  // Nature Icons
+  Sun, Moon, Star, Leaf, TreePine, Flower,
+  // Arrows
+  ArrowRight, ArrowLeft, ArrowUp, ArrowDown, ArrowUpRight, ArrowDownLeft,
+  // General
+  Heart, Home, Settings, Search, Calendar, Clock,
+  // Upload
+  Upload, Image, FileImage,
+  // AI Chat
+  Bot, MessageSquare, Sparkles, Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -398,6 +416,230 @@ function TemplateEditorInner() {
     updateSelectedProperty('textAlign', align);
   };
 
+  // Set font family
+  const setFontFamily = (fontFamily: string) => {
+    if (!selectedObject || selectedObject.type !== 'textbox') return;
+    updateSelectedProperty('fontFamily', fontFamily);
+  };
+
+  // Common font families
+  const fontFamilies = [
+    { value: 'Arial', label: 'Arial' },
+    { value: 'Helvetica', label: 'Helvetica' },
+    { value: 'Times New Roman', label: 'Times New Roman' },
+    { value: 'Georgia', label: 'Georgia' },
+    { value: 'Verdana', label: 'Verdana' },
+    { value: 'Trebuchet MS', label: 'Trebuchet MS' },
+    { value: 'Courier New', label: 'Courier New' },
+    { value: 'Impact', label: 'Impact' },
+    { value: 'Comic Sans MS', label: 'Comic Sans MS' },
+  ];
+
+  // Icon library organized by categories
+  const iconLibrary = {
+    business: [
+      { icon: Briefcase, name: 'Briefcase' },
+      { icon: Target, name: 'Target' },
+      { icon: TrendingUp, name: 'Trending Up' },
+      { icon: BarChart, name: 'Bar Chart' },
+      { icon: PieChart, name: 'Pie Chart' },
+      { icon: DollarSign, name: 'Dollar Sign' },
+    ],
+    communication: [
+      { icon: Mail, name: 'Mail' },
+      { icon: Phone, name: 'Phone' },
+      { icon: MessageCircle, name: 'Message' },
+      { icon: Users, name: 'Users' },
+      { icon: UserCheck, name: 'User Check' },
+      { icon: Send, name: 'Send' },
+    ],
+    technology: [
+      { icon: Monitor, name: 'Monitor' },
+      { icon: Smartphone, name: 'Smartphone' },
+      { icon: Wifi, name: 'Wifi' },
+      { icon: Database, name: 'Database' },
+      { icon: Cloud, name: 'Cloud' },
+      { icon: Cpu, name: 'CPU' },
+    ],
+    nature: [
+      { icon: Sun, name: 'Sun' },
+      { icon: Moon, name: 'Moon' },
+      { icon: Star, name: 'Star' },
+      { icon: Leaf, name: 'Leaf' },
+      { icon: TreePine, name: 'Tree' },
+      { icon: Flower, name: 'Flower' },
+    ],
+    arrows: [
+      { icon: ArrowRight, name: 'Arrow Right' },
+      { icon: ArrowLeft, name: 'Arrow Left' },
+      { icon: ArrowUp, name: 'Arrow Up' },
+      { icon: ArrowDown, name: 'Arrow Down' },
+      { icon: ArrowUpRight, name: 'Arrow Up Right' },
+      { icon: ArrowDownLeft, name: 'Arrow Down Left' },
+    ],
+    general: [
+      { icon: Heart, name: 'Heart' },
+      { icon: Home, name: 'Home' },
+      { icon: Settings, name: 'Settings' },
+      { icon: Search, name: 'Search' },
+      { icon: Calendar, name: 'Calendar' },
+      { icon: Clock, name: 'Clock' },
+    ],
+  };
+
+  // Icon SVG path data - simplified approach using predefined SVG strings
+  const getIconSVG = (iconName: string): string => {
+    const iconPaths: Record<string, string> = {
+      'Briefcase': '<path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+      'Target': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+      'Trending Up': '<polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/><polyline points="16,7 22,7 22,13"/>',
+      'Bar Chart': '<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>',
+      'Pie Chart': '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="m22 12-10-10v10z"/>',
+      'Dollar Sign': '<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+      'Mail': '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-10 5L2 7"/>',
+      'Phone': '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+      'Message': '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+      'Users': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m22 21-3.5-3.5M17 8.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/>',
+      'Heart': '<path d="m19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/>',
+      'Star': '<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>',
+    };
+    
+    const pathData = iconPaths[iconName] || '<text x="12" y="16" text-anchor="middle" font-size="8">Icon</text>';
+    
+    return `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      ${pathData}
+    </svg>`;
+  };
+
+  // Add icon to canvas using proper SVG loading
+  const addIcon = (IconComponent: React.ComponentType<{ className?: string }>, iconName: string) => {
+    if (!canvas) return;
+    
+    try {
+      // Get SVG string for the icon
+      const svgString = getIconSVG(iconName);
+      
+      // Load SVG into Fabric.js canvas
+      fabric.loadSVGFromString(svgString, (objects, options) => {
+        const icon = fabric.util.groupSVGElements(objects, options);
+        
+        // Set position and properties
+        icon.set({
+          left: 100,
+          top: 100,
+          scaleX: 1,
+          scaleY: 1,
+        });
+        
+        canvas.add(icon);
+        canvas.setActiveObject(icon);
+        canvas.renderAll();
+      });
+    } catch (error) {
+      console.error('Error adding icon:', error);
+      
+      // Fallback: create a simple text element
+      const iconText = new Textbox(iconName, {
+        left: 100,
+        top: 100,
+        width: 80,
+        height: 30,
+        fontSize: 14,
+        fill: '#333333',
+        fontFamily: 'Arial',
+        textAlign: 'center',
+        editable: true,
+      });
+      
+      canvas.add(iconText);
+      canvas.setActiveObject(iconText);
+      canvas.renderAll();
+    }
+  };
+
+  // State for selected icon category
+  const [selectedIconCategory, setSelectedIconCategory] = useState<string>('business');
+  
+  // State for right sidebar mode
+  const [rightSidebarMode, setRightSidebarMode] = useState<'editor' | 'ai'>('editor');
+  
+  // State for AI chat
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, role: 'user' | 'assistant', content: string, timestamp: Date}>>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: 'Hi! I\'m your AI design assistant. I can help you modify your slide template by adding elements, changing colors, adjusting layouts, and more. What would you like to do?',
+      timestamp: new Date()
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  
+  // Handle AI chat submission
+  const handleChatSubmit = async () => {
+    if (!chatInput.trim()) return;
+    
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: chatInput,
+      timestamp: new Date()
+    };
+    
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    
+    // Simulate AI response (in a real app, this would call an AI API)
+    setTimeout(() => {
+      const aiResponse = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: generateAIResponse(chatInput),
+        timestamp: new Date()
+      };
+      
+      setChatMessages(prev => [...prev, aiResponse]);
+      
+      // Apply the requested changes to the canvas
+      applyAIChanges(chatInput);
+    }, 1000);
+  };
+  
+  // Generate AI response (placeholder - in real app would use actual AI)
+  const generateAIResponse = (userInput: string): string => {
+    const input = userInput.toLowerCase();
+    
+    if (input.includes('text') || input.includes('title')) {
+      return 'I\'ve added a text element to your slide. You can edit it by clicking on it and typing. Would you like me to change the font, size, or color?';
+    } else if (input.includes('circle') || input.includes('round')) {
+      return 'I\'ve added a circle shape to your slide. You can resize it by dragging the corners or change its color in the Properties panel.';
+    } else if (input.includes('rectangle') || input.includes('box')) {
+      return 'I\'ve added a rectangle to your slide. You can move and resize it as needed. Would you like me to change its color or add a border?';
+    } else if (input.includes('icon')) {
+      return 'I\'ve added an icon to your slide. You can find more icons in the Icon Library section, organized by categories like Business, Communication, and Technology.';
+    } else if (input.includes('color') || input.includes('background')) {
+      return 'I can help you change colors! Select any element and use the Properties panel to adjust its fill and stroke colors. What specific color changes would you like?';
+    } else {
+      return 'I can help you add text, shapes, icons, or modify existing elements. Try asking me to "add a title", "create a circle", or "add a business icon". What would you like to create?';
+    }
+  };
+  
+  // Apply AI-suggested changes to canvas
+  const applyAIChanges = (userInput: string) => {
+    const input = userInput.toLowerCase();
+    
+    if (input.includes('text') || input.includes('title')) {
+      addText();
+    } else if (input.includes('circle') || input.includes('round')) {
+      addCircle();
+    } else if (input.includes('rectangle') || input.includes('box')) {
+      addRectangle();
+    } else if (input.includes('icon') && input.includes('business')) {
+      addIcon(Briefcase, 'Briefcase');
+    } else if (input.includes('icon')) {
+      addIcon(Star, 'Star');
+    }
+  };
+
   // Zoom functions - scale the canvas dimensions themselves
   const updateCanvasSize = useCallback((zoom: number) => {
     if (!canvas || !containerRef.current) return;
@@ -776,6 +1018,30 @@ function TemplateEditorInner() {
             {rightSidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
           
+          {/* Mode Toggle Buttons - Only show when expanded */}
+          {!rightSidebarCollapsed && (
+            <div className="absolute top-4 right-4 z-10 flex gap-1 bg-background/90 backdrop-blur-sm rounded-lg border p-1">
+              <Button
+                variant={rightSidebarMode === 'editor' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setRightSidebarMode('editor')}
+                className="h-8 px-3"
+              >
+                <Type className="h-4 w-4 mr-1" />
+                <span className="text-xs">Editor</span>
+              </Button>
+              <Button
+                variant={rightSidebarMode === 'ai' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setRightSidebarMode('ai')}
+                className="h-8 px-3"
+              >
+                <Bot className="h-4 w-4 mr-1" />
+                <span className="text-xs">AI Chat</span>
+              </Button>
+            </div>
+          )}
+          
           {/* Collapsed Icons */}
           {rightSidebarCollapsed && (
             <div className="flex flex-col items-center pt-16 space-y-3">
@@ -813,32 +1079,72 @@ function TemplateEditorInner() {
             "h-full overflow-y-auto",
             rightSidebarCollapsed && "hidden"
           )}>
-            <div className="p-4 space-y-4 sm:space-y-6 pt-14">
+            {rightSidebarMode === 'editor' ? (
+              /* Editor Mode */
+              <div className="p-4 space-y-4 sm:space-y-6 pt-14">
               {/* Add Elements */}
               <Card variant="glass" className="card-contrast">
                 <CardHeader className="p-3 sm:p-4">
                   <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-semibold tracking-tight">
                     <Type className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                    Add Elements
+                    Elements
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" size="sm" onClick={addText}>
+                <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3">
+                  {/* Text */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Text</Label>
+                    <Button 
+                      variant="outline" 
+                      onClick={addText}
+                      className="w-full justify-start gap-2 h-10 hover:bg-accent transition-colors"
+                    >
                       <Type className="h-4 w-4" />
+                      Add Text
                     </Button>
-                    <Button variant="outline" size="sm" onClick={addRectangle}>
-                      <Square className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={addCircle}>
-                      <CircleIcon className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={addLine}>
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={addTriangle}>
-                      <TriangleIcon className="h-4 w-4" />
-                    </Button>
+                  </div>
+                  
+                  {/* Basic Shapes */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Basic Shapes</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={addRectangle}
+                        className="h-10 flex flex-col items-center justify-center gap-1 hover:bg-accent transition-colors"
+                        title="Rectangle"
+                      >
+                        <Square className="h-4 w-4" />
+                        <span className="text-xs">Rectangle</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={addCircle}
+                        className="h-10 flex flex-col items-center justify-center gap-1 hover:bg-accent transition-colors"
+                        title="Circle"
+                      >
+                        <CircleIcon className="h-4 w-4" />
+                        <span className="text-xs">Circle</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={addTriangle}
+                        className="h-10 flex flex-col items-center justify-center gap-1 hover:bg-accent transition-colors"
+                        title="Triangle"
+                      >
+                        <TriangleIcon className="h-4 w-4" />
+                        <span className="text-xs">Triangle</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={addLine}
+                        className="h-10 flex flex-col items-center justify-center gap-1 hover:bg-accent transition-colors"
+                        title="Line"
+                      >
+                        <Minus className="h-4 w-4" />
+                        <span className="text-xs">Line</span>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -872,6 +1178,31 @@ function TemplateEditorInner() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3">
+                  {/* Font Family */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Font Family</Label>
+                    <Select 
+                      value={selectedObject?.type === 'textbox' ? selectedObject.fontFamily || 'Arial' : 'Arial'}
+                      onValueChange={setFontFamily}
+                      disabled={!selectedObject || selectedObject.type !== 'textbox'}
+                    >
+                      <SelectTrigger className={cn(
+                        "w-full text-sm",
+                        (!selectedObject || selectedObject.type !== 'textbox') && "opacity-50 cursor-not-allowed"
+                      )}>
+                        <SelectValue placeholder="Select font" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fontFamilies.map((font) => (
+                          <SelectItem key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                            {font.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Font Styling */}
                   <div className="flex gap-1">
                     <Button
                       variant={selectedObject?.type === 'textbox' && selectedObject.fontWeight === 'bold' ? 'default' : 'outline'}
@@ -941,6 +1272,95 @@ function TemplateEditorInner() {
                     >
                       <AlignRight className="h-4 w-4" />
                     </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Icon Library */}
+              <Card variant="glass">
+                <CardHeader className="p-3 sm:p-4">
+                  <CardTitle className="text-base sm:text-lg font-semibold tracking-tight">
+                    Icon Library
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3">
+                  {/* Category Tabs */}
+                  <div className="flex flex-wrap gap-1">
+                    {Object.keys(iconLibrary).map((category) => (
+                      <Button
+                        key={category}
+                        variant={selectedIconCategory === category ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedIconCategory(category)}
+                        className="text-xs px-2 py-1 h-auto"
+                      >
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  {/* Icon Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {iconLibrary[selectedIconCategory as keyof typeof iconLibrary]?.map((iconItem, index) => {
+                      const IconComponent = iconItem.icon;
+                      return (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addIcon(IconComponent, iconItem.name)}
+                          className="h-16 w-full flex flex-col items-center justify-center gap-1 p-2 hover:bg-accent transition-colors"
+                          title={iconItem.name}
+                        >
+                          <IconComponent className="h-5 w-5 flex-shrink-0" />
+                          <span className="text-[9px] text-muted-foreground truncate w-full text-center leading-tight">
+                            {iconItem.name.split(' ')[0]}
+                          </span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Media Upload */}
+              <Card variant="glass">
+                <CardHeader className="p-3 sm:p-4">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold tracking-tight">
+                    <Image className="h-4 w-4 text-primary" />
+                    Media
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                  {/* File Upload Dropzone */}
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="h-8 w-8 text-muted-foreground" />
+                      <div className="text-sm text-muted-foreground">
+                        <span className="font-medium">Drop images here</span> or{' '}
+                        <label className="text-primary cursor-pointer hover:underline">
+                          browse
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => {
+                              // Handle file upload - placeholder for now
+                              console.log('Files selected:', e.target.files);
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        PNG, JPG, SVG up to 10MB
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Placeholder for uploaded images */}
+                  <div className="mt-3 text-xs text-muted-foreground text-center">
+                    No images uploaded yet
                   </div>
                 </CardContent>
               </Card>

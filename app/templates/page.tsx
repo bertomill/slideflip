@@ -141,6 +141,9 @@ export default function TemplatesPage() {
   // Template deletion state
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   
+  // Success notification state
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
   // Confirmation dialog state
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -270,8 +273,13 @@ export default function TemplatesPage() {
           .limit(24);
         setTemplates((userTemplates as TemplateRow[]) || []);
         
-        // Show success message
-        alert(`Successfully imported "${templateName}" as a template!`);
+        // Show success notification
+        setSuccessMessage(`Successfully imported "${templateName}" as a template!`);
+        
+        // Auto-hide success message after 4 seconds
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 4000);
       } else {
         throw new Error(result.error || 'Failed to convert PPTX');
       }
@@ -310,13 +318,19 @@ export default function TemplatesPage() {
       // Refresh templates list by removing the deleted template
       setTemplates(prev => prev.filter(t => t.id !== templateId));
       
-      // Show success message
-      alert(`Template "${templateName}" has been deleted successfully.`);
+      // Show success notification
+      setSuccessMessage(`Template "${templateName}" has been deleted successfully.`);
+      
+      // Auto-hide success message after 4 seconds
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 4000);
     } catch (error) {
       console.error('Delete template error:', error);
       alert(error instanceof Error ? error.message : 'Failed to delete template');
     } finally {
       setDeletingTemplateId(null);
+      setConfirmDialog({ open: false, templateId: "", templateName: "" });
     }
   };
 
@@ -412,6 +426,26 @@ export default function TemplatesPage() {
               </>
             </div>
           </div>
+
+          {/* Success notification for operations */}
+          {successMessage && (
+            <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 bg-green-500 rounded-full flex items-center justify-center">
+                  <div className="h-2 w-2 bg-white rounded-full" />
+                </div>
+                <span className="text-green-700 dark:text-green-400 text-sm font-medium">{successMessage}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSuccessMessage(null)}
+                  className="ml-auto text-green-500 hover:text-green-700"
+                >
+                  ✕
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Error display for upload failures */}
           {uploadError && (
@@ -586,6 +620,18 @@ export default function TemplatesPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Template Deletion */}
+      <ConfirmationDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Template"
+        description={`Are you sure you want to delete "${confirmDialog.templateName}"? This action cannot be undone.`}
+        onConfirm={performDeleteTemplate}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   );
 }
