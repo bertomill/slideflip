@@ -3,7 +3,8 @@ Main API router for SlideFlip Backend
 Contains all HTTP endpoints
 """
 
-from src.core.websocket_manager import WebSocketManager
+# Note: websocket_manager will be injected from main.py via init_debug_endpoints
+# from src.core.improved_websocket_manager import websocket_manager
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -40,12 +41,18 @@ else:
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Initialize services
+# Initialize services (these will be injected from main.py)
 file_service = FileService()
-websocket_manager = WebSocketManager()
+websocket_manager = None  # Will be injected from main.py
 
 # Create router
 router = APIRouter(prefix="/api", tags=["api"])
+
+
+def init_api_endpoints(ws_manager):
+    """Initialize the API endpoints with required services"""
+    global websocket_manager
+    websocket_manager = ws_manager
 
 # Pydantic models for embedding API
 
@@ -83,6 +90,17 @@ async def root():
 @router.get("/health")
 async def health_check():
     """Detailed health check"""
+    if not websocket_manager:
+        return {
+            "status": "healthy",
+            "version": "1.0.0",
+            "services": {
+                "file_service": "running",
+                "slide_service": "running",
+                "websocket_manager": "not_initialized"
+            }
+        }
+
     stats = websocket_manager.get_connection_stats()
     return {
         "status": "healthy",
@@ -99,6 +117,12 @@ async def health_check():
 @router.get("/debug/connections")
 async def debug_connections():
     """Debug endpoint to show current WebSocket connections"""
+    if not websocket_manager:
+        return {
+            "stats": "websocket_manager not available",
+            "connections": "websocket_manager not available"
+        }
+
     stats = websocket_manager.get_connection_stats()
     connections = websocket_manager.get_all_connection_info()
     return {

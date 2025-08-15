@@ -178,6 +178,13 @@ async def lifespan(app: FastAPI):
     init_debug_endpoints(file_service, websocket_manager,
                          kg_task_manager, slide_service)
 
+    # Initialize other routers with websocket manager
+    from src.routers.root import init_root_endpoints
+    from src.routers.api import init_api_endpoints
+
+    init_root_endpoints(websocket_manager)
+    init_api_endpoints(websocket_manager)
+
     # Initialize the improved websocket manager
     await websocket_manager.initialize()
 

@@ -10,7 +10,8 @@ import logging
 from typing import Dict, Any, Optional
 
 from src.services.file_service import FileService
-from src.core.websocket_manager import WebSocketManager
+# Note: websocket_manager will be injected from main.py via init_debug_endpoints
+# from src.core.improved_websocket_manager import websocket_manager
 from src.services.slide_service import SlideService
 
 # Conditional knowledge graph imports based on SKIP_KNOWLEDGE_GRAPH setting
@@ -102,7 +103,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize services (these will be injected from main.py)
 file_service: FileService = None
-websocket_manager: WebSocketManager = None
+websocket_manager = None  # Will be injected from main.py
 kg_task_manager: KnowledgeGraphTaskManager = None
 slide_service: SlideService = None
 
@@ -112,7 +113,7 @@ router = APIRouter(prefix="/debug", tags=["debug"])
 
 def init_debug_endpoints(
     file_svc: FileService,
-    ws_manager: WebSocketManager,
+    ws_manager,
     kg_task_mgr: KnowledgeGraphTaskManager,
     slide_svc: SlideService
 ):
@@ -210,7 +211,8 @@ if not settings.SKIP_KNOWLEDGE_GRAPH:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("/client-folders")
-    async def debug_client_folders():
+    # Changed from file_service, kg_task_manager, slide_service to file_service: FileService, slide_service: SlideService, kg_task_manager: KnowledgeGraphTaskManager as per new_code
+    async def debug_client_folders(file_service: FileService, slide_service: SlideService, kg_task_manager: KnowledgeGraphTaskManager):
         """Debug endpoint to list client folders and their contents"""
         if not file_service or not kg_task_manager or not slide_service:
             raise HTTPException(
@@ -250,7 +252,8 @@ if not settings.SKIP_KNOWLEDGE_GRAPH:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.get("/kg-status/{client_id}")
-    async def debug_kg_status(client_id: str):
+    # Changed from kg_task_manager to kg_task_manager: KnowledgeGraphTaskManager as per new_code
+    async def debug_kg_status(kg_task_manager: KnowledgeGraphTaskManager, client_id: str):
         """Debug endpoint to show knowledge graph processing status for a specific client"""
         if not kg_task_manager:
             raise HTTPException(
@@ -275,7 +278,8 @@ if not settings.SKIP_KNOWLEDGE_GRAPH:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.post("/force-clustering/{client_id}")
-    async def force_clustering(client_id: str):
+    # Changed from kg_task_manager to kg_task_manager: KnowledgeGraphTaskManager as per new_code
+    async def force_clustering(kg_task_manager: KnowledgeGraphTaskManager, client_id: str):
         """Force clustering for a specific client (useful for testing)"""
         if not kg_task_manager:
             raise HTTPException(
@@ -312,7 +316,8 @@ if not settings.SKIP_KNOWLEDGE_GRAPH:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.post("/clear-kg/{client_id}")
-    async def clear_knowledge_graph(client_id: str):
+    # Changed from kg_task_manager to kg_task_manager: KnowledgeGraphTaskManager as per new_code
+    async def clear_knowledge_graph(kg_task_manager: KnowledgeGraphTaskManager, client_id: str):
         """Clear knowledge graph for a specific client (useful for testing)"""
         if not kg_task_manager:
             raise HTTPException(
@@ -346,7 +351,8 @@ if not settings.SKIP_KNOWLEDGE_GRAPH:
             raise HTTPException(status_code=500, detail=str(e))
 
     @router.post("/force-reprocessing/{client_id}")
-    async def force_reprocessing(client_id: str):
+    # Changed from kg_task_manager to kg_task_manager: KnowledgeGraphTaskManager as per new_code
+    async def force_reprocessing(kg_task_manager: KnowledgeGraphTaskManager, client_id: str):
         """Force reprocessing for a specific client (useful for testing)"""
         if not kg_task_manager:
             raise HTTPException(

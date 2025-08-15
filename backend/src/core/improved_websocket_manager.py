@@ -88,6 +88,18 @@ class ClientSession:
         ])
         self.overall_progress = int((completed_steps / total_steps) * 100)
 
+    def get_all_step_data(self) -> Dict[str, Any]:
+        """Get all step data for compatibility with old routers"""
+        return {
+            "step_1_upload": self.step_1_upload,
+            "step_1b_slide_description": self.step_1b_slide_description,
+            "step_2_theme": self.step_2_theme,
+            "step_3_research": self.step_3_research,
+            "step_4_content": self.step_4_content,
+            "step_5_preview": self.step_5_preview,
+            "overall_progress": self.overall_progress
+        }
+
 
 class ImprovedWebSocketManager:
     """Enhanced WebSocket manager with better connection handling"""
@@ -412,6 +424,21 @@ class ImprovedWebSocketManager:
                     "current_step": session.current_step,
                     "status": session.status.value,
                     "processing": session.processing
+                }
+                for client_id, session in self._sessions.items()
+            }
+        }
+
+    def get_all_connection_info(self) -> Dict[str, Any]:
+        """Get information about all connections for compatibility with old routers"""
+        return {
+            "total_connections": len(self._sessions),
+            "clients": {
+                client_id: {
+                    "client_id": client_id,
+                    "connected_at": session.connected_at.isoformat(),
+                    "connection_duration": (datetime.now() - session.connected_at).total_seconds(),
+                    "data": session.get_all_step_data()
                 }
                 for client_id, session in self._sessions.items()
             }
