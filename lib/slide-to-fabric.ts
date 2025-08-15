@@ -187,6 +187,9 @@ function renderShapeObject(canvas: Canvas, obj: ShapeObject) {
 /**
  * Render image object on canvas
  */
+/**
+ * Render image object on canvas
+ */
 function renderImageObject(canvas: Canvas, obj: any) {
   console.log('🖼️ Rendering image object:', obj);
   const { path, options } = obj;
@@ -202,9 +205,10 @@ function renderImageObject(canvas: Canvas, obj: any) {
     pixels: { left, top, width, height }
   });
   
-  // Load and add image to canvas
+  // Load and add image to canvas with proper error handling
   console.log('🔗 Loading image from URL:', path);
   
+  // Enhanced error handling for missing images
   FabricImage.fromURL(path, {
     crossOrigin: 'anonymous'
   }).then((fabricImage) => {
@@ -217,38 +221,42 @@ function renderImageObject(canvas: Canvas, obj: any) {
       evented: true
     });
     
-    console.log('🖼️ Fabric image created:', {
-      src: path.substring(0, 50) + '...',
-      position: { left, top },
-      size: { width, height },
-      scale: { 
-        x: width / (fabricImage.width || 1), 
-        y: height / (fabricImage.height || 1) 
-      }
-    });
-    
-    console.log('➕ Adding image to canvas...');
+    console.log('✅ Image loaded successfully:', path.substring(0, 50) + '...');
     canvas.add(fabricImage);
-    console.log('✅ Image added to canvas');
     canvas.renderAll();
   }).catch((error) => {
-    console.error('❌ Failed to load image:', error);
+    console.warn('⚠️ Failed to load image, creating placeholder:', error.message);
+    console.warn('🔗 Failed URL:', path);
     
-    // Fallback: create a placeholder rectangle
+    // Create a more informative placeholder
     const placeholder = new Rect({
       left: left,
       top: top,
       width: width,
       height: height,
-      fill: '#f0f0f0',
-      stroke: '#cccccc',
+      fill: '#f8f9fa',
+      stroke: '#dee2e6',
       strokeWidth: 2,
       selectable: true,
       evented: true
     });
     
-    console.log('📦 Adding placeholder rectangle for failed image');
+    // Add text to show it's a missing image
+    const placeholderText = new Textbox('Image not found', {
+      left: left + 10,
+      top: top + height / 2 - 10,
+      width: width - 20,
+      fontSize: 14,
+      fontFamily: 'Arial',
+      fill: '#6c757d',
+      textAlign: 'center',
+      selectable: false,
+      evented: false
+    });
+    
+    console.log('📦 Adding placeholder for missing image');
     canvas.add(placeholder);
+    canvas.add(placeholderText);
     canvas.renderAll();
   });
 }
