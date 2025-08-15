@@ -2,7 +2,7 @@
 
 import { LoginForm } from "@/components/login-form";
 import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
-import Image from "next/image";
+import { PixelImage } from "@/components/magicui/pixel-image";
 
 export default function Page() {
   return (
@@ -34,35 +34,37 @@ export default function Page() {
           <div className="relative w-full h-full flex flex-col items-center justify-center space-y-8 z-10 px-8">
             {/* First slide */}
             <div className="relative w-[320px] aspect-[16/9] rounded-2xl overflow-hidden bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl hover:scale-105 transition-transform duration-300 noise-texture">
-              <Image
+              <PixelImage
                 src="/samples/slides/product-infographic.png"
-                alt="Product infographic slide"
-                width={320}
-                height={180}
-                className="object-cover w-full h-full"
+                grid="8x8"
+                grayscaleAnimation
+                pixelFadeInDuration={800}
+                maxAnimationDelay={1000}
+                colorRevealDelay={1200}
               />
             </div>
 
             {/* Second slide */}
             <div className="relative w-[320px] aspect-[16/9] rounded-2xl overflow-hidden bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl hover:scale-105 transition-transform duration-300 noise-texture">
-              <Image
+              <PixelImage
                 src="/samples/slides/jpm_slide_1.png"
-                alt="Financial highlights slide"
-                width={320}
-                height={180}
-                priority
-                className="object-cover w-full h-full"
+                grid="8x8"
+                grayscaleAnimation
+                pixelFadeInDuration={900}
+                maxAnimationDelay={1100}
+                colorRevealDelay={1400}
               />
             </div>
 
             {/* Third slide */}
             <div className="relative w-[320px] aspect-[16/9] rounded-2xl overflow-hidden bg-black/20 backdrop-blur-sm border border-white/10 shadow-2xl hover:scale-105 transition-transform duration-300 noise-texture">
-              <Image
+              <PixelImage
                 src="/samples/slides/mckinsey-example-1.png"
-                alt="Consulting slide example"
-                width={320}
-                height={180}
-                className="object-cover w-full h-full"
+                grid="8x8"
+                grayscaleAnimation
+                pixelFadeInDuration={1000}
+                maxAnimationDelay={1200}
+                colorRevealDelay={1600}
               />
             </div>
           </div>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileText, X, ArrowRight, Type, Sparkles, Mic, Square, Eye, CheckCircle, Clock, XCircle } from "lucide-react";
+import { Upload, FileText, X, ArrowRight, Type, Sparkles, Mic, Square, Eye, CheckCircle, Clock, XCircle, Link, Plus, Trash2 } from "lucide-react";
 import { SlideData } from "@/app/build/page";
 
 // Minimal types to avoid 'any' while supporting browser SpeechRecognition
@@ -71,6 +71,9 @@ export function UploadStep({
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [showTextInput, setShowTextInput] = useState(false);
   const [pastedText, setPastedText] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [articleUrls, setArticleUrls] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isParsing] = useState(false);
   const [viewingContent, setViewingContent] = useState<string | null>(null);
@@ -363,6 +366,57 @@ export function UploadStep({
     }
   }, [slideData.documents, updateSlideData, sendFileUpload, isConnected]);
 
+  // Validate URL format
+  const isValidUrl = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  // Add URL to the list
+  const handleAddUrl = () => {
+    const trimmedUrl = urlInput.trim();
+    if (trimmedUrl && isValidUrl(trimmedUrl) && !articleUrls.includes(trimmedUrl)) {
+      setArticleUrls(prev => [...prev, trimmedUrl]);
+      setUrlInput("");
+    }
+  };
+
+  // Remove URL from the list
+  const removeUrl = (index: number) => {
+    setArticleUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Process URLs and fetch content
+  const handleProcessUrls = async () => {
+    if (articleUrls.length === 0) return;
+
+    setUploadStatus(`Processing ${articleUrls.length} article${articleUrls.length > 1 ? 's' : ''}...`);
+    
+    // For now, create virtual files from URLs
+    // In production, this would call your web scraping API
+    for (const url of articleUrls) {
+      try {
+        const urlFile = new File([`Article URL: ${url}`], `article-${Date.now()}.txt`, { type: 'text/plain' });
+        updateSlideData({ documents: [...slideData.documents, urlFile] });
+        
+        if (isConnected && sendFileUpload) {
+          await sendFileUpload(urlFile);
+        }
+      } catch (error) {
+        console.error('Error processing URL:', url, error);
+      }
+    }
+    
+    setUploadStatus(`Successfully processed ${articleUrls.length} article URLs`);
+    setTimeout(() => setUploadStatus(""), 3000);
+    setArticleUrls([]);
+    setShowUrlInput(false);
+  };
+
   // Generate an example description using AI or fallback to static examples
   const generateExampleDescription = async () => {
     setIsGenerating(true);
@@ -472,7 +526,7 @@ export function UploadStep({
             />
           </div>
 
-          <div className="text-center">
+          <div className="flex justify-center gap-2">
             <Button
               variant="outline"
               onClick={() => setShowTextInput(!showTextInput)}
@@ -480,6 +534,14 @@ export function UploadStep({
             >
               <Type className="h-4 w-4" />
               Paste Text
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowUrlInput(!showUrlInput)}
+              className="gap-2"
+            >
+              <Link className="h-4 w-4" />
+              Add Article URLs
             </Button>
           </div>
 
@@ -512,6 +574,80 @@ export function UploadStep({
                   disabled={!pastedText.trim()}
                 >
                   Add Text
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* URL Input Area */}
+          {showUrlInput && (
+            <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
+              <Label htmlFor="url-input">Add Article URLs</Label>
+              <div className="flex gap-2">
+                <input
+                  id="url-input"
+                  type="url"
+                  placeholder="https://example.com/article"
+                  className="flex-1 p-2 text-sm rounded-lg border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddUrl()}
+                />
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleAddUrl}
+                  disabled={!urlInput.trim() || !isValidUrl(urlInput.trim())}
+                  className="gap-2"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add
+                </Button>
+              </div>
+              
+              {/* Display added URLs */}
+              {articleUrls.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Added URLs ({articleUrls.length})</Label>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {articleUrls.map((url, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-background rounded border">
+                        <span className="text-xs text-muted-foreground truncate flex-1 mr-2">{url}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeUrl(index)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowUrlInput(false);
+                    setUrlInput("");
+                    setArticleUrls([]);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleProcessUrls}
+                  disabled={articleUrls.length === 0}
+                  className="gap-2"
+                >
+                  <Link className="h-3 w-3" />
+                  Process {articleUrls.length} URL{articleUrls.length !== 1 ? 's' : ''}
                 </Button>
               </div>
             </div>
@@ -616,22 +752,6 @@ export function UploadStep({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-3 sm:p-4">
-          {/* Global AI Model selection (available early) */}
-          <div className="flex items-center gap-3">
-            <Label className="min-w-[80px]">AI Model</Label>
-            <Select
-              value={modelAwareSlideData.selectedModel || "gpt-4"}
-              onValueChange={(value) => updateSlideData({ selectedModel: value } as Partial<SlideData>)}
-            >
-              <SelectTrigger className="w-[220px] h-8 rounded-full">
-                <SelectValue placeholder="Select model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gpt-4">GPT-4 (current)</SelectItem>
-                <SelectItem value="gpt-5-2025-08-07">GPT-5 (2025-08-07)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="description">Slide Focus</Label>

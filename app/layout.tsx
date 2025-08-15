@@ -3,6 +3,8 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { WebSocketProvider } from "@/components/websocket-provider";
+import { UploadProgressProvider } from "@/contexts/upload-progress-context";
+import { GlobalUploadProgress } from "@/components/global-upload-progress";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -75,9 +77,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <WebSocketProvider>
-            {children}
-          </WebSocketProvider>
+          <UploadProgressProvider>
+            <WebSocketProvider>
+              {children}
+              <GlobalUploadProgress />
+            </WebSocketProvider>
+          </UploadProgressProvider>
         </ThemeProvider>
       </body>
     </html>

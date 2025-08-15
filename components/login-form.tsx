@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import Image from "next/image";
 // Removed unused Tabs and Select imports
 
 export function LoginForm({
@@ -71,13 +70,9 @@ export function LoginForm({
       {/* Logo and title */}
       <div className="text-center mb-6">
         <div className="flex justify-center mb-4">
-          <Image
-            src="/slideo-logo-white.svg"
-            alt="Slideo Logo"
-            width={40}
-            height={40}
-            className="w-10 h-10"
-          />
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+            <span className="text-primary font-bold text-lg">S</span>
+          </div>
         </div>
         <h1 className="text-2xl font-bold text-foreground mb-1">Sign in</h1>
       </div>

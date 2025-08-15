@@ -15,7 +15,7 @@ import Link from "next/link";
 import type { SlideDefinition } from "@/lib/slide-types";
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
-import { UploadProgressShelf } from "@/components/ui/upload-progress-shelf";
+import { useUploadProgress } from "@/contexts/upload-progress-context";
 
 /**
  * Small Fabric.js preview component for rendering a template's slide_json
@@ -139,18 +139,8 @@ export default function TemplatesPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Upload progress shelf state
-  const [uploadProgress, setUploadProgress] = useState<{
-    isOpen: boolean;
-    fileName: string;
-    currentStep: string;
-    error?: string;
-  }>({
-    isOpen: false,
-    fileName: '',
-    currentStep: 'upload',
-    error: undefined
-  });
+  // Use global upload progress context
+  const { showUploadProgress, hideUploadProgress, updateUploadStep } = useUploadProgress();
   
   // Template deletion state
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
@@ -227,19 +217,14 @@ export default function TemplatesPage() {
     setUploadError(null);
     
     // Open progress shelf
-    setUploadProgress({
-      isOpen: true,
-      fileName: file.name,
-      currentStep: 'upload',
-      error: undefined
-    });
+    showUploadProgress(file.name);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
 
       // Step 1: Upload and convert
-      setUploadProgress(prev => ({ ...prev, currentStep: 'upload' }));
+      updateUploadStep('upload');
       
       const response = await fetch('/api/convert-pptx-to-png', {
         method: 'POST',
@@ -250,15 +235,15 @@ export default function TemplatesPage() {
         throw new Error(`Upload failed: ${response.status}`);
       }
 
-      // Step 2: Converting to PNG
-      setUploadProgress(prev => ({ ...prev, currentStep: 'convert' }));
+      // Step 2: Analyzing content
+      updateUploadStep('convert');
       await new Promise(resolve => setTimeout(resolve, 800)); // Brief pause for visual feedback
       
       const result = await response.json();
       
       if (result.success && result.slideJson) {
-        // Step 3: Processing image
-        setUploadProgress(prev => ({ ...prev, currentStep: 'process' }));
+        // Step 3: Processing design
+        updateUploadStep('process');
         await new Promise(resolve => setTimeout(resolve, 600)); // Brief pause for visual feedback
         
         // Create a new template from the uploaded PPTX
@@ -295,7 +280,7 @@ export default function TemplatesPage() {
         }
         
         // Step 4: Saving to database
-        setUploadProgress(prev => ({ ...prev, currentStep: 'save' }));
+        updateUploadStep('save');
         
         // Prepare template data with user association
         const templateData = {
@@ -336,7 +321,7 @@ export default function TemplatesPage() {
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Close progress shelf
-        setUploadProgress(prev => ({ ...prev, isOpen: false }));
+        hideUploadProgress();
         
         // Auto-hide success message after 4 seconds
         setTimeout(() => {
@@ -351,14 +336,11 @@ export default function TemplatesPage() {
       setUploadError(errorMessage);
       
       // Show error in progress shelf
-      setUploadProgress(prev => ({ 
-        ...prev, 
-        error: errorMessage 
-      }));
+      updateUploadStep('upload', errorMessage);
       
       // Close progress shelf after delay
       setTimeout(() => {
-        setUploadProgress(prev => ({ ...prev, isOpen: false }));
+        hideUploadProgress();
       }, 3000);
     } finally {
       setIsUploading(false);
@@ -698,14 +680,6 @@ export default function TemplatesPage() {
         variant="destructive"
       />
 
-      {/* Upload Progress Shelf */}
-      <UploadProgressShelf
-        isOpen={uploadProgress.isOpen}
-        fileName={uploadProgress.fileName}
-        currentStep={uploadProgress.currentStep}
-        error={uploadProgress.error}
-        onClose={() => setUploadProgress(prev => ({ ...prev, isOpen: false }))}
-      />
     </div>
   );
 }

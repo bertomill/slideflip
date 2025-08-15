@@ -702,15 +702,6 @@ function BuildInner() {
               <div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-green-500' : 'bg-red-500'}`} />
             </div>
             
-            {/* Backend test button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={testBackendConnection}
-              className="text-xs px-2 py-1 h-6"
-            >
-              Test Backend
-            </Button>
           </div>
           
           {/* Theme toggle */}
