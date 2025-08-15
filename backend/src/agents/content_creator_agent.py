@@ -2,8 +2,8 @@
 Content Creator Agent
 
 AI agent responsible for generating additional content for slides using LangGraph workflows.
-This agent can create content based on uploaded files, user descriptions, and optionally
-perform research to enhance the content.
+This agent uses structured workflows with proper state management and agentic behavior
+instead of direct OpenAI calls.
 """
 
 import logging
@@ -11,27 +11,38 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 import json
 
-from src.core.prompt_manager import get_prompt_manager
-from src.services.llm_service import LLMService
+from src.core.simple_prompt_manager import get_prompt_manager
 from src.core.monitoring import get_monitoring_service
+from src.core.config import Settings
+from src.workflows.content_creation_workflow import ContentCreationWorkflow
 
 logger = logging.getLogger(__name__)
 
 
 class ContentCreatorAgent:
     """
-    AI agent for creating comprehensive slide content
+    AI agent for creating comprehensive slide content using LangGraph workflows
 
-    This agent can:
-    1. Generate content based only on uploaded files (basic mode)
-    2. Create enhanced content using AI research capabilities (agent mode)
-    3. Adapt content based on user preferences and themes
+    This agent uses LangGraph for:
+    1. Structured content creation workflows
+    2. Proper state management and error handling
+    3. Agentic behavior with decision-making capabilities
+    4. Enhanced content generation with research integration
     """
 
     def __init__(self):
-        self.llm_service = LLMService()
         self.prompt_manager = get_prompt_manager()
         self.monitoring_service = get_monitoring_service()
+        self.settings = Settings()
+        
+        # Initialize LangGraph workflow
+        try:
+            self.workflow = ContentCreationWorkflow()
+            logger.debug("LangGraph ContentCreationWorkflow initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize LangGraph workflow: {e}")
+            self.workflow = None
+
 
     async def create_content(
         self,
@@ -43,12 +54,12 @@ class ContentCreatorAgent:
         content_style: str = "professional"
     ) -> Dict[str, Any]:
         """
-        Create slide content using the appropriate method
+        Create slide content using LangGraph workflow
 
         Args:
             uploaded_content: Content extracted from uploaded files
             user_description: User's description of what they want
-            theme_info: Theme styling information (not used for content)
+            theme_info: Theme styling information (not used for content generation)
             research_data: Optional research data from external sources
             use_ai_agent: Whether to use AI agent capabilities
             content_style: Style preference for content generation
@@ -59,173 +70,46 @@ class ContentCreatorAgent:
         start_time = datetime.now()
 
         try:
-            if use_ai_agent and research_data:
-                # Use AI agent mode with research enhancement
-                logger.info("Using AI agent mode with research enhancement")
-                content = await self._create_enhanced_content_with_agent(
-                    uploaded_content, user_description, research_data, content_style
-                )
-            elif use_ai_agent:
-                # Use AI agent mode without research (AI generates additional content)
-                logger.info(
-                    "Using AI agent mode to generate additional content")
-                content = await self._create_enhanced_content_without_research(
-                    uploaded_content, user_description, content_style
-                )
-            else:
-                # Basic mode: use only uploaded content
-                logger.info("Using basic mode with uploaded content only")
-                content = await self._create_basic_content(
-                    uploaded_content, user_description
+            if not self.workflow:
+                logger.warning("LangGraph workflow not available, using fallback")
+                return await self._create_fallback_content(
+                    uploaded_content, user_description, "LangGraph workflow not available"
                 )
 
-            # Add metadata
-            content["metadata"] = {
-                "generation_mode": "ai_agent" if use_ai_agent else "basic",
-                "content_style": content_style,
-                "processing_time": (datetime.now() - start_time).total_seconds(),
+            logger.info(f"🚀 Creating content with LangGraph workflow (AI agent: {use_ai_agent})")
+            
+            # Use LangGraph workflow for content creation
+            content = await self.workflow.create_content(
+                uploaded_content=uploaded_content,
+                user_description=user_description,
+                theme_info=theme_info,
+                research_data=research_data,
+                use_ai_agent=use_ai_agent,
+                content_style=content_style
+            )
+
+            # Add processing metadata
+            if "metadata" not in content:
+                content["metadata"] = {}
+                
+            content["metadata"].update({
+                "agent_processing_time": (datetime.now() - start_time).total_seconds(),
+                "agent_mode": "langgraph_workflow",
                 "has_research": bool(research_data),
                 "uploaded_content_length": len(uploaded_content),
                 "generated_at": datetime.now().isoformat()
-            }
+            })
 
+            logger.info("✅ LangGraph content creation completed successfully")
             return content
 
         except Exception as e:
-            logger.error(f"Error in content creation: {e}")
+            logger.error(f"Error in LangGraph content creation: {e}")
             # Return fallback content
             return await self._create_fallback_content(
                 uploaded_content, user_description, str(e)
             )
 
-    async def _create_enhanced_content_with_agent(
-        self,
-        uploaded_content: str,
-        user_description: str,
-        research_data: str,
-        content_style: str
-    ) -> Dict[str, Any]:
-        """Create enhanced content using AI agent with research data"""
-        try:
-            # Prepare variables for the enhanced content generation prompt
-            template_variables = {
-                "uploaded_content": uploaded_content[:3000] + "..." if len(uploaded_content) > 3000 else uploaded_content,
-                "user_description": user_description,
-                "research_data": research_data[:2000] + "..." if len(research_data) > 2000 else research_data,
-                "content_style": content_style,
-                "current_timestamp": datetime.now().isoformat()
-            }
-
-            # Render the enhanced content generation prompt
-            prompt_data = await self.prompt_manager.render_prompt(
-                "enhanced_content_generation",
-                template_variables
-            )
-
-            # Generate content using LLM
-            response = await self.llm_service.generate_completion(
-                system_prompt=prompt_data["system_prompt"],
-                user_prompt=prompt_data["user_prompt"],
-                **prompt_data["model_config"]
-            )
-
-            # Parse the response
-            try:
-                content_data = json.loads(response)
-                logger.info(
-                    "✅ Successfully generated enhanced content with AI agent")
-                return content_data
-            except json.JSONDecodeError as e:
-                logger.warning(
-                    f"Failed to parse enhanced content response: {e}")
-                return await self._create_fallback_content(
-                    uploaded_content, user_description, "JSON parsing failed"
-                )
-
-        except Exception as e:
-            logger.error(f"Error in enhanced content creation: {e}")
-            return await self._create_fallback_content(
-                uploaded_content, user_description, str(e)
-            )
-
-    async def _create_enhanced_content_without_research(
-        self,
-        uploaded_content: str,
-        user_description: str,
-        content_style: str
-    ) -> Dict[str, Any]:
-        """Create enhanced content using AI agent without external research"""
-        try:
-            # Prepare variables for AI-enhanced content generation
-            template_variables = {
-                "uploaded_content": uploaded_content[:3000] + "..." if len(uploaded_content) > 3000 else uploaded_content,
-                "user_description": user_description,
-                "content_style": content_style,
-                "current_timestamp": datetime.now().isoformat()
-            }
-
-            # Render the AI-enhanced content generation prompt
-            prompt_data = await self.prompt_manager.render_prompt(
-                "ai_enhanced_content_generation",
-                template_variables
-            )
-
-            # Generate content using LLM
-            response = await self.llm_service.generate_completion(
-                system_prompt=prompt_data["system_prompt"],
-                user_prompt=prompt_data["user_prompt"],
-                **prompt_data["model_config"]
-            )
-
-            # Parse the response
-            try:
-                content_data = json.loads(response)
-                logger.info("✅ Successfully generated AI-enhanced content")
-                return content_data
-            except json.JSONDecodeError as e:
-                logger.warning(
-                    f"Failed to parse AI-enhanced content response: {e}")
-                return await self._create_fallback_content(
-                    uploaded_content, user_description, "JSON parsing failed"
-                )
-
-        except Exception as e:
-            logger.error(f"Error in AI-enhanced content creation: {e}")
-            return await self._create_fallback_content(
-                uploaded_content, user_description, str(e)
-            )
-
-    async def _create_basic_content(
-        self,
-        uploaded_content: str,
-        user_description: str
-    ) -> Dict[str, Any]:
-        """Create basic content using only uploaded files"""
-        try:
-            # Use the existing slide content generation prompt
-            template_variables = {
-                "content": uploaded_content[:3000] + "..." if len(uploaded_content) > 3000 else uploaded_content,
-                "description": user_description,
-                "layout": {"type": "basic", "sections": 3},  # Basic layout
-                "theme_info": None
-            }
-
-            # Generate content using existing LLM service method
-            content = await self.llm_service.generate_slide_content(
-                content=uploaded_content,
-                description=user_description,
-                layout={"type": "basic", "sections": 3},
-                theme_info=None
-            )
-
-            logger.info("✅ Successfully generated basic content")
-            return content
-
-        except Exception as e:
-            logger.error(f"Error in basic content creation: {e}")
-            return await self._create_fallback_content(
-                uploaded_content, user_description, str(e)
-            )
 
     async def _create_fallback_content(
         self,

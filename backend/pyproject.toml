@@ -37,6 +37,7 @@ dependencies = [
     "langchain-community>=0.3.0",
     "langchain-openai>=0.2.0",
     "pypdf>=6.0.0",
+    "scipy>=1.16.1",
 ]
 
 [build-system]

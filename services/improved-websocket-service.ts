@@ -350,6 +350,62 @@ class ImprovedWebSocketService {
   }
 
   /**
+   * Send slide description message (compatibility with old interface)
+   */
+  public async sendSlideDescription(description: string): Promise<any> {
+    return this.sendMessage<any>('slide_description', {
+      description
+    });
+  }
+
+  /**
+   * Send research request message (compatibility with old interface)
+   */
+  public async sendResearchRequest(description: string, researchOptions: any, wantsResearch: boolean): Promise<any> {
+    return this.sendMessage<any>('research_request', {
+      description,
+      research_options: researchOptions,
+      wants_research: wantsResearch
+    });
+  }
+
+  /**
+   * Send generate slide message (compatibility with old interface)
+   */
+  public async sendGenerateSlide(description: string, theme: string = "default", wantsResearch: boolean = false, useAIAgent: boolean = false, contentStyle: string = "professional"): Promise<any> {
+    return this.sendMessage<any>('generate_slide', {
+      description,
+      theme,
+      wants_research: wantsResearch,
+      use_ai_agent: useAIAgent,
+      content_style: contentStyle
+    });
+  }
+
+  /**
+   * Send step guidance request message (compatibility with old interface)
+   */
+  public async sendStepGuidanceRequest(currentStep: string): Promise<any> {
+    return this.sendMessage<any>('get_step_guidance', {
+      current_step: currentStep
+    });
+  }
+
+  /**
+   * Send session status request message (compatibility with old interface)
+   */
+  public async sendSessionStatusRequest(): Promise<any> {
+    return this.sendMessage<any>('get_session_status', {});
+  }
+
+  /**
+   * Send process slide message (compatibility with old interface)
+   */
+  public async sendProcessSlide(options: any): Promise<any> {
+    return this.sendMessage<any>('process_slide', options);
+  }
+
+  /**
    * Send status request
    */
   public async sendStatusRequest(): Promise<any> {

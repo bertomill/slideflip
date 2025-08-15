@@ -82,6 +82,30 @@ class FileService:
         os.makedirs(self.settings.UPLOAD_DIR, exist_ok=True)
         os.makedirs(self.settings.TEMP_DIR, exist_ok=True)
     
+    async def save_file(
+        self, 
+        filename: str, 
+        content: str, 
+        file_type: str,
+        client_id: Optional[str] = None
+    ) -> 'FileInfo':
+        """
+        Save an uploaded file and return FileInfo object
+        
+        This method replaces save_uploaded_file to align with WebSocket message handling.
+        Returns FileInfo object instead of Path for better integration.
+        """
+        file_path = await self.save_uploaded_file(filename, content, file_type, client_id)
+        
+        # Return FileInfo object for WebSocket compatibility
+        return FileInfo(
+            filename=filename,
+            file_path=str(file_path),
+            file_size=len(base64.b64decode(content)),
+            file_type=file_type,
+            upload_time=datetime.now().isoformat()
+        )
+    
     async def save_uploaded_file(
         self, 
         filename: str, 

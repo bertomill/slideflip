@@ -90,6 +90,12 @@ next-env.d.ts
 # Cursor
 .cursor/
 
+# test results
+test_results/
+
+# claude
+.claude/
+
 # Startup scripts
 STARTUP_README.md
 

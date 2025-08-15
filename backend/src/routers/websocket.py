@@ -3,46 +3,148 @@ WebSocket router for SlideFlip Backend
 Handles WebSocket connections and message processing
 """
 
+from src.services.document_parser import DocumentParserService
+from src.services.llm_service import LLMService
 import asyncio
-import json
 import logging
-from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, Any, Set
+import json
+import os
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional, Set
 from enum import Enum
+from pathlib import Path
 
-from src.core.websocket_manager import WebSocketManager
+# FastAPI and WebSocket imports
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+# Import our custom modules
 from src.core.config import Settings
-from src.handlers.file_handler import FileHandler
-from src.handlers.slide_handler import SlideHandler
-from src.models.message_models import (
+from src.core.logger import setup_logging
+from src.core.websocket_manager import WebSocketManager
+from src.models.websocket_messages import (
     ClientMessage,
     ServerMessage,
-    FileUploadMessage,
-    SlideDescriptionMessage,
+    MessageType,
+    FileUploadData,
+    ThemeSelectionData,
+    ContentPlanningData,
+    SlideGenerationData,
     SlideGenerationMessage,
-    ProcessingStatus,
-    ThemeMessage,
-    ResearchRequestMessage,
-    ContentPlanningMessage,
-    ContentPlanResponseMessage,
-    ProgressUpdateMessage,
-    AgenticResearchRequestMessage,
     EnhancedResearchOptions
 )
 from src.services.file_service import FileService, FileInfo
 from src.services.slide_service import SlideService
-from src.services.knowledge_graph_service import KnowledgeGraphService
-from src.services.kg_task_manager import KnowledgeGraphTaskManager
-from src.services.graph_query_service import GraphQueryService
-from src.services.llm_service import LLMService
-from src.services.document_parser import DocumentParserService
-from src.services.kg_processing import process_file_for_knowledge_graph, perform_final_clustering, get_current_timestamp
-from src.handlers.kg_message_handlers import (
-    handle_kg_status_request,
-    handle_force_clustering_request,
-    handle_clear_kg_request,
-    handle_force_reprocessing_request
-)
+
+# Conditional knowledge graph imports based on SKIP_KNOWLEDGE_GRAPH setting
+settings = Settings()
+if not settings.SKIP_KNOWLEDGE_GRAPH:
+    from src.services.knowledge_graph_service import KnowledgeGraphService
+    from src.services.kg_task_manager import KnowledgeGraphTaskManager
+    from src.services.graph_query_service import GraphQueryService
+    from src.services.kg_processing import process_file_for_knowledge_graph, perform_final_clustering, get_current_timestamp
+    from src.handlers.kg_message_handlers import (
+        handle_kg_status_request,
+        handle_force_clustering_request,
+        handle_clear_kg_request,
+        handle_force_reprocessing_request
+    )
+else:
+    # Create dummy classes when knowledge graph is disabled
+    class KnowledgeGraphService:
+        def __init__(self, client_id: str):
+            pass
+
+        async def process_file(self, *args, **kwargs):
+            return {"success": False, "reason": "Knowledge graph disabled"}
+
+        async def perform_clustering(self, *args, **kwargs):
+            return {"success": False, "reason": "Knowledge graph disabled"}
+
+        def clustered_graph_exists(self, *args, **kwargs):
+            return False
+
+        async def load_existing_clustered_graph(self, *args, **kwargs):
+            return False
+
+    class KnowledgeGraphTaskManager:
+        def __init__(self):
+            pass
+
+        async def get_or_create_kg_service(self, client_id: str):
+            return None
+
+        async def is_clustering_needed(self, client_id: str) -> bool:
+            return False
+
+        async def load_existing_graphs_if_available(self, client_id: str) -> bool:
+            return False
+
+        async def mark_file_processed(self, client_id: str, filename: str):
+            pass
+
+        async def add_processing_task(self, client_id: str, filename: str, task):
+            pass
+
+        async def remove_processing_task(self, client_id: str, filename: str):
+            pass
+
+        async def mark_clustering_needed(self, client_id: str):
+            pass
+
+        async def can_skip_processing(self, client_id: str) -> bool:
+            return False
+
+        async def check_if_new_processing_needed(self, client_id: str) -> dict:
+            return {"needs_processing": False, "reason": "Knowledge graph disabled"}
+
+        async def cleanup_client_tasks(self, client_id: str):
+            pass
+
+        async def get_processing_status(self, client_id: str) -> dict:
+            return {"status": "disabled", "reason": "Knowledge graph disabled"}
+
+        async def force_clustering(self, client_id: str) -> dict:
+            return {"success": False, "reason": "Knowledge graph disabled"}
+
+        async def force_reprocessing(self, client_id: str) -> dict:
+            return {"success": False, "reason": "Knowledge graph disabled"}
+
+        async def get_kg_status(self, client_id: str) -> dict:
+            return {"status": "disabled", "reason": "Knowledge graph disabled"}
+
+        async def clear_kg(self, client_id: str) -> dict:
+            return {"success": False, "reason": "Knowledge graph disabled"}
+
+    class GraphQueryService:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def query_graph_for_slide_content(self, *args, **kwargs):
+            return {"error": "Knowledge graph disabled"}
+
+    def process_file_for_knowledge_graph(*args, **kwargs):
+        return {"success": False, "reason": "Knowledge graph disabled"}
+
+    def perform_final_clustering(*args, **kwargs):
+        return {"success": False, "reason": "Knowledge graph disabled"}
+
+    def get_current_timestamp():
+        return datetime.now().isoformat()
+
+    async def handle_kg_status_request(*args, **kwargs):
+        return {"status": "disabled", "reason": "Knowledge graph disabled"}
+
+    async def handle_force_clustering_request(*args, **kwargs):
+        return {"success": False, "reason": "Knowledge graph disabled"}
+
+    async def handle_clear_kg_request(*args, **kwargs):
+        return {"success": False, "reason": "Knowledge graph disabled"}
+
+    async def handle_force_reprocessing_request(*args, **kwargs):
+        return {"success": False, "reason": "Knowledge graph disabled"}
+
 
 # Add workflow state management at the top of the file
 
@@ -340,10 +442,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 async def initialize_client_session(websocket: WebSocket, client_id: str):
     """Phase 2: Initialize client session with enhanced data tracking"""
     try:
-        # Initialize client data structure with all 5 steps
+        # Initialize client data structure with all 6 steps (added slide description step)
         websocket_manager.update_client_data(client_id, {
             "session_id": client_id,
             "step_1_upload": {"completed": False, "data": {}},
+            "step_1b_slide_description": {"completed": False, "data": {}},  # New step for slide description
             "step_2_theme": {"completed": False, "data": {}},
             "step_3_research": {"completed": False, "data": {}},
             "step_4_content": {"completed": False, "data": {}},
@@ -411,7 +514,7 @@ async def send_enhanced_progress_update(
         # Map step names to actual step keys
         step_mapping = {
             "file_processing": "step_1_upload",
-            "slide_description": "step_1_upload",
+            "slide_description": "step_1b_slide_description",  # Map to new step
             "theme_selection": "step_2_theme",
             "research": "step_3_research",
             "content_planning": "step_4_content",
@@ -472,18 +575,33 @@ async def get_step_guidance(client_id: str, current_step: str) -> Dict[str, Any]
 
         # Check what steps are available
         if client_data.get("step_1_upload", {}).get("completed", False):
-            available_actions.append("theme_selection")
-            available_actions.append("research_request")
-            available_actions.append("content_planning")
-            available_actions.append("slide_generation")
-
-            if not client_data.get("step_2_theme", {}).get("completed", False):
+            available_actions.append("slide_description")  # Add slide description as available action
+            
+            if not client_data.get("step_1b_slide_description", {}).get("completed", False):
+                guidance = "Please provide a slide description to continue. This helps us understand what you want to create."
+            elif not client_data.get("step_2_theme", {}).get("completed", False):
+                available_actions.append("theme_selection")
+                available_actions.append("research_request")
+                available_actions.append("content_planning")
+                available_actions.append("slide_generation")
                 guidance = "You can choose a theme or continue with the default. All other steps are available."
             elif not client_data.get("step_3_research", {}).get("completed", False):
+                available_actions.append("theme_selection")
+                available_actions.append("research_request")
+                available_actions.append("content_planning")
+                available_actions.append("slide_generation")
                 guidance = "Research is optional. You can skip it and go directly to content planning or slide generation."
             elif not client_data.get("step_4_content", {}).get("completed", False):
+                available_actions.append("theme_selection")
+                available_actions.append("research_request")
+                available_actions.append("content_planning")
+                available_actions.append("slide_generation")
                 guidance = "You can plan your content or go directly to slide generation."
             else:
+                available_actions.append("theme_selection")
+                available_actions.append("research_request")
+                available_actions.append("content_planning")
+                available_actions.append("slide_generation")
                 guidance = "All steps completed! You can generate and preview your slides."
         else:
             available_actions.append("file_upload")
@@ -548,12 +666,12 @@ async def validate_step_prerequisites(client_id: str, current_step: str) -> Dict
 
     # More flexible step requirements - only require essential steps
     step_requirements = {
-        "step_2_theme": ["step_1_upload"],
+        "step_2_theme": ["step_1_upload", "step_1b_slide_description"],  # Require both upload and slide description
         # Research is optional, don't require theme
-        "step_3_research": ["step_1_upload"],
-        # Content planning only requires upload
-        "step_4_content": ["step_1_upload"],
-        "step_5_preview": ["step_1_upload"]    # Preview only requires upload
+        "step_3_research": ["step_1_upload", "step_1b_slide_description"],
+        # Content planning only requires upload and slide description
+        "step_4_content": ["step_1_upload", "step_1b_slide_description"],
+        "step_5_preview": ["step_1_upload", "step_1b_slide_description"]    # Preview requires upload and slide description
     }
 
     logger.info(f"🔍 Validating {current_step} for client {client_id}")
@@ -708,16 +826,25 @@ async def handle_session_status_request(websocket: WebSocket, client_id: str):
             return
 
         # Calculate overall progress based on completed steps
-        completed_steps = sum(1 for step in ["step_1_upload", "step_2_theme", "step_3_research", "step_4_content", "step_5_preview"]
-                              if client_data.get(step, {}).get("completed", False))
-        overall_progress = (completed_steps / 5) * 100
+        total_steps = 6  # Updated to include slide description step
+        completed_steps = sum([
+            1 if client_data.get("step_1_upload", {}).get("completed", False) else 0,
+            1 if client_data.get("step_1b_slide_description", {}).get("completed", False) else 0,  # Add new step
+            1 if client_data.get("step_2_theme", {}).get("completed", False) else 0,
+            1 if client_data.get("step_3_research", {}).get("completed", False) else 0,
+            1 if client_data.get("step_4_content", {}).get("completed", False) else 0,
+            1 if client_data.get("step_5_preview", {}).get("completed", False) else 0
+        ])
+        overall_progress = (completed_steps / total_steps) * 100
 
-        # Determine next available steps and provide guidance
+        # Determine next steps based on current progress
         next_steps = []
         if not client_data.get("step_1_upload", {}).get("completed", False):
-            next_steps.append("Upload a document to get started")
+            next_steps.append("Upload a document")
+        elif not client_data.get("step_1b_slide_description", {}).get("completed", False):
+            next_steps.append("Provide a slide description")
         elif not client_data.get("step_2_theme", {}).get("completed", False):
-            next_steps.append("Choose a theme or continue with default")
+            next_steps.append("Choose a theme")
         elif not client_data.get("step_3_research", {}).get("completed", False):
             next_steps.append("Optional: Add research data")
         elif not client_data.get("step_4_content", {}).get("completed", False):
@@ -736,6 +863,7 @@ async def handle_session_status_request(websocket: WebSocket, client_id: str):
                 "overall_progress": overall_progress,
                 "step_details": {
                     "step_1_upload": client_data.get("step_1_upload", {}),
+                    "step_1b_slide_description": client_data.get("step_1b_slide_description", {}),  # Add new step
                     "step_2_theme": client_data.get("step_2_theme", {}),
                     "step_3_research": client_data.get("step_3_research", {}),
                     "step_4_content": client_data.get("step_4_content", {}),
@@ -1301,6 +1429,19 @@ async def handle_slide_description(websocket: WebSocket, client_id: str, data: d
                 "length": len(description_data.description)
             }
         )
+
+        # Mark the slide description step as completed and update current step
+        client_data = websocket_manager.get_client_data(client_id)
+        if client_data:
+            client_data["step_1b_slide_description"]["completed"] = True
+            client_data["step_1b_slide_description"]["data"] = {
+                "description": description_data.description,
+                "length": len(description_data.description)
+            }
+            # Update current step to indicate user should proceed to theme selection
+            client_data["current_step"] = "step_2_theme"
+            websocket_manager.update_client_data(client_id, client_data)
+            logger.info(f"✅ Step 1b (slide description) marked as completed for client {client_id}")
 
         # Send success message
         success_message = ServerMessage(

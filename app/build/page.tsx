@@ -30,7 +30,7 @@ import { PreviewStep } from "@/components/builder/preview-step-fabric"; // Step 
 import { createClient } from "@/lib/supabase/client";
 
 // WebSocket hook for backend communication
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useImprovedWebSocket } from "@/hooks/use-improved-websocket";
 
 // ============================================================================
 // TYPE DEFINITIONS: Data structures for the slide builder workflow
@@ -168,7 +168,7 @@ export default function Build() {
     sendStepGuidanceRequest,
     sendSessionStatusRequest,
     sendProcessSlide,
-  } = useWebSocket({
+  } = useImprovedWebSocket({
     clientId,
     onMessage: (message) => {
       console.log('Received message from backend:', message);

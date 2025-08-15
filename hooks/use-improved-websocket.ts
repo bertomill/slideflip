@@ -30,6 +30,9 @@ export interface UseWebSocketOptions {
   onSlideComplete?: (slide: SlideComplete) => void;
   onContentPlan?: (plan: ContentPlanResponse) => void;
   onError?: (error: ErrorResponse) => void;
+  onMessage?: (message: any) => void;
+  onClose?: () => void;
+  onOpen?: () => void;
 }
 
 export interface UseWebSocketReturn {
@@ -47,9 +50,19 @@ export interface UseWebSocketReturn {
   sendSlideGeneration: (contentPlan: any, themeConfig: any, options?: any) => Promise<SlideComplete>;
   sendStatusRequest: () => Promise<any>;
   
+  // Compatibility methods (from old websocket)
+  sendSlideDescription: (description: string) => Promise<any>;
+  sendResearchRequest: (description: string, researchOptions: any, wantsResearch: boolean) => Promise<any>;
+  sendGenerateSlide: (description: string, theme: string, wantsResearch: boolean, useAIAgent?: boolean, contentStyle?: string) => Promise<any>;
+  sendStepGuidanceRequest: (currentStep: string) => Promise<any>;
+  sendSessionStatusRequest: () => Promise<any>;
+  sendProcessSlide: (options: any) => Promise<any>;
+  
   // Utility methods
   isConnected: boolean;
   clientId: string;
+  connectionStatus: string;
+  lastMessage: any;
 }
 
 export function useImprovedWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
@@ -59,7 +72,10 @@ export function useImprovedWebSocket(options: UseWebSocketOptions): UseWebSocket
     onProgress, 
     onSlideComplete, 
     onContentPlan, 
-    onError 
+    onError,
+    onMessage,
+    onClose,
+    onOpen
   } = options;
 
   // State
@@ -148,6 +164,43 @@ export function useImprovedWebSocket(options: UseWebSocketOptions): UseWebSocket
 
       if (optionsRef.current.onError) {
         optionsRef.current.onError(error);
+      }
+    },
+
+    onMessage: (message: any) => {
+      setState(prev => ({
+        ...prev,
+        lastMessage: JSON.stringify(message),
+        error: null
+      }));
+
+      if (optionsRef.current.onMessage) {
+        optionsRef.current.onMessage(message);
+      }
+    },
+
+    onClose: () => {
+      setState(prev => ({
+        ...prev,
+        isConnected: false,
+        connectionState: 'disconnected',
+        isProcessing: false,
+        error: null
+      }));
+      if (optionsRef.current.onClose) {
+        optionsRef.current.onClose();
+      }
+    },
+
+    onOpen: () => {
+      setState(prev => ({
+        ...prev,
+        isConnected: true,
+        connectionState: 'connected',
+        error: null
+      }));
+      if (optionsRef.current.onOpen) {
+        optionsRef.current.onOpen();
       }
     }
   }), []);
@@ -317,6 +370,103 @@ export function useImprovedWebSocket(options: UseWebSocketOptions): UseWebSocket
     }
   }, []);
 
+  // Compatibility functions (from old websocket)
+  const sendSlideDescription = useCallback(async (description: string): Promise<any> => {
+    if (!improvedWebSocketService.isConnected()) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    try {
+      return await improvedWebSocketService.sendSlideDescription(description);
+    } catch (error) {
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Slide description failed' 
+      }));
+      throw error;
+    }
+  }, []);
+
+  const sendResearchRequest = useCallback(async (description: string, researchOptions: any, wantsResearch: boolean): Promise<any> => {
+    if (!improvedWebSocketService.isConnected()) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    try {
+      return await improvedWebSocketService.sendResearchRequest(description, researchOptions, wantsResearch);
+    } catch (error) {
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Research request failed' 
+      }));
+      throw error;
+    }
+  }, []);
+
+  const sendGenerateSlide = useCallback(async (description: string, theme: string, wantsResearch: boolean, useAIAgent: boolean = false, contentStyle: string = "professional"): Promise<any> => {
+    if (!improvedWebSocketService.isConnected()) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    try {
+      return await improvedWebSocketService.sendGenerateSlide(description, theme, wantsResearch, useAIAgent, contentStyle);
+    } catch (error) {
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Generate slide failed' 
+      }));
+      throw error;
+    }
+  }, []);
+
+  const sendStepGuidanceRequest = useCallback(async (currentStep: string): Promise<any> => {
+    if (!improvedWebSocketService.isConnected()) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    try {
+      return await improvedWebSocketService.sendStepGuidanceRequest(currentStep);
+    } catch (error) {
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Step guidance request failed' 
+      }));
+      throw error;
+    }
+  }, []);
+
+  const sendSessionStatusRequest = useCallback(async (): Promise<any> => {
+    if (!improvedWebSocketService.isConnected()) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    try {
+      return await improvedWebSocketService.sendSessionStatusRequest();
+    } catch (error) {
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Session status request failed' 
+      }));
+      throw error;
+    }
+  }, []);
+
+  const sendProcessSlide = useCallback(async (options: any): Promise<any> => {
+    if (!improvedWebSocketService.isConnected()) {
+      throw new Error('Not connected to WebSocket');
+    }
+
+    try {
+      return await improvedWebSocketService.sendProcessSlide(options);
+    } catch (error) {
+      setState(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Process slide failed' 
+      }));
+      throw error;
+    }
+  }, []);
+
   // Auto-connect effect
   useEffect(() => {
     if (autoConnect && clientId) {
@@ -352,8 +502,16 @@ export function useImprovedWebSocket(options: UseWebSocketOptions): UseWebSocket
     sendContentPlanning,
     sendSlideGeneration,
     sendStatusRequest,
+    sendSlideDescription,
+    sendResearchRequest,
+    sendGenerateSlide,
+    sendStepGuidanceRequest,
+    sendSessionStatusRequest,
+    sendProcessSlide,
     isConnected: state.isConnected,
-    clientId
+    clientId,
+    connectionStatus: state.connectionState,
+    lastMessage: state.lastMessage
   };
 }
 

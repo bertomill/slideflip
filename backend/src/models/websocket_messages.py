@@ -24,6 +24,7 @@ class MessageType(str, Enum):
     """Standardized message types"""
     # Client -> Server
     FILE_UPLOAD = "file_upload"
+    SLIDE_DESCRIPTION = "slide_description"  # Add missing message type
     THEME_SELECTION = "theme_selection"
     CONTENT_PLANNING = "content_planning"
     SLIDE_GENERATION = "slide_generation"
@@ -68,7 +69,7 @@ class FileUploadData(BaseModel):
     filename: str = Field(..., description="Name of the uploaded file")
     content: str = Field(..., description="Base64 encoded file content")
     file_type: str = Field(..., description="MIME type of the file")
-    file_size: int = Field(..., gt=0, le=52428800, description="File size in bytes (max 50MB)")
+    file_size: int = Field(gt=0, le=52428800, description="File size in bytes (max 50MB)")
     
     @validator('filename')
     def validate_filename(cls, v):
@@ -90,9 +91,20 @@ class FileUploadData(BaseModel):
 
 
 class FileUploadMessage(ClientMessage):
-    """File upload message"""
+    """File upload message from client"""
     type: Literal[MessageType.FILE_UPLOAD] = MessageType.FILE_UPLOAD
     data: FileUploadData
+
+
+class SlideDescriptionMessage(BaseWebSocketMessage):
+    """Slide description message from client"""
+    type: Literal[MessageType.SLIDE_DESCRIPTION] = MessageType.SLIDE_DESCRIPTION
+    data: Dict[str, str] = Field(..., description="Slide description data")
+    
+    @property
+    def description(self) -> str:
+        """Get the description from the data field"""
+        return self.data.get("description", "")
 
 
 class ThemeSelectionData(BaseModel):
@@ -129,6 +141,8 @@ class ContentPlanningData(BaseModel):
     content_outline: Optional[str] = Field(None, description="User-provided content outline")
     include_research: bool = Field(False, description="Whether to include web research")
     research_topics: List[str] = Field(default_factory=list, description="Specific research topics")
+    use_ai_agent: bool = Field(False, description="Whether to use AI content creator agent")
+    content_style: str = Field(default="professional", description="Content style for AI agent generation")
 
 
 class ContentPlanningMessage(ClientMessage):
@@ -290,6 +304,7 @@ class PongMessage(ServerMessage):
 # Message Union Types for Type Hints
 ClientMessageUnion = Union[
     FileUploadMessage,
+    SlideDescriptionMessage,  # Add missing message type
     ThemeSelectionMessage,
     ContentPlanningMessage,
     SlideGenerationMessage,

@@ -7,7 +7,7 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional, List, Callable
 from src.core.config import Settings
-from src.core.prompt_manager import get_prompt_manager
+from src.core.simple_prompt_manager import get_prompt_manager
 from src.services.file_service import FileService
 from src.services.llm_service import LLMService
 
@@ -26,8 +26,7 @@ class AIService:
         self.file_service = FileService()
         self.llm_service = LLMService()
         self.websocket_manager = websocket_manager
-        logger.info(
-            "AIService initialized with content-focused generation support")
+        logger.debug("AIService initialized with content-focused generation support")
 
     def is_available(self) -> bool:
         """Check if AI service is available"""

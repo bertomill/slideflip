@@ -185,7 +185,7 @@ class PromptManager:
             self.metrics[template_name] = PromptMetrics(
                 prompt_name=template_name)
 
-            logger.info(f"Loaded template: {template_name}")
+            logger.debug(f"Loaded template: {template_name}")
 
         except Exception as e:
             logger.error(f"Failed to load template {template_path}: {e}")

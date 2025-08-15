@@ -1,17 +1,18 @@
 # Slideo Backend
 
-A Python FastAPI backend service for AI-powered presentation generation with real-time WebSocket communication, knowledge graph processing, and multi-format document parsing.
+A Python FastAPI backend service for AI-powered presentation generation with real-time WebSocket communication, LangGraph-based agentic workflows, and multi-format document parsing.
 
 ## Architecture Overview
 
-This backend provides a **FastAPI-based web service** with **WebSocket support** for real-time communication with the Next.js frontend. It handles document processing, AI-powered content generation, and slide creation workflows.
+This backend provides a **FastAPI-based web service** with **WebSocket support** for real-time communication with the Next.js frontend. It features a **Service Orchestrator** that manages the proper flow between all services with clear separation of concerns, and uses **LangGraph workflows** for agentic AI behavior instead of direct OpenAI calls.
 
 ### Tech Stack
 - **Framework**: FastAPI with Uvicorn ASGI server
 - **Language**: Python 3.12+ with async/await patterns
 - **Package Manager**: `uv` (modern Python package management)
 - **WebSocket**: Native FastAPI WebSocket support
-- **AI Integration**: OpenAI GPT models with structured prompts
+- **AI Integration**: OpenAI GPT models with LangGraph workflows for agentic behavior
+- **Workflow Engine**: LangGraph for structured AI workflows and state management
 - **Document Processing**: Multi-format support (PDF, DOCX, TXT, MD)
 - **Knowledge Graphs**: NetworkX with optional clustering
 - **Templates**: YAML-based prompts with Jinja2 rendering
@@ -29,15 +30,16 @@ backend/
 src/                       # Main source code
 ├── core/                  # Core system components
 │   ├── config.py          # Settings and configuration
+│   ├── service_orchestrator.py # Service flow orchestration and coordination
 │   ├── websocket_manager.py # WebSocket connection management
 │   ├── prompt_manager.py   # YAML prompt template system
 │   ├── initialization.py   # Service initialization and validation
 │   └── monitoring.py      # Performance and usage tracking
 
-├── agents/                # AI agent implementations
+├── agents/                # AI agent implementations (LangGraph-based)
 │   ├── base_agent.py      # Base agent class with LangGraph integration
-│   ├── content_creator_agent.py # Enhanced content generation
-│   └── web_research_agent.py    # Web research capabilities
+│   ├── content_creator_agent.py # LangGraph workflow for content generation
+│   └── web_research_agent.py    # Web research capabilities with agentic behavior
 
 ├── handlers/              # WebSocket message handlers
 │   ├── file_handler.py    # File upload and processing
@@ -69,6 +71,7 @@ src/                       # Main source code
 │   └── theme_service.py      # Theme and styling management
 
 ├── workflows/             # LangGraph workflow definitions
+│   ├── content_creation_workflow.py # LangGraph workflow for content creation
 │   ├── slide_generation_workflow.py # Main slide generation pipeline
 │   └── research_workflow.py         # Research integration workflow
 
@@ -91,6 +94,59 @@ tests/                     # Test suite
 ├── test_phase2_integration.py # WebSocket integration tests
 └── test-backend.sh          # Backend test script
 ```
+
+## Service Flow Architecture
+
+### Service Orchestrator (`/src/core/service_orchestrator.py`)
+
+The **ServiceOrchestrator** manages the proper flow between all backend services with clear separation of concerns:
+
+```python
+class ServiceOrchestrator:
+    """
+    Orchestrates the flow between all backend services
+    
+    Flow Architecture:
+    1. File Processing: FileService handles uploads and content extraction
+    2. Content Planning: LLMService or ContentCreatorAgent creates content plans
+    3. Research Enhancement: WebResearchAgent (optional) enhances content with external data
+    4. Content Generation: ContentCreatorAgent generates detailed slide content using LangGraph
+    5. Theme Application: ThemeService applies styling and visual design
+    6. Slide Generation: SlideService creates final HTML/PowerPoint output
+    """
+```
+
+### Component Responsibilities
+
+**Core Services:**
+- **FileService**: Handles file uploads, validation, and content extraction
+- **LLMService**: Basic LLM operations and simple content planning
+- **AIService**: Enhanced AI operations with complex content planning
+- **SlideService**: Final slide generation (HTML/PowerPoint output)
+- **ThemeService**: Theme and styling management
+
+**AI Agents (LangGraph-based):**
+- **ContentCreatorAgent**: Uses LangGraph workflows for structured content creation with proper state management
+- **WebResearchAgent**: Performs web research with agentic behavior for content enhancement
+
+**Workflows:**
+- **ContentCreationWorkflow**: LangGraph-based workflow with nodes for analysis, planning, research enhancement, content generation, and finalization
+- **ResearchWorkflow**: Structured research integration with external data sources
+
+### Proper Service Flow
+
+1. **File Upload** → FileService processes and extracts content
+2. **Content Planning** → LLMService or AIService creates structured content plan
+3. **Research Enhancement** (Optional) → WebResearchAgent enhances with external data
+4. **Content Generation** → ContentCreatorAgent uses LangGraph workflow for detailed content
+5. **Theme Application** → ThemeService applies visual styling (NOT content generation)
+6. **Slide Generation** → SlideService creates final output
+
+**Key Principles:**
+- **Content-First**: All content generated from uploaded files, not themes
+- **Theme-as-Styling**: Themes only affect visual presentation, never content
+- **LangGraph Workflows**: Agentic behavior with proper state management
+- **Service Separation**: Clear boundaries between file processing, AI generation, and output
 
 ## Key Features & Implementation
 

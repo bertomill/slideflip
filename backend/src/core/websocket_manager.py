@@ -175,11 +175,13 @@ class WebSocketManager:
         - Use this structure to persist user progress across page refreshes
         """
         try:
-            # Initialize session data structure for all 5 builder steps
+            # Initialize session data structure for all 6 builder steps (added slide description step)
             self.client_data[client_id] = {
                 "session_id": client_id,
                 # Step 1: Upload component data
                 "step_1_upload": {"completed": False, "data": {}},
+                # Step 1b: Slide description component data
+                "step_1b_slide_description": {"completed": False, "data": {}},
                 # Step 2: Theme selection component data
                 "step_2_theme": {"completed": False, "data": {}},
                 # Step 3: Research component data

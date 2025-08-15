@@ -12,7 +12,7 @@ from src.core.config import Settings
 logger = logging.getLogger(__name__)
 
 
-class LLMService:
+class EnhancedLLMService:
     """
     Simplified LLM service with robust content generation
     
@@ -34,7 +34,7 @@ class LLMService:
             api_key = self.settings.OPENAI_API_KEY
             if api_key:
                 self.client = OpenAI(api_key=api_key)
-                logger.debug("OpenAI client initialized successfully")
+                logger.info("OpenAI client initialized successfully")
             else:
                 logger.warning("OpenAI API key not found. LLM features will be disabled.")
                 self.client = None
@@ -47,7 +47,7 @@ class LLMService:
         try:
             from src.agents.content_creator_agent import ContentCreatorAgent
             agent = ContentCreatorAgent()
-            logger.debug("ContentCreatorAgent initialized successfully")
+            logger.info("ContentCreatorAgent initialized successfully")
             return agent
         except Exception as e:
             logger.info(f"ContentCreatorAgent not available: {e}")
@@ -207,7 +207,7 @@ Be creative and expansive - turn brief topics into rich, informative content."""
             if research_data:
                 user_prompt_parts.append(f"\nIncorporating this research:\n{research_data[:500]}...")
             
-            user_prompt_parts.append("""
+            user_prompt_parts.append(f"""
 
 Please generate a detailed presentation content plan that includes:
 
@@ -220,7 +220,7 @@ Please generate a detailed presentation content plan that includes:
    - Key insights and takeaways
 4. **Conclusion**: Summary and call-to-action
 
-Make the content engaging, informative, and suitable for a professional presentation. Expand on the topic with relevant details, examples, and insights even if the input is minimal.""")
+Make the content engaging, informative, and suitable for a professional presentation. Expand on the topic with relevant details, examples, and insights even if the input is minimal."""
 
             user_prompt = '\n'.join(user_prompt_parts)
 
