@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
-import ReactDOM from 'react-dom/client';
-import { Canvas, Textbox, Rect, Circle, Line, Triangle, FabricObject, fabric } from 'fabric';
+import { Canvas, Textbox, Rect, Circle, Line, Triangle, FabricObject } from 'fabric';
+import { loadSVGFromString, util } from 'fabric';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,9 +28,9 @@ import {
   // General
   Heart, Home, Settings, Search, Calendar, Clock,
   // Upload
-  Upload, Image, FileImage,
+  Upload, Image as ImageIcon,
   // AI Chat
-  Bot, MessageSquare, Sparkles, Send
+  Bot, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -71,7 +71,7 @@ function TemplateEditorInner() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomLevelRef = useRef(1);
-  const updateCanvasSizeRef = useRef<(zoom: number) => void>();
+  const updateCanvasSizeRef = useRef<((zoom: number) => void) | null>(null);
 
   // Load user authentication
   useEffect(() => {
@@ -372,16 +372,17 @@ function TemplateEditorInner() {
   };
 
   // Duplicate selected object
-  const duplicateSelected = () => {
+  const duplicateSelected = async () => {
     if (!canvas || !selectedObject) return;
-    
-    selectedObject.clone((cloned: FabricObject) => {
-      cloned.left += 20;
-      cloned.top += 20;
-      canvas.add(cloned);
-      canvas.setActiveObject(cloned);
-      canvas.renderAll();
-    });
+    // @ts-expect-error Fabric v6 clone returns a promise in some builds; fall back to callback signature
+    const cloned: FabricObject = typeof (selectedObject as any).clone === 'function' && (await (selectedObject as any).clone?.()) || (selectedObject as any).clone;
+    if (!cloned) return;
+    // Offset the clone for visibility
+    (cloned as any).left = ((selectedObject as any).left || 0) + 20;
+    (cloned as any).top = ((selectedObject as any).top || 0) + 20;
+    canvas.add(cloned);
+    canvas.setActiveObject(cloned);
+    canvas.renderAll();
   };
 
   // Update selected object properties
@@ -512,7 +513,7 @@ function TemplateEditorInner() {
   };
 
   // Add icon to canvas using proper SVG loading
-  const addIcon = (IconComponent: React.ComponentType<{ className?: string }>, iconName: string) => {
+  const addIcon = (_IconComponent: React.ComponentType<{ className?: string }>, iconName: string) => {
     if (!canvas) return;
     
     try {
@@ -520,8 +521,8 @@ function TemplateEditorInner() {
       const svgString = getIconSVG(iconName);
       
       // Load SVG into Fabric.js canvas
-      fabric.loadSVGFromString(svgString, (objects, options) => {
-        const icon = fabric.util.groupSVGElements(objects, options);
+      loadSVGFromString(svgString, (objects: any[], options: any) => {
+        const icon = util.groupSVGElements(objects, options);
         
         // Set position and properties
         icon.set({
@@ -531,7 +532,7 @@ function TemplateEditorInner() {
           scaleY: 1,
         });
         
-        canvas.add(icon);
+        canvas.add(icon as unknown as FabricObject);
         canvas.setActiveObject(icon);
         canvas.renderAll();
       });
@@ -573,34 +574,43 @@ function TemplateEditorInner() {
     }
   ]);
   const [chatInput, setChatInput] = useState('');
+  const [isAiThinking, setIsAiThinking] = useState(false);
   
   // Handle AI chat submission
   const handleChatSubmit = async () => {
     if (!chatInput.trim()) return;
+    handleSendMessage(chatInput);
+  };
+
+  // Handle sending messages (both manual input and suggestions)
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
     
     const userMessage = {
       id: Date.now().toString(),
       role: 'user' as const,
-      content: chatInput,
+      content: message,
       timestamp: new Date()
     };
     
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
+    setIsAiThinking(true);
     
     // Simulate AI response (in a real app, this would call an AI API)
     setTimeout(() => {
       const aiResponse = {
         id: (Date.now() + 1).toString(),
         role: 'assistant' as const,
-        content: generateAIResponse(chatInput),
+        content: generateAIResponse(message),
         timestamp: new Date()
       };
       
       setChatMessages(prev => [...prev, aiResponse]);
+      setIsAiThinking(false);
       
       // Apply the requested changes to the canvas
-      applyAIChanges(chatInput);
+      applyAIChanges(message);
     }, 1000);
   };
   
@@ -619,7 +629,7 @@ function TemplateEditorInner() {
     } else if (input.includes('color') || input.includes('background')) {
       return 'I can help you change colors! Select any element and use the Properties panel to adjust its fill and stroke colors. What specific color changes would you like?';
     } else {
-      return 'I can help you add text, shapes, icons, or modify existing elements. Try asking me to "add a title", "create a circle", or "add a business icon". What would you like to create?';
+      return 'I can help you add text, shapes, icons, or modify existing elements. Try asking me to &quot;add a title&quot;, &quot;create a circle&quot;, or &quot;add a business icon&quot;. What would you like to create?';
     }
   };
   
@@ -1020,25 +1030,29 @@ function TemplateEditorInner() {
           
           {/* Mode Toggle Buttons - Only show when expanded */}
           {!rightSidebarCollapsed && (
-            <div className="absolute top-4 right-4 z-10 flex gap-1 bg-background/90 backdrop-blur-sm rounded-lg border p-1">
-              <Button
-                variant={rightSidebarMode === 'editor' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setRightSidebarMode('editor')}
-                className="h-8 px-3"
-              >
-                <Type className="h-4 w-4 mr-1" />
-                <span className="text-xs">Editor</span>
-              </Button>
-              <Button
-                variant={rightSidebarMode === 'ai' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setRightSidebarMode('ai')}
-                className="h-8 px-3"
-              >
-                <Bot className="h-4 w-4 mr-1" />
-                <span className="text-xs">AI Chat</span>
-              </Button>
+            <div className="absolute top-0 left-0 right-0 z-10 bg-background border-b">
+              <div className="flex w-full p-2 gap-1">
+                <Button
+                  variant={rightSidebarMode === 'editor' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRightSidebarMode('editor')}
+                  className="flex-1 h-9 justify-center"
+                >
+                  <Type className="h-4 w-4 mr-2" />
+                  <span className="text-sm font-medium">Editor</span>
+                </Button>
+                <Button
+                  variant={rightSidebarMode === 'ai' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setRightSidebarMode('ai')}
+                  className="flex-1 h-9 justify-center"
+                >
+                  <div className="h-4 w-4 mr-2 rounded-full bg-gradient-to-br from-purple-400 via-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                    <Sparkles className="h-2.5 w-2.5 text-white drop-shadow-sm" />
+                  </div>
+                  <span className="text-sm font-medium">AI Builder</span>
+                </Button>
+              </div>
             </div>
           )}
           
@@ -1081,7 +1095,7 @@ function TemplateEditorInner() {
           )}>
             {rightSidebarMode === 'editor' ? (
               /* Editor Mode */
-              <div className="p-4 space-y-4 sm:space-y-6 pt-14">
+              <div className="p-4 space-y-4 sm:space-y-6 pt-16">
               {/* Add Elements */}
               <Card variant="glass" className="card-contrast">
                 <CardHeader className="p-3 sm:p-4">
@@ -1327,7 +1341,7 @@ function TemplateEditorInner() {
               <Card variant="glass">
                 <CardHeader className="p-3 sm:p-4">
                   <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-semibold tracking-tight">
-                    <Image className="h-4 w-4 text-primary" />
+                    <ImageIcon className="h-4 w-4 text-primary" />
                     Media
                   </CardTitle>
                 </CardHeader>
@@ -1441,6 +1455,128 @@ function TemplateEditorInner() {
                 </Card>
               )}
             </div>
+            ) : (
+              /* AI Builder Mode */
+              <div className="h-full flex flex-col pt-16">
+                {/* Chat Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {chatMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        "flex",
+                        message.role === 'user' ? 'justify-end' : 'justify-start'
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                          message.role === 'user' 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          {message.role === 'assistant' && (
+                            <div className="h-4 w-4 mt-0.5 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-400 via-purple-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                              <Bot className="h-2.5 w-2.5 text-white drop-shadow-sm" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            {message.content}
+                          </div>
+                        </div>
+                        <div className="text-xs opacity-70 mt-1">
+                          {message.timestamp.toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Empty state */}
+                  {chatMessages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                      <div className="h-12 w-12 mb-4 rounded-full bg-gradient-to-br from-purple-400 via-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                        <Bot className="h-7 w-7 text-white drop-shadow-sm" />
+                      </div>
+                      <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                        AI Design Assistant
+                      </h3>
+                      <p className="text-sm text-muted-foreground/70 mb-6 max-w-xs">
+                        Ask me to help you design your slide. I can add elements, change colors, adjust layouts, and more.
+                      </p>
+                      
+                      {/* Quick suggestions */}
+                      <div className="space-y-2 w-full max-w-xs">
+                        <p className="text-xs text-muted-foreground/60 mb-3">Try asking:</p>
+                        {[
+                          "Add a title and subtitle",
+                          "Change the background to blue",
+                          "Add some bullet points",
+                          "Make the text larger and centered"
+                        ].map((suggestion, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-left text-xs h-auto py-2 px-3 whitespace-normal"
+                            onClick={() => handleSendMessage(suggestion)}
+                          >
+                            "{suggestion}"
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Chat Input */}
+                <div className="border-t p-4">
+                  <form onSubmit={handleChatSubmit} className="space-y-3">
+                    <div className="flex gap-2">
+                      <Input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Describe what you want to add or change..."
+                        className="flex-1"
+                        disabled={isAiThinking}
+                      />
+                      <Button type="submit" disabled={!chatInput.trim() || isAiThinking}>
+                        {isAiThinking ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {/* Quick actions */}
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        "Add text",
+                        "Change colors",
+                        "Add shapes",
+                        "Adjust layout"
+                      ].map((action) => (
+                        <Button
+                          key={action}
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setChatInput(action)}
+                          disabled={isAiThinking}
+                        >
+                          {action}
+                        </Button>
+                      ))}
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
