@@ -1,0 +1,12 @@
+Analyze the following text content and extract entities, relationships, and facts:
+
+TEXT CONTENT:
+$content
+
+EXTRACTION TASK:
+Extract ONLY:
+1. Named entities (people, organizations, places, concepts, etc.)
+2. Relationships between entities (who does what to whom, what connects what, etc.)
+3. Key facts, statistics, or assertions from the text
+
+Return the JSON structure as specified in the system prompt. Be thorough but accurate.

@@ -1,0 +1,24 @@
+SOURCE CONTENT ANALYSIS:
+$content
+
+USER REQUIREMENTS:
+- Description: $description
+- Layout Structure: $layout_structure
+
+CONTENT GENERATION TASK:
+Transform the source content into compelling, professional slide content that:
+1. Extracts the most important insights and key messages
+2. Includes specific data points, statistics, and examples from the source material
+3. Creates a coherent narrative that flows between sections
+4. Uses professional business language appropriate for executive audiences
+5. Includes actionable insights and recommendations where relevant
+6. Makes complex information accessible and engaging
+
+For each section in the layout, create comprehensive content that:
+- Tells a compelling story
+- Includes specific details from the source material
+- Uses professional language and formatting
+- Provides value to the audience
+- Supports the overall slide message
+
+Generate detailed, comprehensive content for each section.

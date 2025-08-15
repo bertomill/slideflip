@@ -7,6 +7,7 @@ import json
 from typing import Dict, List, Optional, Any
 import openai
 from src.core.config import Settings
+from src.prompts.prompt_loader import PromptLoader
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class LLMService:
     def __init__(self):
         self.settings = Settings()
         self.client = None
+        self.prompt_loader = PromptLoader()
         self._initialize_client()
     
     def _initialize_client(self):
@@ -75,72 +77,21 @@ THEME INFORMATION:
 Please incorporate this theme's visual style, color palette, and design philosophy into the layout.
 """
             
-            system_prompt = f"""You are an expert presentation designer with 15+ years of experience creating compelling slides for Fortune 500 companies, TED talks, and academic conferences. Your task is to analyze content and user requirements to design an optimal, professional slide layout that maximizes impact and engagement.
-
-CRITICAL REQUIREMENTS:
-- Create layouts that tell a story and guide the audience's attention
-- Design for visual hierarchy and readability
-- Ensure content is well-distributed across the slide
-- Consider the theme and make it cohesive with the design
-- Create multiple sections that work together to present the information effectively
-{theme_context}
-
-Return ONLY a JSON object with the following structure (no markdown formatting, no code blocks):
-{{
-    "layout_type": "title_slide|content_slide|image_slide|mixed|key_insights|comparison|timeline|process",
-    "title": "Compelling, action-oriented slide title",
-    "sections": [
-        {{
-            "type": "text|bullet_list|image|chart|quote|highlight_box|timeline|process_step",
-            "content": "Brief description of what this section will contain",
-            "position": {{"x": 5, "y": 25, "width": 45, "height": 35}},
-            "style": {{"font_size": "18px", "color": "#2c3e50", "alignment": "left", "font_weight": "bold"}}
-        }},
-        {{
-            "type": "text|bullet_list|image|chart|quote|highlight_box|timeline|process_step", 
-            "content": "Brief description of what this section will contain",
-            "position": {{"x": 55, "y": 25, "width": 40, "height": 35}},
-            "style": {{"font_size": "16px", "color": "#34495e", "alignment": "left"}}
-        }}
-    ],
-    "background_style": "gradient|solid|image|pattern",
-    "color_scheme": "professional|creative|minimal|colorful|corporate|academic|modern"
-}}
-
-LAYOUT GUIDELINES:
-- Use 2-4 sections for optimal content distribution
-- Position sections to create visual flow (left to right, top to bottom)
-- Vary section types to maintain interest (text, bullet lists, highlights)
-- Ensure adequate spacing between sections (at least 5% gap)
-- Make title prominent and engaging
-- Consider the content type and create appropriate sections
-"""
-
-            user_prompt = f"""CONTENT ANALYSIS:
-{content[:3000]}...
-
-DESIGN REQUIREMENTS:
-- User Description: {description}
-- Theme: {theme}
-- Available Media: {'Images available' if has_images else 'Text content only'}
-
-LAYOUT DESIGN TASK:
-Create a professional, engaging slide layout that:
-1. Effectively presents the key information from the content
-2. Uses visual hierarchy to guide audience attention
-3. Creates a compelling narrative flow
-4. Maximizes impact and engagement
-5. Works well with the specified theme
-6. Distributes content optimally across the slide
-
-Consider the content type and create appropriate sections:
-- For data-heavy content: Use charts, bullet lists, and highlight boxes
-- For narrative content: Use text sections with compelling storytelling
-- For process content: Use timeline or process step sections
-- For comparison content: Use side-by-side sections
-- For key insights: Use highlight boxes and bullet lists
-
-Design a layout that transforms this content into a compelling, professional presentation slide."""
+            # Load prompts from external files
+            system_variables = {"theme_context": theme_context}
+            user_variables = {
+                "content": content[:3000] if len(content) > 3000 else content,
+                "description": description,
+                "theme": theme,
+                "media_availability": 'Images available' if has_images else 'Text content only'
+            }
+            
+            system_prompt, user_prompt = self.prompt_loader.load_system_user_prompts(
+                "slide_layout_prompt", 
+                "layout", 
+                system_variables, 
+                user_variables
+            )
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -233,60 +184,20 @@ THEME INFORMATION:
 Please ensure the content style and tone match this theme's characteristics.
 """
             
-            system_prompt = f"""You are a senior content strategist and copywriter with 10+ years of experience creating compelling presentation content for Fortune 500 companies, TED talks, and high-profile events. Your task is to transform raw content into engaging, well-structured slide content that tells a compelling story.
-
-CRITICAL REQUIREMENTS:
-- Create content that is concise, impactful, and easy to read
-- Maintain professional tone while being engaging
-- Ensure content fits the specified layout structure
-- Make information scannable and memorable
-- Use active voice and action-oriented language
-{theme_context}
-
-Return ONLY a JSON object with content for each section (no markdown formatting, no code blocks):
-{{
-    "section_0": {{
-        "content": "Engaging, well-formatted content for the first section",
-        "style_notes": "Any specific styling or formatting notes"
-    }},
-    "section_1": {{
-        "content": "Engaging, well-formatted content for the second section", 
-        "style_notes": "Any specific styling or formatting notes"
-    }}
-}}
-
-CONTENT GUIDELINES:
-- Keep bullet points to 3-5 items maximum
-- Use clear, action-oriented language
-- Include key insights and takeaways
-- Make content scannable and memorable
-- Ensure proper hierarchy and flow
-"""
-
-            user_prompt = f"""SOURCE CONTENT ANALYSIS:
-{content[:3000]}...
-
-USER REQUIREMENTS:
-- Description: {description}
-- Layout Structure: {json.dumps(layout, indent=2)}
-
-CONTENT GENERATION TASK:
-Transform the source content into compelling, professional slide content that:
-1. Extracts the most important insights and key messages
-2. Includes specific data points, statistics, and examples from the source material
-3. Creates a coherent narrative that flows between sections
-4. Uses professional business language appropriate for executive audiences
-5. Includes actionable insights and recommendations where relevant
-6. Makes complex information accessible and engaging
-
-For each section in the layout, create comprehensive content that:
-- Tells a compelling story
-- Includes specific details from the source material
-- Uses professional language and formatting
-- Provides value to the audience
-- Supports the overall slide message
-
-Generate detailed, comprehensive content for each section."""
+            # Load prompts from external files
+            system_variables = {"theme_context": theme_context}
+            user_variables = {
+                "content": content[:3000] + "..." if len(content) > 3000 else content,
+                "description": description,
+                "layout_structure": json.dumps(layout, indent=2)
+            }
+            
+            system_prompt, user_prompt = self.prompt_loader.load_system_user_prompts(
+                "slide_content_prompt", 
+                "content", 
+                system_variables, 
+                user_variables
+            )
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -412,58 +323,18 @@ Generate detailed, comprehensive content for each section."""
             return self._generate_empty_knowledge_graph_data(chunk_index, filename, file_path)
         
         try:
-            system_prompt = """You are an expert knowledge graph extraction specialist. Your task is to analyze text content and extract ONLY three types of information:
-
-1. ENTITIES: Named entities, concepts, organizations, people, places, etc.
-2. RELATIONSHIPS: Connections between entities (subject-verb-object relationships)
-3. FACTS: Key factual information, statistics, claims, or assertions
-
-CRITICAL REQUIREMENTS:
-- Return ONLY a JSON object with the exact structure specified
-- Do not include any explanations, markdown, or additional text
-- Focus on factual, extractable information
-- Be precise and accurate
-- Do not generate or invent information not present in the text
-
-Return ONLY this JSON structure (no other text):
-{
-    "entities": [
-        {
-            "id": "unique_entity_id",
-            "name": "entity_name",
-            "type": "entity_type",
-            "description": "brief_description",
-        }
-    ],
-    "relationships": [
-        {
-            "id": "unique_relationship_id",
-            "source_entity": "source_entity_id",
-            "target_entity": "target_entity_id",
-            "relationship_type": "relationship_label",
-        }
-    ],
-    "facts": [
-        {
-            "id": "unique_fact_id",
-            "content": "factual_statement",
-            "source_entities": ["entity_id1", "entity_id2"],
-        }
-    ]
-}"""
-
-            user_prompt = f"""Analyze the following text content and extract entities, relationships, and facts:
-
-TEXT CONTENT:
-{content}
-
-EXTRACTION TASK:
-Extract ONLY:
-1. Named entities (people, organizations, places, concepts, etc.)
-2. Relationships between entities (who does what to whom, what connects what, etc.)
-3. Key facts, statistics, or assertions from the text
-
-Return the JSON structure as specified in the system prompt. Be thorough but accurate."""
+            # Load prompts from external files
+            system_variables = {}
+            user_variables = {
+                "content": content
+            }
+            
+            system_prompt, user_prompt = self.prompt_loader.load_system_user_prompts(
+                "knowledge_graph_prompt", 
+                "extraction", 
+                system_variables, 
+                user_variables
+            )
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -658,60 +529,47 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
             raise Exception("LLM service not available")
         
         try:
-            # PROMPT CONSTRUCTION: Build the comprehensive prompt for OpenAI GPT based on available data
-            # This prompt engineering approach ensures consistent, high-quality slide generation
-            # by providing clear requirements, examples, and constraints to the AI model
-            prompt = f"""Create a professional PowerPoint slide in HTML format based on the following requirements:
-
-SLIDE DESCRIPTION: {description}
-
-THEME: {theme}
-
-"""
-
-            # Add content plan from content planning step if available
-            # This provides structured guidance for what should be included on the slide
+            # Build optional content sections dynamically
+            content_plan = ""
             if contentPlan:
-                prompt += f"""CONTENT PLAN:
+                content_plan = f"""CONTENT PLAN:
 {contentPlan}
 
 """
 
-            # Add user feedback and additional requirements if provided
-            # This allows for iterative improvements and specific user requests
+            user_feedback = ""
             if userFeedback:
-                prompt += f"""USER FEEDBACK & ADDITIONAL REQUIREMENTS:
+                user_feedback = f"""USER FEEDBACK & ADDITIONAL REQUIREMENTS:
 {userFeedback}
 
 """
 
-            # Append research data to prompt if provided by user
-            # This allows AI to incorporate relevant insights and statistics
+            research_data = ""
             if researchData:
-                prompt += f"""RESEARCH DATA TO INCORPORATE:
+                research_data = f"""RESEARCH DATA TO INCORPORATE:
 {researchData}
 
 """
 
-            # Add parsed document content if available
-            # This provides the actual content from uploaded documents for AI to use
+            document_content = ""
             if documents and len(documents) > 0:
-                prompt += "DOCUMENT CONTENT:\n"
+                document_content = "DOCUMENT CONTENT:\n"
 
                 # If we have parsed document content, include the actual text
                 if len(documents) > 0 and isinstance(documents[0], dict) and 'content' in documents[0]:
                     # documents contains parsed content
                     for index, doc in enumerate(documents):
                         if doc.get('success') and doc.get('content'):
-                            prompt += f"Document {index + 1} ({doc.get('filename', 'unknown')}):\n{doc['content']}\n\n"
+                            document_content += f"Document {index + 1} ({doc.get('filename', 'unknown')}):\n{doc['content']}\n\n"
                         else:
-                            prompt += f"Document {index + 1} ({doc.get('filename', 'unknown')}): [Content extraction failed]\n\n"
+                            document_content += f"Document {index + 1} ({doc.get('filename', 'unknown')}): [Content extraction failed]\n\n"
                 else:
                     # Fallback: just mention document count if no parsed content available
-                    prompt += f"User has uploaded {len(documents)} document(s) for reference.\n\n"
+                    document_content += f"User has uploaded {len(documents)} document(s) for reference.\n\n"
 
-            # TEMPLATE EXAMPLES: For now, we'll use a basic template example
-            # TODO: Integrate with template service to fetch actual examples
+            # Build templates content (for future integration with template service)
+            # TODO: Replace this hardcoded template with dynamic template fetching from template service
+            # This allows different templates based on theme, user preferences, or A/B testing
             templatesContent = f"""EXAMPLE TEMPLATE TO FOLLOW:
 Here is an example of a well-designed slide that you should use as inspiration for structure, styling, and layout:
 
@@ -745,94 +603,24 @@ Please create a slide that follows similar structural patterns, CSS scoping prac
 
 """
 
-            prompt += templatesContent
-
-            # SLIDE GENERATION REQUIREMENTS: Complete the prompt with detailed requirements and style guidelines
-            # This section emphasizes accessibility, readability, and professional appearance
-            # Key focus areas: CSS scoping, accessibility compliance, and embeddable HTML output
-            prompt += f"""REQUIREMENTS:
-1. Create a complete HTML slide that looks professional and presentation-ready
-2. Use modern CSS styling with the {theme} theme
-3. Incorporate the research data naturally into the slide content
-4. Make it visually appealing with proper typography, spacing, and layout
-5. Include relevant data points, statistics, or insights from the research
-6. Use a clean, readable design suitable for presentations
-7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
-8. Make it responsive and well-structured
-9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
-
-ASPECT RATIO REQUIREMENTS:
-// ============================================================================
-// 16:9 ASPECT RATIO OPTIMIZATION: Critical design constraints for slide display
-// ============================================================================
-// The generated slide must work perfectly within a 16:9 aspect ratio container
-// This ensures consistency between web preview and PowerPoint export formats
-- Design the slide content to work optimally in a 16:9 aspect ratio container
-- This matches standard PowerPoint slide dimensions (1920x1080, 1280x720, etc.)
-- Content should be well-proportioned and not cramped when displayed in this format
-- Use appropriate font sizes and spacing that work well in the 16:9 format
-- Consider that the slide will be viewed at various sizes but always maintain 16:9 proportions
-
-OUTPUT FORMAT:
-Return a complete, self-contained HTML slide that can be embedded safely. You can choose either:
-1. A complete HTML document with scoped CSS in the <head> (recommended for complex layouts)
-2. A single container div with inline <style> tag containing scoped CSS (simpler embedding)
-
-CRITICAL CSS SCOPING REQUIREMENTS:
-- ALL CSS must be scoped to prevent affecting the parent page
-- If using a complete HTML document, scope all styles to a main container class
-- If using a div container, scope all styles to that container class
-- NEVER use global selectors like body, html, *, or unscoped element selectors
-- Example: Use ".slide-container h1" instead of just "h1"
-- Example: Use ".slide-container .title" instead of just ".title"
-
-STYLE GUIDELINES:
-- Use professional fonts (Arial, Helvetica, or similar)
-- CRITICAL: Ensure high contrast text - use dark text (#333333 or darker) on light backgrounds, never light grey text
-- Main headings should be #1a1a1a or #000000 for maximum readability
-- Body text should be #333333 minimum, never lighter than #555555
-- Background colors should provide strong contrast with text
-- Include appropriate margins, padding, and spacing optimized for 16:9 viewing
-- Use bullet points, headings, and visual hierarchy effectively
-- Incorporate any statistics or data points from the research prominently
-- Make the layout clean and uncluttered, suitable for 16:9 presentation format
-- Test color combinations for WCAG accessibility standards
-
-PREFERRED STRUCTURE (Option 1 - Complete HTML):
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-.slide-main {{ 
-  width: 100%; 
-  height: 100%; 
-  background: white; 
-  padding: 40px; 
-  box-sizing: border-box; 
-  font-family: Arial, sans-serif;
-  display: flex;                    /* Enable flexbox layout for vertical centering */
-  flex-direction: column;           /* Stack content vertically */
-  justify-content: center;          /* Center content vertically in 16:9 container */
-}}
-.slide-main h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
-.slide-main p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
-</style>
-</head>
-<body>
-<div class="slide-main">
-  <!-- Your slide content here -->
-</div>
-</body>
-</html>
-
-ALTERNATIVE STRUCTURE (Option 2 - Container div):
-<div class="slide-container" style="width: 100%; height: 100%; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center;">
-  <style>
-    .slide-container h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
-    .slide-container p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
-  </style>
-  <!-- Your slide content here -->
-</div>"""
+            # Load prompts from external files
+            system_variables = {}
+            user_variables = {
+                "description": description,
+                "theme": theme,
+                "content_plan": content_plan,
+                "user_feedback": user_feedback,
+                "research_data": research_data,
+                "document_content": document_content,
+                "templates_content": templatesContent
+            }
+            
+            system_prompt, user_prompt = self.prompt_loader.load_system_user_prompts(
+                "html_generation_prompt", 
+                "slide_html", 
+                system_variables, 
+                user_variables
+            )
 
             # Make API call to OpenAI GPT for slide generation
             # Using specific model, temperature, and token limits for optimal results
@@ -843,11 +631,11 @@ ALTERNATIVE STRUCTURE (Option 2 - Container div):
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert presentation designer who creates professional, visually appealing PowerPoint slides with excellent accessibility and readability. You NEVER use light grey text on light backgrounds and always ensure high contrast ratios. You ALWAYS create complete, working HTML slides that render properly when embedded. You ALWAYS scope ALL CSS to prevent affecting parent page styles. You specialize in incorporating research data and creating clean, modern slide layouts with proper typography contrast. You return valid HTML that displays immediately without errors."
+                        "content": system_prompt
                     },
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": user_prompt
                     }
                 ]
             )

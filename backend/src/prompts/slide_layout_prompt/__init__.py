@@ -1,0 +1,3 @@
+"""
+Slide prompts for layout
+"""

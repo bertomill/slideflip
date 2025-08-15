@@ -1,0 +1,25 @@
+CONTENT ANALYSIS:
+$content
+
+DESIGN REQUIREMENTS:
+- User Description: $description
+- Theme: $theme
+- Available Media: $media_availability
+
+LAYOUT DESIGN TASK:
+Create a professional, engaging slide layout that:
+1. Effectively presents the key information from the content
+2. Uses visual hierarchy to guide audience attention
+3. Creates a compelling narrative flow
+4. Maximizes impact and engagement
+5. Works well with the specified theme
+6. Distributes content optimally across the slide
+
+Consider the content type and create appropriate sections:
+- For data-heavy content: Use charts, bullet lists, and highlight boxes
+- For narrative content: Use text sections with compelling storytelling
+- For process content: Use timeline or process step sections
+- For comparison content: Use side-by-side sections
+- For key insights: Use highlight boxes and bullet lists
+
+Design a layout that transforms this content into a compelling, professional presentation slide.

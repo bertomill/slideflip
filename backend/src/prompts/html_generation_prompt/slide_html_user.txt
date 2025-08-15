@@ -1,0 +1,91 @@
+Create a professional PowerPoint slide in HTML format based on the following requirements:
+
+SLIDE DESCRIPTION: $description
+
+THEME: $theme
+
+$content_plan$user_feedback$research_data$document_content$templates_content
+
+REQUIREMENTS:
+1. Create a complete HTML slide that looks professional and presentation-ready
+2. Use modern CSS styling with the $theme theme
+3. Incorporate the research data naturally into the slide content
+4. Make it visually appealing with proper typography, spacing, and layout
+5. Include relevant data points, statistics, or insights from the research
+6. Use a clean, readable design suitable for presentations
+7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
+8. Make it responsive and well-structured
+9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
+
+ASPECT RATIO REQUIREMENTS:
+// ============================================================================
+// 16:9 ASPECT RATIO OPTIMIZATION: Critical design constraints for slide display
+// ============================================================================
+// The generated slide must work perfectly within a 16:9 aspect ratio container
+// This ensures consistency between web preview and PowerPoint export formats
+- Design the slide content to work optimally in a 16:9 aspect ratio container
+- This matches standard PowerPoint slide dimensions (1920x1080, 1280x720, etc.)
+- Content should be well-proportioned and not cramped when displayed in this format
+- Use appropriate font sizes and spacing that work well in the 16:9 format
+- Consider that the slide will be viewed at various sizes but always maintain 16:9 proportions
+
+OUTPUT FORMAT:
+Return a complete, self-contained HTML slide that can be embedded safely. You can choose either:
+1. A complete HTML document with scoped CSS in the <head> (recommended for complex layouts)
+2. A single container div with inline <style> tag containing scoped CSS (simpler embedding)
+
+CRITICAL CSS SCOPING REQUIREMENTS:
+- ALL CSS must be scoped to prevent affecting the parent page
+- If using a complete HTML document, scope all styles to a main container class
+- If using a div container, scope all styles to that container class
+- NEVER use global selectors like body, html, *, or unscoped element selectors
+- Example: Use ".slide-container h1" instead of just "h1"
+- Example: Use ".slide-container .title" instead of just ".title"
+
+STYLE GUIDELINES:
+- Use professional fonts (Arial, Helvetica, or similar)
+- CRITICAL: Ensure high contrast text - use dark text (#333333 or darker) on light backgrounds, never light grey text
+- Main headings should be #1a1a1a or #000000 for maximum readability
+- Body text should be #333333 minimum, never lighter than #555555
+- Background colors should provide strong contrast with text
+- Include appropriate margins, padding, and spacing optimized for 16:9 viewing
+- Use bullet points, headings, and visual hierarchy effectively
+- Incorporate any statistics or data points from the research prominently
+- Make the layout clean and uncluttered, suitable for 16:9 presentation format
+- Test color combinations for WCAG accessibility standards
+
+PREFERRED STRUCTURE (Option 1 - Complete HTML):
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.slide-main {{ 
+  width: 100%; 
+  height: 100%; 
+  background: white; 
+  padding: 40px; 
+  box-sizing: border-box; 
+  font-family: Arial, sans-serif;
+  display: flex;                    /* Enable flexbox layout for vertical centering */
+  flex-direction: column;           /* Stack content vertically */
+  justify-content: center;          /* Center content vertically in 16:9 container */
+}}
+.slide-main h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+.slide-main p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+</style>
+</head>
+<body>
+<div class="slide-main">
+  <!-- Your slide content here -->
+</div>
+</body>
+</html>
+
+ALTERNATIVE STRUCTURE (Option 2 - Container div):
+<div class="slide-container" style="width: 100%; height: 100%; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center;">
+  <style>
+    .slide-container h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+    .slide-container p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+  </style>
+  <!-- Your slide content here -->
+</div>

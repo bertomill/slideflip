@@ -213,7 +213,6 @@ class SlideService:
             return []
 
     # AI Integration Methods - Core slide generation functionality
-
     async def generate_slide_with_ai(
         self,
         client_id: str,
