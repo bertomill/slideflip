@@ -59,11 +59,11 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [canvas, setCanvas] = useState<Canvas | null>(null);
-  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [canvasKey, setCanvasKey] = useState(0); // Add this line
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false); 
   const [templateSaved, setTemplateSaved] = useState(false);
   const [lastPrompt, setLastPrompt] = useState<string>("");
-  const [canvasKey, setCanvasKey] = useState(0);
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -84,15 +84,13 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
       : undefined;
 
     return {
-      description: slideData.description,
-      theme: slideData.selectedTheme || "Professional",
-      customColors: slideData.selectedPalette, // Include custom color palette
-      researchData: slideData.wantsResearch ? slideData.researchData : undefined,
-      contentPlan: slideData.contentPlan,
-      userFeedback: typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
-      documents: simplifiedDocs,
-      format: "json" // Request JSON format instead of HTML
-      , model: modelAwareSlideData.selectedModel || undefined
+      client_id: `frontend_${Date.now()}`,
+      slide_description: overrideFeedback || slideData.description,
+      documents: simplifiedDocs,  // ← ADD THIS LINE!
+      top_k: 10,
+      similarity_threshold: 0.3,
+      include_embeddings: false,
+      max_tokens: 2000
     };
   };
 
@@ -119,54 +117,87 @@ export function PreviewStep({ slideData, updateSlideData, onPrev }: PreviewStepP
     }
 
     setIsGenerating(true);
-    
+
     try {
       const payload = buildRequestPayload(overrideFeedback);
-      console.log("📦 Request payload:", payload);
+    
+      // 🔍 DEBUG: Log what's being sent to backend
+      console.log("🔍 FULL PAYLOAD TO BACKEND:", JSON.stringify(payload, null, 2));
+      console.log("🔍 DOCUMENTS ARRAY:", payload.documents);
+      console.log("🔍 SLIDE DESCRIPTION:", payload.slide_description);
 
-      console.log("🌐 Making API call to /api/generate-slide-json...");
-      const response = await fetch("/api/generate-slide-json", {
+      const response = await fetch("http://localhost:8000/api/graph-query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      console.log("📡 API Response status:", response.status, response.statusText);
+      // ADD THIS DEBUG LOG:
+      console.log("🔍 BACKEND RESPONSE STATUS:", response.status);
+      console.log("🔍 RESPONSE HEADERS:", [...response.headers.entries()]);
+      const responseText = await response.text(); // Get raw response
+      console.log("🔍 RAW BACKEND RESPONSE:", responseText);
+
+      // Then try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("🔍 PARSED BACKEND DATA:", data);
+      } catch (e) {
+        console.error("❌ Backend returned non-JSON:", responseText.substring(0, 200));
+        return;
+      }
 
       if (response.ok) {
-        const data = await response.json();
-        console.log("📄 API Response data:", data);
-        
-        if (data?.success && data?.slideJson) {
-          console.log("✅ Slide generation successful!");
-          console.log("🎨 Generated slide JSON:", data.slideJson);
-          
-          // Capture the prompt for debugging
-          if (data.debugInfo?.prompt) {
-            setLastPrompt(data.debugInfo.prompt);
-            console.log("📝 Prompt used:", data.debugInfo.prompt);
-          }
-          
-          updateSlideData({ slideJson: data.slideJson });
+        // Look for slideJson in the data object
+        if (data?.success && data?.data?.slideJson) {
+          console.log("✅ Found slideJson:", data.data.slideJson);
+          updateSlideData({ slideJson: data.data.slideJson });
           return;
         } else {
-          console.error("❌ API returned success=false or no slideJson");
-          console.error("🔍 Response details:", data);
-        }
-      } else {
-        // Try to get error details from response
-        try {
-          const errorData = await response.json();
-          console.error("❌ API request failed with error data:", errorData);
-        } catch (parseErr) {
-          console.error("❌ API request failed and couldn't parse error response");
+          console.log("⚠️ No slideJson found in response:", data);
         }
       }
-      
-      // If we get here, API didn't return expected data, use fallback
-      console.log("🔄 API response not successful, using fallback slide");
-      createFallbackSlide();
-      
+
+      // Fallback to a sample slide if API fails
+      console.log("🔄 Using fallback slide");
+      const sampleSlide: SlideDefinition = {
+        id: 'generated-slide',
+        background: { color: 'ffffff' },
+        objects: [
+          {
+            type: 'text',
+            text: slideData.description || 'Your Presentation Title',
+            options: {
+              x: 0.5,
+              y: 2.0,
+              w: 9,
+              h: 1.5,
+              fontSize: 44,
+              fontFace: 'Arial',
+              color: '003366',
+              bold: true,
+              align: 'center',
+              valign: 'middle'
+            }
+          },
+          {
+            type: 'text',
+            text: 'Generated from your content',
+            options: {
+              x: 0.5,
+              y: 3.5,
+              w: 9,
+              h: 0.75,
+              fontSize: 24,
+              fontFace: 'Arial',
+              color: '666666',
+              align: 'center'
+            }
+          }
+        ]
+      };
+      updateSlideData({ slideJson: sampleSlide });
     } catch (err) {
       console.error("💥 Slide generation network/parsing error:", err);
       console.error("🔍 Error details:", {

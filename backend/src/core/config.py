@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         env_file=(".env.local", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=True,
+        extra="ignore"  # Ignore extra fields not defined in this model
     )
     
     # Server settings - Frontend should connect to these endpoints
@@ -48,6 +49,26 @@ class Settings(BaseSettings):
     # WebSocket settings - Use these for real-time progress updates
     WEBSOCKET_PING_INTERVAL: int = 30  # Ping every 30 seconds to keep connection alive
     WEBSOCKET_PING_TIMEOUT: int = 10   # Timeout after 10 seconds if no pong response
+
+    # Database settings
+    DATABASE_URL: Optional[str] = None
+    
+    # External APIs
+    TAVILY_API_KEY: Optional[str] = None
+    
+    # Frontend URLs (for CORS/integration)
+    NEXT_PUBLIC_BACKEND_URL: Optional[str] = None
+    NEXT_PUBLIC_BACKEND_WS_URL: Optional[str] = None
+    
+    # LDAP settings (optional features)
+    LDAP_URL: Optional[str] = None
+    LDAP_BASE_DN: Optional[str] = None
+    LDAP_BIND_DN: Optional[str] = None
+    LDAP_BIND_PASSWORD: Optional[str] = None
+    LDAP_USER_SEARCH_BASE: Optional[str] = None
+    LDAP_USER_SEARCH_FILTER: Optional[str] = None
+    LDAP_GROUP_SEARCH_BASE: Optional[str] = None
+    LDAP_GROUP_SEARCH_FILTER: Optional[str] = None
     
     # Processing settings - Important for progress indicators and timeouts
     MAX_PROCESSING_TIME: int = 300     # 5 minutes - show timeout warning to users
