@@ -343,7 +343,18 @@ curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
   -H 'Content-Type: application/json' \
   -d '{"id":"three-column-kpis-01","name":"Three Column KPIs"}'
 
+# New: Professional Gradient template
+curl -s -X POST http://localhost:3000/api/templates/upsert-fabric \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"professional-gradient-01","name":"Professional Gradient"}'
+
 # Note: `id` refers to the JSON filename under templates/fabric; the DB row id remains a UUID.
+```
+
+Bulk import all Fabric templates found in `templates/fabric` at once:
+
+```bash
+curl -s -X POST http://localhost:3000/api/import-fabric-templates
 ```
 
 ### Debugging preview rendering
