@@ -58,6 +58,7 @@ class SlideGenerationMessage(BaseModel):
     userFeedback: Optional[str] = Field(None, description="User's additional requirements and modifications")
     documents: Optional[List[Dict[str, Any]]] = Field(None, description="Optional uploaded files for additional context")
     model: Optional[str] = Field("gpt-4o", description="AI model to use for generation")
+    slideCount: Optional[int] = Field(5, description="Number of slides to generate")
     client_id: Optional[str] = Field(None, description="Client identifier")
 
 class ResearchRequestMessage(BaseModel):

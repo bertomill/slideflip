@@ -69,13 +69,16 @@ export type SlideData = {
   description: string;      // User's description of what the slide should contain
   selectedTheme: string;    // Visual theme choice for the presentation
   selectedPalette?: string[]; // Hex colors chosen/generated for this slide
+  slideCount?: number;      // Number of slides to generate (default: 5)
   wantsResearch: boolean;   // Whether user wants additional research performed
   researchOptions?: ResearchOptions; // Customizable research parameters
   researchData?: string;    // Optional research results from external sources
   contentPlan?: string;     // AI-generated content plan for user review
   userFeedback?: string;    // User's feedback and additional requirements
-  slideHtml?: string;       // Generated HTML content for the slide (legacy)
-  slideJson?: any;          // Generated JSON slide definition for Fabric.js/PptxGenJS
+  slideHtml?: string;       // Generated HTML content for the slide (legacy - single slide)
+  slideJson?: any;          // Generated JSON slide definition for Fabric.js/PptxGenJS (legacy - single slide)
+  slidesHtml?: string[];    // Generated HTML content for multiple slides
+  slidesJson?: any[];       // Generated JSON slide definitions for multiple slides
 };
 
 // Configuration for the multi-step slide builder process
@@ -282,11 +285,14 @@ function BuildInner() {
             parsedDocuments: presentation.parsed_documents || [],
             selectedTheme: presentation.selected_theme || '',
             selectedPalette: presentation.selected_palette || undefined,
+            slideCount: presentation.slide_count || 5,
             wantsResearch: presentation.wants_research || false,
             researchOptions: presentation.research_options || undefined,
             researchData: presentation.research_data || undefined,
             slideHtml: presentation.slide_html || undefined,
             slideJson: presentation.slide_json || undefined,
+            slidesHtml: presentation.slides_html || undefined,
+            slidesJson: presentation.slides_json || undefined,
             selectedModel: presentation.selected_model || undefined
           }));
           
@@ -377,11 +383,14 @@ function BuildInner() {
         if (updates.parsedDocuments !== undefined) dbUpdates.parsed_documents = updates.parsedDocuments;
         if (updates.selectedTheme !== undefined) dbUpdates.selected_theme = updates.selectedTheme;
         if (updates.selectedPalette !== undefined) dbUpdates.selected_palette = updates.selectedPalette;
+        if (updates.slideCount !== undefined) dbUpdates.slide_count = updates.slideCount;
         if (updates.wantsResearch !== undefined) dbUpdates.wants_research = updates.wantsResearch;
         if (updates.researchOptions !== undefined) dbUpdates.research_options = updates.researchOptions;
         if (updates.researchData !== undefined) dbUpdates.research_data = updates.researchData;
         if (updates.slideHtml !== undefined) dbUpdates.slide_html = updates.slideHtml;
         if (updates.slideJson !== undefined) dbUpdates.slide_json = updates.slideJson;
+        if (updates.slidesHtml !== undefined) dbUpdates.slides_html = updates.slidesHtml;
+        if (updates.slidesJson !== undefined) dbUpdates.slides_json = updates.slidesJson;
         if ((updates as any).selectedModel !== undefined) dbUpdates.selected_model = (updates as any).selectedModel;
         
         // Update step timestamps

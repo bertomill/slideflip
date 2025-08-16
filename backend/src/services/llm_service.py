@@ -518,7 +518,8 @@ Please ensure the content style and tone match this theme's characteristics.
         contentPlan: Optional[str] = None,
         userFeedback: Optional[str] = None,
         documents: Optional[List[Dict[str, Any]]] = None,
-        model: str = "gpt-4o"
+        model: str = "gpt-4o",
+        slideCount: int = 5
     ) -> str:
         """
         Generate professional PowerPoint slide in HTML format using the same prompt engineering as frontend
@@ -612,7 +613,8 @@ Please create a slide that follows similar structural patterns, CSS scoping prac
                 "user_feedback": user_feedback,
                 "research_data": research_data,
                 "document_content": document_content,
-                "templates_content": templatesContent
+                "templates_content": templatesContent,
+                "slide_count": slideCount
             }
             
             system_prompt, user_prompt = self.prompt_loader.load_system_user_prompts(
@@ -640,41 +642,236 @@ Please create a slide that follows similar structural patterns, CSS scoping prac
                 ]
             )
 
-            # Extract the generated slide HTML content from OpenAI response
-            slide_html = completion.choices[0].message.content
+            # Extract the generated slide content from OpenAI response
+            raw_content = completion.choices[0].message.content
 
             # Validate that content was actually generated
-            if not slide_html:
+            if not raw_content:
                 raise Exception('No slide content generated')
 
-            # Clean up the response by extracting HTML from markdown code blocks
-            # OpenAI sometimes wraps HTML in markdown formatting that needs removal
-            if '```html' in slide_html:
-                # Extract content from HTML-specific code blocks
+            # Clean up the response by extracting content from markdown code blocks
+            cleaned_content = raw_content
+            if '```json' in raw_content:
+                # Extract content from JSON-specific code blocks
                 import re
-                html_match = re.search(r'```html\n([\s\S]*?)\n```', slide_html)
-                if html_match:
-                    slide_html = html_match.group(1)
-            elif '```' in slide_html:
+                json_match = re.search(r'```json\n([\s\S]*?)\n```', raw_content)
+                if json_match:
+                    cleaned_content = json_match.group(1)
+            elif '```' in raw_content:
                 # Extract content from generic code blocks
                 import re
-                code_match = re.search(r'```[a-zA-Z]*\n([\s\S]*?)\n```', slide_html)
+                code_match = re.search(r'```[a-zA-Z]*\n([\s\S]*?)\n```', raw_content)
                 if code_match:
-                    slide_html = code_match.group(1)
+                    cleaned_content = code_match.group(1)
 
-            # RESPONSE VALIDATION: Debug logging to monitor OpenAI output quality and format
-            # These logs help troubleshoot issues with slide generation and ensure we receive valid HTML
-            logger.info(f'Generated slide HTML length: {len(slide_html)}')
-            logger.info(f'Generated slide HTML preview: {slide_html[:200]}...')
+            # Try to parse as JSON array format first (new format)
+            try:
+                slides_data = json.loads(cleaned_content)
+                if isinstance(slides_data, dict) and 'slides' in slides_data:
+                    slides_array = slides_data['slides']
+                    if isinstance(slides_array, list) and len(slides_array) > 0:
+                        logger.info(f'✅ Successfully parsed {len(slides_array)} slides from JSON response')
+                        
+                        # Return the first slide for backward compatibility
+                        first_slide = slides_array[0]
+                        
+                        # RESPONSE VALIDATION: Debug logging
+                        logger.info(f'Generated {len(slides_array)} slides')
+                        logger.info(f'First slide preview: {first_slide[:200]}...')
+                        
+                        return first_slide.strip()
+                    else:
+                        logger.warning('JSON response does not contain valid slides array')
+                else:
+                    logger.warning('JSON response does not contain slides field')
+            except json.JSONDecodeError as e:
+                logger.warning(f'Failed to parse JSON response: {e}')
+            
+            # Fallback to treating as single HTML content (legacy format)
+            logger.info('Using fallback single HTML parsing')
+            
+            # RESPONSE VALIDATION: Debug logging for fallback
+            logger.info(f'Generated slide HTML length: {len(cleaned_content)}')
+            logger.info(f'Generated slide HTML preview: {cleaned_content[:200]}...')
 
-            # CONTENT VALIDATION: Verify that OpenAI returned actual HTML markup
-            # Check for common HTML elements to ensure the response contains valid slide content
-            # This helps catch cases where OpenAI might return plain text or malformed responses
-            if not ('<div' in slide_html or '<html' in slide_html):
+            # CONTENT VALIDATION: Verify that response contains valid HTML markup
+            if not ('<div' in cleaned_content or '<html' in cleaned_content):
                 logger.warning('Warning: Generated content may not be valid HTML')
 
-            return slide_html.strip()  # Remove any leading/trailing whitespace
+            return cleaned_content.strip()  # Remove any leading/trailing whitespace
 
         except Exception as e:
             logger.error(f"Error generating slide HTML: {e}")
             raise Exception(f"Failed to generate slide: {str(e)}") 
+
+    async def generate_slides_array(
+        self,
+        description: str,
+        theme: str = "Professional",
+        researchData: Optional[str] = None,
+        contentPlan: Optional[str] = None,
+        userFeedback: Optional[str] = None,
+        documents: Optional[List[Dict[str, Any]]] = None,
+        model: str = "gpt-4o",
+        slideCount: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Generate multiple slides and return both single and array formats for backward compatibility
+        
+        Returns:
+            Dict containing:
+            - slide_html: First slide for backward compatibility
+            - slides_html: Array of all slides
+        """
+        if not self.client:
+            raise Exception("LLM service not available")
+        
+        try:
+            # Build optional content sections dynamically (same as single slide generation)
+            content_plan = ""
+            if contentPlan:
+                content_plan = f"""CONTENT PLAN:
+{contentPlan}
+
+"""
+
+            user_feedback = ""
+            if userFeedback:
+                user_feedback = f"""USER FEEDBACK & ADDITIONAL REQUIREMENTS:
+{userFeedback}
+
+"""
+
+            research_data = ""
+            if researchData:
+                research_data = f"""RESEARCH DATA TO INCORPORATE:
+{researchData}
+
+"""
+
+            document_content = ""
+            if documents and len(documents) > 0:
+                document_content = "DOCUMENT CONTENT:\n"
+
+                if len(documents) > 0 and isinstance(documents[0], dict) and 'content' in documents[0]:
+                    for index, doc in enumerate(documents):
+                        if doc.get('success') and doc.get('content'):
+                            document_content += f"Document {index + 1} ({doc.get('filename', 'unknown')}):\n{doc['content']}\n\n"
+                        else:
+                            document_content += f"Document {index + 1} ({doc.get('filename', 'unknown')}): [Content extraction failed]\n\n"
+                else:
+                    document_content += f"User has uploaded {len(documents)} document(s) for reference.\n\n"
+
+            templatesContent = f"""EXAMPLE TEMPLATE TO FOLLOW:
+Here is an example of a well-designed slide that you should use as inspiration for structure, styling, and layout:
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.slide-main {{ 
+  width: 100%; 
+  height: 100%; 
+  background: white; 
+  padding: 40px; 
+  box-sizing: border-box; 
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}}
+.slide-main h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+.slide-main p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+</style>
+</head>
+<body>
+<div class="slide-main">
+  <!-- Your slide content here -->
+</div>
+</body>
+</html>
+
+Please create slides that follow similar structural patterns, CSS scoping practices, and professional styling as shown in the example above.
+
+"""
+
+            # Load prompts from external files
+            system_variables = {}
+            user_variables = {
+                "description": description,
+                "theme": theme,
+                "content_plan": content_plan,
+                "user_feedback": user_feedback,
+                "research_data": research_data,
+                "document_content": document_content,
+                "templates_content": templatesContent,
+                "slide_count": slideCount
+            }
+            
+            system_prompt, user_prompt = self.prompt_loader.load_system_user_prompts(
+                "html_generation_prompt", 
+                "slide_html", 
+                system_variables, 
+                user_variables
+            )
+
+            # Make API call to OpenAI GPT for slides generation
+            completion = self.client.chat.completions.create(
+                model=model,
+                max_tokens=4000,  # Increased for multiple slides
+                temperature=0.7,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt
+                    }
+                ]
+            )
+
+            # Extract the generated content from OpenAI response
+            raw_content = completion.choices[0].message.content
+
+            if not raw_content:
+                raise Exception('No slide content generated')
+
+            # Clean up markdown code blocks
+            cleaned_content = raw_content
+            if '```json' in raw_content:
+                import re
+                json_match = re.search(r'```json\n([\s\S]*?)\n```', raw_content)
+                if json_match:
+                    cleaned_content = json_match.group(1)
+            elif '```' in raw_content:
+                import re
+                code_match = re.search(r'```[a-zA-Z]*\n([\s\S]*?)\n```', raw_content)
+                if code_match:
+                    cleaned_content = code_match.group(1)
+
+            # Parse the JSON response
+            try:
+                slides_data = json.loads(cleaned_content)
+                if isinstance(slides_data, dict) and 'slides' in slides_data:
+                    slides_array = slides_data['slides']
+                    if isinstance(slides_array, list) and len(slides_array) > 0:
+                        logger.info(f'✅ Successfully generated {len(slides_array)} slides')
+                        
+                        return {
+                            'slide_html': slides_array[0],  # First slide for backward compatibility
+                            'slides_html': slides_array,    # All slides array
+                            'slide_count': len(slides_array)
+                        }
+                    else:
+                        raise Exception('JSON response does not contain valid slides array')
+                else:
+                    raise Exception('JSON response does not contain slides field')
+            except json.JSONDecodeError as e:
+                logger.error(f'Failed to parse JSON response: {e}')
+                raise Exception(f'Invalid JSON response from AI: {e}')
+
+        except Exception as e:
+            logger.error(f"Error generating slides array: {e}")
+            raise Exception(f"Failed to generate slides: {str(e)}")

@@ -1005,9 +1005,10 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             userFeedback = generation_data.userFeedback
             documents = generation_data.documents
             model = generation_data.model
+            slideCount = generation_data.slideCount or 5
             if model != "gpt-4o":
                 model = "gpt-4o"
-            logger.info(f"Using parameterized request - description: {description[:50]}..., theme: {theme}, research: {wants_research}")
+            logger.info(f"Using parameterized request - description: {description[:50]}..., theme: {theme}, research: {wants_research}, slideCount: {slideCount}")
         except Exception as e:
             logger.error(f"Error parsing generation data: {e}")
             error_message = ServerMessage(
@@ -1296,19 +1297,26 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             "Generating slide HTML using AI..."
         )
 
-        # Generate the slide using the new LLM service method that matches frontend API
+        # Generate slides using the new array method with backward compatibility
         try:
-            slide_html = await llm_service.generate_slide_html(
+            # Use new method that generates multiple slides
+            slides_result = await llm_service.generate_slides_array(
                 description=description,
                 theme=theme,
                 researchData=researchData,
                 contentPlan=contentPlan,
                 userFeedback=userFeedback,
                 documents=processed_documents,
-                model=model
+                model=model,
+                slideCount=slideCount
             )
             
-            logger.info(f"Slide HTML generated successfully for client {client_id}, length: {len(slide_html)}")
+            # Extract both formats
+            slide_html = slides_result['slide_html']      # First slide (backward compatibility)
+            slides_html = slides_result['slides_html']    # All slides array
+            actual_slide_count = slides_result['slide_count']
+            
+            logger.info(f"Slides generated successfully for client {client_id}: {actual_slide_count} slides, first slide length: {len(slide_html)}")
             
         except Exception as e:
             logger.error(f"Error generating slide HTML: {e}")
@@ -1334,10 +1342,20 @@ async def handle_generate_slide(websocket: WebSocket, client_id: str, data: dict
             logger.warning(f"HTML content too large ({len(slide_html)} chars), truncating")
             slide_html = slide_html[:50000]
 
+        # Truncate slides array if needed
+        truncated_slides_html = []
+        for slide in slides_html:
+            if len(slide) > 50000:
+                truncated_slides_html.append(slide[:50000])
+            else:
+                truncated_slides_html.append(slide)
+
         # Prepare response data that matches frontend API response format
         message_data = {
             "status": ProcessingStatus.COMPLETED,
-            "slide_html": slide_html,
+            "slide_html": slide_html,        # First slide (backward compatibility)
+            "slides_html": truncated_slides_html,  # All slides array (new)
+            "slide_count": actual_slide_count,     # Number of slides generated
             "ppt_file_path": "",  # Not generated in this implementation
             "processing_time": 0,  # Could be calculated if needed
             "theme": theme,

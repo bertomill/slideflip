@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, ArrowLeft, ArrowRight, Brain, CheckCircle, XCircle, Lightbulb, Settings, Image, Clock, Shield } from "lucide-react";
+import { Search, ArrowLeft, ArrowRight, Brain, CheckCircle, XCircle, Lightbulb, Settings, Image, Clock, Shield, Globe, BarChart3, Mic, Volume2, Zap, TrendingUp, MessageSquare, Play } from "lucide-react";
 import { SlideData, ResearchOptions } from "@/app/builder/page";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,6 +44,14 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendG
     excludeSocial: true,        // Professional sources are preferred for business presentations
   });
 
+  // Agent Enhancement Options: Control which AI agents are enabled
+  const [agentOptions, setAgentOptions] = useState({
+    webResearchAgent: false,    // Deep web research capability
+    dataAnalystAgent: false,    // KPI insights with charts and plots
+    narrationAgent: false,      // Speaker notes generation
+    voiceAgent: false,          // Audio playback functionality
+  });
+
   /**
    * Updates research configuration options and syncs with parent component
    * Ensures both local state and global slide data stay synchronized
@@ -53,6 +61,16 @@ export function ResearchStep({ slideData, updateSlideData, onNext, onPrev, sendG
     const newOptions = { ...researchOptions, ...updates };
     setResearchOptions(newOptions);                    // Update local component state
     updateSlideData({ researchOptions: newOptions }); // Sync with parent slide data
+  };
+
+  /**
+   * Updates agent options and syncs with parent component
+   * @param updates - Partial agent options to merge with current settings
+   */
+  const updateAgentOptions = (updates: Partial<typeof agentOptions>) => {
+    const newOptions = { ...agentOptions, ...updates };
+    setAgentOptions(newOptions);
+    updateSlideData({ agentOptions: newOptions } as Partial<SlideData>);
   };
 
   /**
@@ -331,6 +349,220 @@ Your slide will be created using the uploaded documents and description provided
           </CardContent>
         </Card>
       </div>
+
+      {/* Agent Enhancement Options */}
+      {slideData.wantsResearch === true && (
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Brain className="h-5 w-5 text-primary" />
+              AI Agent Enhancements
+            </CardTitle>
+            <CardDescription>
+              Enable specialized AI agents to enhance your slide with advanced capabilities
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Web Research Agent */}
+              <Card
+                variant={agentOptions.webResearchAgent ? "premium" : "glass"}
+                className={`cursor-pointer transition-premium hover:scale-[1.02] ${
+                  agentOptions.webResearchAgent ? "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/20" : ""
+                }`}
+                onClick={() => updateAgentOptions({ webResearchAgent: !agentOptions.webResearchAgent })}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
+                      agentOptions.webResearchAgent 
+                        ? "bg-blue-500 text-white" 
+                        : "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                    }`}>
+                      <Globe className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Web Research Agent</CardTitle>
+                      {agentOptions.webResearchAgent && (
+                        <Badge variant="secondary" className="mt-1">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <CardDescription className="mb-3">
+                    <strong>Deep Intelligence Gathering:</strong> Conducts comprehensive web research across multiple authoritative sources to uncover the latest industry insights, market trends, and competitive intelligence.
+                  </CardDescription>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <TrendingUp className="h-3 w-3 text-blue-500" />
+                      Real-time market analysis & competitor insights
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Search className="h-3 w-3 text-blue-500" />
+                      Multi-source verification & fact-checking
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Lightbulb className="h-3 w-3 text-blue-500" />
+                      Industry-specific terminology & context
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Data Analyst Agent */}
+              <Card
+                variant={agentOptions.dataAnalystAgent ? "premium" : "glass"}
+                className={`cursor-pointer transition-premium hover:scale-[1.02] ${
+                  agentOptions.dataAnalystAgent ? "ring-2 ring-green-500 bg-green-50/50 dark:bg-green-950/20" : ""
+                }`}
+                onClick={() => updateAgentOptions({ dataAnalystAgent: !agentOptions.dataAnalystAgent })}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
+                      agentOptions.dataAnalystAgent 
+                        ? "bg-green-500 text-white" 
+                        : "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                    }`}>
+                      <BarChart3 className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Data Analyst Agent</CardTitle>
+                      {agentOptions.dataAnalystAgent && (
+                        <Badge variant="secondary" className="mt-1">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <CardDescription className="mb-3">
+                    <strong>Intelligent Data Storytelling:</strong> Transforms raw information into compelling visual narratives with automated KPI analysis, interactive charts, and data-driven insights that make complex information digestible.
+                  </CardDescription>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <BarChart3 className="h-3 w-3 text-green-500" />
+                      Auto-generated charts, graphs & infographics
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <TrendingUp className="h-3 w-3 text-green-500" />
+                      KPI identification & performance metrics
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Brain className="h-3 w-3 text-green-500" />
+                      Pattern recognition & predictive insights
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Narration Agent */}
+              <Card
+                variant={agentOptions.narrationAgent ? "premium" : "glass"}
+                className={`cursor-pointer transition-premium hover:scale-[1.02] ${
+                  agentOptions.narrationAgent ? "ring-2 ring-purple-500 bg-purple-50/50 dark:bg-purple-950/20" : ""
+                }`}
+                onClick={() => updateAgentOptions({ narrationAgent: !agentOptions.narrationAgent })}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
+                      agentOptions.narrationAgent 
+                        ? "bg-purple-500 text-white" 
+                        : "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                    }`}>
+                      <MessageSquare className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Narration Agent</CardTitle>
+                      {agentOptions.narrationAgent && (
+                        <Badge variant="secondary" className="mt-1">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <CardDescription className="mb-3">
+                    <strong>Professional Presentation Coaching:</strong> Creates comprehensive speaker notes with talking points, transition phrases, and presentation flow guidance to help you deliver confident, engaging presentations.
+                  </CardDescription>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MessageSquare className="h-3 w-3 text-purple-500" />
+                      Detailed talking points & key message emphasis
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Lightbulb className="h-3 w-3 text-purple-500" />
+                      Smooth transitions & storytelling flow
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3 text-purple-500" />
+                      Timing cues & audience engagement tips
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Voice Agent */}
+              <Card
+                variant={agentOptions.voiceAgent ? "premium" : "glass"}
+                className={`cursor-pointer transition-premium hover:scale-[1.02] ${
+                  agentOptions.voiceAgent ? "ring-2 ring-orange-500 bg-orange-50/50 dark:bg-orange-950/20" : ""
+                }`}
+                onClick={() => updateAgentOptions({ voiceAgent: !agentOptions.voiceAgent })}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
+                      agentOptions.voiceAgent 
+                        ? "bg-orange-500 text-white" 
+                        : "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                    }`}>
+                      <Play className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Voice Agent</CardTitle>
+                      {agentOptions.voiceAgent && (
+                        <Badge variant="secondary" className="mt-1">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <CardDescription className="mb-3">
+                    <strong>Interactive Audio Experience:</strong> Transforms your presentation into an immersive audio experience with natural voice narration of slide content, speaker notes, and contextual explanations.
+                  </CardDescription>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Volume2 className="h-3 w-3 text-orange-500" />
+                      Natural voice synthesis & pronunciation
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Play className="h-3 w-3 text-orange-500" />
+                      Interactive playback controls & timing
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Settings className="h-3 w-3 text-orange-500" />
+                      Voice customization & speed control
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Advanced Research Options */}
       {slideData.wantsResearch === true && !isResearching && !researchComplete && (

@@ -4,18 +4,21 @@ SLIDE DESCRIPTION: $description
 
 THEME: $theme
 
+NUMBER OF SLIDES TO GENERATE: $slide_count
+
 $content_plan$user_feedback$research_data$document_content$templates_content
 
 REQUIREMENTS:
-1. Create a complete HTML slide that looks professional and presentation-ready
-2. Use modern CSS styling with the $theme theme
-3. Incorporate the research data naturally into the slide content
-4. Make it visually appealing with proper typography, spacing, and layout
-5. Include relevant data points, statistics, or insights from the research
+1. Create $slide_count complete HTML slides that look professional and presentation-ready
+2. Use modern CSS styling with the $theme theme consistently across all slides
+3. Incorporate the research data naturally across the slides
+4. Make each slide visually appealing with proper typography, spacing, and layout
+5. Include relevant data points, statistics, or insights distributed across slides
 6. Use a clean, readable design suitable for presentations
-7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
-8. Make it responsive and well-structured
-9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
+7. Ensure each slide is self-contained with scoped CSS that won't affect parent elements
+8. Make each slide responsive and well-structured
+9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - each slide will be displayed in a container with 16:9 proportions
+10. MULTIPLE SLIDES: Generate exactly $slide_count distinct slides with logical flow and progression. Each slide should focus on a specific aspect or section of the content, creating a cohesive presentation when viewed together.
 
 ASPECT RATIO REQUIREMENTS:
 // ============================================================================
@@ -30,9 +33,21 @@ ASPECT RATIO REQUIREMENTS:
 - Consider that the slide will be viewed at various sizes but always maintain 16:9 proportions
 
 OUTPUT FORMAT:
-Return a complete, self-contained HTML slide that can be embedded safely. You can choose either:
+Return a JSON array containing $slide_count HTML slides. Each slide should be a complete, self-contained HTML document that can be embedded safely. Format as:
+
+```json
+{
+  "slides": [
+    "<!DOCTYPE html><html><head><style>/* CSS for slide 1 */</style></head><body><div class=\"slide-main\"><!-- Slide 1 content --></div></body></html>",
+    "<!DOCTYPE html><html><head><style>/* CSS for slide 2 */</style></head><body><div class=\"slide-main\"><!-- Slide 2 content --></div></body></html>",
+    "<!-- Continue for all $slide_count slides -->"
+  ]
+}
+```
+
+Each slide should be:
 1. A complete HTML document with scoped CSS in the <head> (recommended for complex layouts)
-2. A single container div with inline <style> tag containing scoped CSS (simpler embedding)
+2. Self-contained and embeddable without affecting parent page elements
 
 CRITICAL CSS SCOPING REQUIREMENTS:
 - ALL CSS must be scoped to prevent affecting the parent page
@@ -54,7 +69,8 @@ STYLE GUIDELINES:
 - Make the layout clean and uncluttered, suitable for 16:9 presentation format
 - Test color combinations for WCAG accessibility standards
 
-PREFERRED STRUCTURE (Option 1 - Complete HTML):
+SLIDE STRUCTURE TEMPLATE:
+Each slide in the array should follow this structure:
 <!DOCTYPE html>
 <html>
 <head>
@@ -76,16 +92,13 @@ PREFERRED STRUCTURE (Option 1 - Complete HTML):
 </head>
 <body>
 <div class="slide-main">
-  <!-- Your slide content here -->
+  <!-- Specific slide content here -->
 </div>
 </body>
 </html>
 
-ALTERNATIVE STRUCTURE (Option 2 - Container div):
-<div class="slide-container" style="width: 100%; height: 100%; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center;">
-  <style>
-    .slide-container h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
-    .slide-container p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
-  </style>
-  <!-- Your slide content here -->
-</div>
+CONTENT DISTRIBUTION:
+- Slide 1: Title/Introduction slide with overview
+- Slide 2-N: Main content slides, each focusing on specific topics
+- Final slide: Conclusion/summary if appropriate
+- Distribute research data, statistics, and key points across slides logically

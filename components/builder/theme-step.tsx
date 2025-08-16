@@ -1166,6 +1166,49 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
         </Card>
       )}
 
+      {/* Slide Count Selection */}
+      {slideData.selectedTheme && (
+        <Card variant="glass">
+          <CardHeader className="p-3 sm:p-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <Layers className="h-5 w-5 text-primary" />
+              Number of Slides
+            </CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">
+              Choose how many slides to generate for your presentation
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 lg:p-6 lg:pt-0">
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <label htmlFor="slide-count" className="text-sm font-medium text-foreground min-w-0">
+                  Slides to generate:
+                </label>
+                <Select 
+                  value={slideData.slideCount?.toString() || "5"} 
+                  onValueChange={(value) => updateSlideData({ slideCount: parseInt(value) })}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="5" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 slide</SelectItem>
+                    <SelectItem value="3">3 slides</SelectItem>
+                    <SelectItem value="5">5 slides</SelectItem>
+                    <SelectItem value="7">7 slides</SelectItem>
+                    <SelectItem value="10">10 slides</SelectItem>
+                    <SelectItem value="15">15 slides</SelectItem>
+                    <SelectItem value="20">20 slides</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                More slides allow for more detailed content but may take longer to generate.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Navigation buttons - consistent spacing and styling */}
       <div className="flex justify-between">

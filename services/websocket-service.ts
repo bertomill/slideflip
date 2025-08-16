@@ -342,7 +342,8 @@ class WebSocketService {
     contentPlan?: string,
     userFeedback?: string,
     documents?: Array<{ filename: string; success?: boolean; content?: string }>,
-    model?: string
+    model?: string,
+    slideCount?: number
   ): boolean {
     const message = {
       type: 'generate_slide',
@@ -354,7 +355,8 @@ class WebSocketService {
         contentPlan,
         userFeedback,
         documents,
-        model
+        model,
+        slideCount: slideCount || 5
       }
     };
     

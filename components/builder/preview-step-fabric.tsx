@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowLeft, RefreshCw, MessageSquare, Sparkles, Download, Save, Heart } from "lucide-react";
 import { SlideData } from "@/app/build/page";
+import { SlideCarousel } from "@/components/ui/slide-carousel";
 import { Canvas } from "fabric";
 import { createSlideCanvas, calculateOptimalScale } from "@/lib/slide-to-fabric";
 import { SlideDefinition } from "@/lib/slide-types";
@@ -55,7 +56,8 @@ interface PreviewStepProps {
     contentPlan?: string,
     userFeedback?: string,
     documents?: Array<{ filename: string; success?: boolean; content?: string }>,
-    model?: string
+    model?: string,
+    slideCount?: number
   ) => boolean;
   lastMessage?: any;
 }
@@ -165,7 +167,8 @@ export function PreviewStep({
           slideData.contentPlan,
           typeof overrideFeedback === "string" ? overrideFeedback : slideData.userFeedback,
           buildRequestPayload(overrideFeedback).documents,
-          modelAwareSlideData.selectedModel
+          modelAwareSlideData.selectedModel,
+          slideData.slideCount || 5
         );
         
         console.log('🔍 sendGenerateSlideRequest result (Fabric):', success);
@@ -414,13 +417,18 @@ export function PreviewStep({
       if (lastMessage.data?.slide_html) {
         // Store the generated HTML content in slideData
         const generatedHtml = lastMessage.data.slide_html;
+        const generatedSlidesHtml = lastMessage.data?.slides_html || [generatedHtml];
+        const slideCount = lastMessage.data?.slide_count || 1;
+        
         console.log('🔍 Generated HTML content length:', generatedHtml.length);
+        console.log('🔍 Generated slides count:', slideCount);
         console.log('🔍 Generated HTML content preview:', generatedHtml.substring(0, 200) + '...');
         
         console.log('🔍 About to call updateSlideData...');
-        // Update the slide data with the generated HTML
+        // Update the slide data with both single and array formats
         updateSlideData({ 
-          slideHtml: generatedHtml,
+          slideHtml: generatedHtml,        // First slide (backward compatibility)
+          slidesHtml: generatedSlidesHtml, // All slides array
           slideJson: undefined // Clear any existing JSON since we have HTML
         });
         console.log('🔍 updateSlideData called successfully');
@@ -739,7 +747,7 @@ export function PreviewStep({
     }
   };
 
-  const canProceed = (extendedSlideData.slideJson || slideData.slideHtml) && !isGenerating && !isRegenerating;
+  const canProceed = (extendedSlideData.slideJson || slideData.slideHtml || slideData.slidesHtml) && !isGenerating && !isRegenerating;
 
   return (
     <div className="space-y-6">
@@ -747,12 +755,16 @@ export function PreviewStep({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Generated Slide</CardTitle>
+              <CardTitle className="text-lg">
+                Generated {slideData.slidesHtml && slideData.slidesHtml.length > 1 ? `Slides (${slideData.slidesHtml.length})` : 'Slide'}
+              </CardTitle>
               <CardDescription>
-                {slideData.slideHtml ? 'HTML preview with PowerPoint export' : 'Rendered on canvas for exact PowerPoint representation'}
+                {slideData.slideHtml || slideData.slidesHtml 
+                  ? `HTML preview with PowerPoint export${slideData.slidesHtml && slideData.slidesHtml.length > 1 ? ' - navigate with arrows' : ''}`
+                  : 'Rendered on canvas for exact PowerPoint representation'}
               </CardDescription>
             </div>
-            {(extendedSlideData.slideJson || slideData.slideHtml) && (
+            {(extendedSlideData.slideJson || slideData.slideHtml || slideData.slidesHtml) && (
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
@@ -810,23 +822,21 @@ export function PreviewStep({
                 </div>
               </div>
             </div>
-          ) : slideData.slideHtml ? (
-            // Show generated HTML content
-            <div className="border rounded-lg overflow-hidden shadow-lg bg-white">
-              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                <iframe
-                  srcDoc={slideData.slideHtml}
-                  className="absolute inset-0 w-full h-full border-0"
-                  title="Generated Slide Preview"
-                  sandbox="allow-scripts allow-same-origin"
-                />
-              </div>
-              <div className="p-4 bg-gray-50 border-t">
+          ) : (slideData.slideHtml || slideData.slidesHtml) ? (
+            // Show generated HTML content using carousel for multiple slides
+            <div className="space-y-4">
+              <SlideCarousel 
+                slides={slideData.slidesHtml || [slideData.slideHtml!]}
+                className="shadow-lg"
+              />
+              <div className="p-4 bg-gray-50 border rounded-lg">
                 <p className="text-sm text-gray-600">
-                  <strong>HTML Content Generated:</strong> {slideData.slideHtml.length} characters
+                  <strong>Generated Slides:</strong> {slideData.slidesHtml ? slideData.slidesHtml.length : 1} slide{slideData.slidesHtml && slideData.slidesHtml.length > 1 ? 's' : ''}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  This is the AI-generated HTML slide content. You can export it as PowerPoint or save as a template.
+                  {slideData.slidesHtml && slideData.slidesHtml.length > 1 
+                    ? 'Use the navigation arrows or dots to view different slides. You can export all slides as PowerPoint or save as templates.'
+                    : 'This is the AI-generated HTML slide content. You can export it as PowerPoint or save as a template.'}
                 </p>
               </div>
             </div>
@@ -852,7 +862,7 @@ export function PreviewStep({
         </CardContent>
       </Card>
 
-      {extendedSlideData.slideJson || slideData.slideHtml ? (
+      {extendedSlideData.slideJson || slideData.slideHtml || slideData.slidesHtml ? (
         <>
           <Card variant="glass">
             <CardHeader>

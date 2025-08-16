@@ -190,7 +190,8 @@ export function useWebSocket({
     contentPlan?: string,
     userFeedback?: string,
     documents?: Array<{ filename: string; success?: boolean; content?: string }>,
-    model?: string
+    model?: string,
+    slideCount?: number
   ) => {
     return websocketService.sendGenerateSlideRequest(
       description,
@@ -199,7 +200,8 @@ export function useWebSocket({
       contentPlan,
       userFeedback,
       documents,
-      model
+      model,
+      slideCount
     );
   }, []);
 
