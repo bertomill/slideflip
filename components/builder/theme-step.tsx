@@ -486,7 +486,7 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
   };
 
   // Handler for pasting images from clipboard
-  const handlePasteImage = async (e: ReactClipboardEvent<HTMLDivElement>) => {
+  const handlePasteImage = async (e: ReactClipboardEvent<HTMLDivElement> | ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
     for (let i = 0; i < items.length; i++) {
@@ -504,6 +504,21 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
       }
     }
   };
+
+  // Global paste listener for the entire page
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      // Only handle paste if we're in logo mode
+      if (paletteMode === 'logo') {
+        handlePasteImage(e);
+      }
+    };
+
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => {
+      document.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [paletteMode]);
 
   // Function to generate color palette based on text prompt
   // Uses simple keyword matching to suggest appropriate color schemes
@@ -807,6 +822,31 @@ export function ThemeStep({ slideData, updateSlideData, onNext, onPrev }: ThemeS
                                         </Button>
                                       </div>
                                     </div>
+                                    
+                                    {/* Paste zone for clipboard images */}
+                                    <div 
+                                      ref={pasteZoneRef}
+                                      onPaste={handlePasteImage}
+                                      className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer"
+                                      tabIndex={0}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'v' && (e.metaKey || e.ctrlKey)) {
+                                          e.preventDefault();
+                                          // Focus the paste zone to enable pasting
+                                          pasteZoneRef.current?.focus();
+                                        }
+                                      }}
+                                    >
+                                      <div className="flex flex-col items-center gap-2">
+                                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                        <div className="text-sm text-muted-foreground">
+                                          <span className="font-medium">Paste image here</span>
+                                          <br />
+                                          <span className="text-xs">or press Cmd/Ctrl+V</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
                                     <p className="text-xs text-muted-foreground">Upload a logo or paste an image (Cmd/Ctrl+V) to extract colors.</p>
                                   </div>
                                   {/* Logo preview with remove option */}

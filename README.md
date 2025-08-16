@@ -12,7 +12,7 @@ Slideo is a full-stack application that combines the power of AI with modern web
 - **AI-Powered Slide Generation**: Transform documents into professional presentations
 - **Real-time Collaboration**: WebSocket-based live editing and chat
 - **Multi-format Support**: Upload PDF, DOCX, TXT, and Markdown files
-- **Theme Customization**: Professional themes with color scheme options
+- **Theme Customization**: Professional themes with color scheme options and logo-based color extraction
 - **Export Options**: Download presentations in multiple formats
 - **Responsive Design**: Works seamlessly across all devices
 
@@ -22,6 +22,7 @@ Slideo is a full-stack application that combines the power of AI with modern web
 - **Authentication**: Supabase-powered user management
 - **File Processing**: Advanced document parsing and content extraction
 - **AI Integration**: LLM-powered content analysis and slide generation
+- **Theme Engine**: Advanced color palette extraction from logos and images with file upload and clipboard paste support
 
 ## 🏗️ Architecture
 
