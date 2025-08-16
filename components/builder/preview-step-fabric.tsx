@@ -171,6 +171,7 @@ export function PreviewStep({
         console.log('🔍 sendGenerateSlideRequest result (Fabric):', success);
         
         if (!success) {
+          console.log('🔍 ❌ WebSocket send failed, falling back to API or fallback slide');
           throw new Error('Failed to send websocket message');
         }
         
@@ -324,34 +325,60 @@ export function PreviewStep({
 
   // Initialize and update canvas when slide JSON changes
   useEffect(() => {
-    if (!canvasRef.current || !containerRef.current || !extendedSlideData.slideJson) {
-      console.log('Canvas initialization prerequisites not met:', {
-        hasCanvasRef: !!canvasRef.current,
-        hasContainerRef: !!containerRef.current,
-        hasSlideJson: !!extendedSlideData.slideJson
-      });
+    if (!extendedSlideData.slideJson) {
+      console.log('No slide JSON available for canvas rendering');
       return;
     }
 
-    // Calculate scale based on container size
-    const containerWidth = containerRef.current.offsetWidth;
-    const containerHeight = containerRef.current.offsetHeight || 500;
-    const scale = calculateOptimalScale(containerWidth, containerHeight);
+    // Use a small delay to ensure DOM is ready
+    const initCanvas = () => {
+      if (!canvasRef.current || !containerRef.current) {
+        console.log('Canvas refs not ready, will retry...', {
+          hasCanvasRef: !!canvasRef.current,
+          hasContainerRef: !!containerRef.current
+        });
+        // Try again after a short delay
+        setTimeout(initCanvas, 100);
+        return;
+      }
 
-    // Always dispose of existing canvas first
-    if (canvas) {
-      canvas.dispose();
-      setCanvas(null);
-    }
+      console.log('Canvas refs ready, initializing canvas...');
+      
+      // Calculate scale based on container size
+      const containerWidth = containerRef.current.offsetWidth;
+      const containerHeight = containerRef.current.offsetHeight || 500;
+      const scale = calculateOptimalScale(containerWidth, containerHeight);
 
-    // Create new canvas for each update
-    const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
-    setCanvas(newCanvas);
+      // Always dispose of existing canvas first
+      if (canvas) {
+        console.log('Disposing existing canvas');
+        canvas.dispose();
+        setCanvas(null);
+      }
+
+      try {
+        // Create new canvas for each update
+        console.log('Creating new canvas with scale:', scale);
+        const newCanvas = createSlideCanvas(canvasRef.current, extendedSlideData.slideJson, scale);
+        setCanvas(newCanvas);
+        console.log('Canvas created successfully');
+      } catch (error) {
+        console.error('Failed to create canvas:', error);
+        // If creation fails, retry once more after a delay
+        if (error instanceof Error && error.message === 'Canvas element is required') {
+          setTimeout(initCanvas, 200);
+        }
+      }
+    };
+
+    // Start the initialization
+    initCanvas();
 
     // Cleanup function
     return () => {
-      if (newCanvas) {
-        newCanvas.dispose();
+      if (canvas) {
+        console.log('Cleaning up canvas on unmount/update');
+        canvas.dispose();
       }
     };
   }, [extendedSlideData.slideJson, canvasKey]); // Add canvasKey to dependencies
@@ -361,6 +388,7 @@ export function PreviewStep({
     console.log("🎯 Preview step useEffect triggered");
     console.log("🔍 Current state:", {
       hasSlideJson: !!extendedSlideData.slideJson,
+      hasSlideHtml: !!slideData.slideHtml,
       slideJsonId: extendedSlideData.slideJson?.id,
       description: slideData.description,
       isGenerating,
@@ -368,21 +396,33 @@ export function PreviewStep({
       hasSendGenerateSlideRequest: !!sendGenerateSlideRequest
     });
 
-    if (!extendedSlideData.slideJson) {
-      if (slideData.description && isConnected && sendGenerateSlideRequest) {
-        console.log("🚀 Triggering slide generation with description via websocket");
-        generateSlide();
-      } else if (slideData.description && (!isConnected || !sendGenerateSlideRequest)) {
-        console.log("⚠️ Cannot generate via websocket - not connected or missing function, creating fallback slide");
-        createFallbackSlide();
-      } else if (!slideData.description) {
-        console.log("⚠️ No description available, creating fallback slide");
-        createFallbackSlide();
-      }
-    } else {
-      console.log("✅ Slide JSON already exists, skipping generation");
+    // If we already have slide content (JSON or HTML), skip generation
+    if (extendedSlideData.slideJson || slideData.slideHtml) {
+      console.log("✅ Slide content already exists, skipping generation");
+      return;
     }
-  }, [extendedSlideData.slideJson, slideData.description, isConnected, sendGenerateSlideRequest]);
+
+    // If we don't have a description, create a fallback slide
+    if (!slideData.description) {
+      console.log("⚠️ No description available, creating fallback slide");
+      createFallbackSlide();
+      return;
+    }
+
+    // Only try WebSocket generation if we're properly connected
+    // This prevents the step validation error when not connected to backend
+    if (isConnected && sendGenerateSlideRequest) {
+      console.log("🚀 Triggering slide generation with description via websocket");
+      // Note: This may fail with step validation error if previous steps aren't completed
+      // The backend requires step_1_upload to be completed before step_5_preview
+      console.log("⚠️ Note: Generation may fail if previous steps aren't marked as completed in backend");
+      generateSlide();
+    } else {
+      console.log("⚠️ Cannot generate via websocket - not connected or missing function");
+      console.log("💡 Creating fallback slide for offline preview");
+      createFallbackSlide();
+    }
+  }, [extendedSlideData.slideJson, slideData.slideHtml, slideData.description, isConnected, sendGenerateSlideRequest]);
 
   // Add this useEffect for cleanup - PUT IT HERE
   useEffect(() => {
@@ -439,8 +479,16 @@ export function PreviewStep({
         console.log('🔍 ❌ No slide_html in message data');
         console.log('🔍 Message data content:', lastMessage.data);
       }
-    } else if (lastMessage.type === 'slide_generation_error') {
-      console.error('🔍 ❌ Slide generation error:', lastMessage.data?.error);
+    } else if (lastMessage.type === 'slide_generation_error' || lastMessage.type === 'error') {
+      console.error('🔍 ❌ Slide generation error:', lastMessage.data?.error || lastMessage.data?.message);
+      
+      // Check if it's a step validation error
+      if (lastMessage.data?.error?.includes('must be completed before') || 
+          lastMessage.data?.message?.includes('must be completed before')) {
+        console.log('🔍 ⚠️ Step validation error detected - creating fallback slide');
+        console.log('🔍 💡 This happens when previous builder steps haven\'t been completed');
+      }
+      
       // Fallback to placeholder so user can continue the flow
       createFallbackSlide();
       setIsGenerating(false);

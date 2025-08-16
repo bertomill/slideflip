@@ -378,12 +378,19 @@ export function renderSlideOnCanvas(
  * Create a Fabric.js canvas for slide preview
  */
 export function createSlideCanvas(
-  canvasElement: HTMLCanvasElement,
+  canvasElement: HTMLCanvasElement | null,
   slide: SlideDefinition,
   scale: number = 1
 ): Canvas {
   if (!canvasElement) {
+    console.error('❌ Canvas element is null or undefined');
     throw new Error('Canvas element is required');
+  }
+  
+  // Additional check to ensure the element is in the DOM
+  if (!canvasElement.parentNode) {
+    console.error('❌ Canvas element is not attached to DOM');
+    throw new Error('Canvas element must be attached to DOM');
   }
   
   console.log('🏗️ Creating Fabric canvas...');

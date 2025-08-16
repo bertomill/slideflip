@@ -650,9 +650,9 @@ Return the JSON structure as specified in the system prompt. Be thorough but acc
         model: str = "gpt-4o"
     ) -> str:
         """
-        Generate professional PowerPoint slide in HTML format using the same prompt engineering as frontend
+        Generate professional PowerPoint slide in HTML format using enhanced prompt engineering
         
-        This method replicates the exact logic from the frontend /api/generate-slide endpoint
+        This method uses the same advanced prompt engineering approach as the successful frontend endpoint
         """
         if not self.client:
             raise Exception("LLM service not available")
@@ -710,11 +710,136 @@ THEME: {theme}
                     # Fallback: just mention document count if no parsed content available
                     prompt += f"User has uploaded {len(documents)} document(s) for reference.\n\n"
 
-            # TEMPLATE EXAMPLES: For now, we'll use a basic template example
-            # TODO: Integrate with template service to fetch actual examples
-            templatesContent = f"""EXAMPLE TEMPLATE TO FOLLOW:
-Here is an example of a well-designed slide that you should use as inspiration for structure, styling, and layout:
+            # TEMPLATE EXAMPLES: Provide example templates for consistency
+            templatesContent = """EXAMPLE TEMPLATES TO FOLLOW:
+Here are examples of well-designed slides that you should use as inspiration for structure, styling, and layout:
 
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.slide-main { 
+  width: 100%; 
+  height: 100%; 
+  background: white; 
+  padding: 40px; 
+  box-sizing: border-box; 
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.slide-main h1 { color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }
+.slide-main p { color: #333333; font-size: 1.1rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="slide-main">
+  <!-- Your slide content here -->
+</div>
+</body>
+</html>
+
+Please create a slide that follows similar structural patterns, CSS scoping practices, and professional styling as shown in the example above.
+
+"""
+
+            prompt += templatesContent
+
+            # Add theme-specific styling guidance
+            theme_guidance = ""
+            if theme.lower() == "professional":
+                theme_guidance = """
+THEME-SPECIFIC GUIDANCE (Professional):
+- Use clean, corporate style with blue/gray color schemes
+- Prefer structured layouts with clear hierarchy
+- Use conservative fonts and spacing
+- Include subtle gradients and shadows
+- Maintain business-appropriate color palette
+"""
+            elif theme.lower() == "creative":
+                theme_guidance = """
+THEME-SPECIFIC GUIDANCE (Creative):
+- Use vibrant colors with artistic gradients and patterns
+- Embrace bold typography and creative layouts
+- Include dynamic visual elements
+- Use energetic color combinations
+- Allow for more expressive design choices
+"""
+            elif theme.lower() == "minimal":
+                theme_guidance = """
+THEME-SPECIFIC GUIDANCE (Minimal):
+- Clean, simple design with lots of white space
+- Use minimal color palette (primarily black, white, gray)
+- Focus on typography and spacing
+- Avoid unnecessary decorative elements
+- Emphasize content over visual flourishes
+"""
+            elif theme.lower() == "modern":
+                theme_guidance = """
+THEME-SPECIFIC GUIDANCE (Modern):
+- Contemporary design with bold typography
+- Use current design trends and techniques
+- Include geometric shapes and clean lines
+- Use modern color schemes and gradients
+- Emphasize sleek, cutting-edge appearance
+"""
+            
+            if theme_guidance:
+                prompt += theme_guidance
+
+            # SLIDE GENERATION REQUIREMENTS: Complete the prompt with detailed requirements and style guidelines
+            # This section emphasizes accessibility, readability, and professional appearance
+            # Key focus areas: CSS scoping, accessibility compliance, and embeddable HTML output
+            prompt += f"""REQUIREMENTS:
+1. Create a complete HTML slide that looks professional and presentation-ready
+2. Use modern CSS styling with the {theme} theme
+3. Incorporate the research data naturally into the slide content
+4. Make it visually appealing with proper typography, spacing, and layout
+5. Include relevant data points, statistics, or insights from the research
+6. Use a clean, readable design suitable for presentations
+7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
+8. Make it responsive and well-structured
+9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
+
+ASPECT RATIO REQUIREMENTS:
+// ============================================================================
+// 16:9 ASPECT RATIO OPTIMIZATION: Critical design constraints for slide display
+// ============================================================================
+// The generated slide must work perfectly within a 16:9 aspect ratio container
+// This ensures consistency between web preview and PowerPoint export formats
+- Design the slide content to work optimally in a 16:9 aspect ratio container
+- This matches standard PowerPoint slide dimensions (1920x1080, 1280x720, etc.)
+- Content should be well-proportioned and not cramped when displayed in this format
+- Use appropriate font sizes and spacing that work well in the 16:9 format
+- Consider that the slide will be viewed at various sizes but always maintain 16:9 proportions
+
+OUTPUT FORMAT:
+Return a complete, self-contained HTML slide that can be embedded safely. You can choose either:
+1. A complete HTML document with scoped CSS in the <head> (recommended for complex layouts)
+2. A single container div with inline <style> tag containing scoped CSS (simpler embedding)
+
+CRITICAL CSS SCOPING REQUIREMENTS:
+- ALL CSS must be scoped to prevent affecting the parent page
+- If using a complete HTML document, scope all styles to a main container class
+- If using a div container, scope all styles to that container class
+- NEVER use global selectors like body, html, *, or unscoped element selectors
+- Example: Use ".slide-container h1" instead of just "h1"
+- Example: Use ".slide-container .title" instead of just ".title"
+
+STYLE GUIDELINES:
+- Use professional fonts (Arial, Helvetica, or similar)
+- CRITICAL: Ensure high contrast text - use dark text (#333333 or darker) on light backgrounds, never light grey text
+- Main headings should be #1a1a1a or #000000 for maximum readability
+- Body text should be #333333 minimum, never lighter than #555555
+- Background colors should provide strong contrast with text
+- Include appropriate margins, padding, and spacing optimized for 16:9 viewing
+- Use bullet points, headings, and visual hierarchy effectively
+- Incorporate any statistics or data points from the research prominently
+- Make the layout clean and uncluttered, suitable for 16:9 presentation format
+- Test color combinations for WCAG accessibility standards
+
+PREFERRED STRUCTURE (Option 1 - Complete HTML):
 <!DOCTYPE html>
 <html>
 <head>
@@ -741,25 +866,14 @@ Here is an example of a well-designed slide that you should use as inspiration f
 </body>
 </html>
 
-Please create a slide that follows similar structural patterns, CSS scoping practices, and professional styling as shown in the example above.
-
-"""
-
-            prompt += templatesContent
-
-            # SLIDE GENERATION REQUIREMENTS: Complete the prompt with detailed requirements and style guidelines
-            # This section emphasizes accessibility, readability, and professional appearance
-            # Key focus areas: CSS scoping, accessibility compliance, and embeddable HTML output
-            prompt += f"""REQUIREMENTS:
-1. Create a complete HTML slide that looks professional and presentation-ready
-2. Use modern CSS styling with the {theme} theme
-3. Incorporate the research data naturally into the slide content
-4. Make it visually appealing with proper typography, spacing, and layout
-5. Include relevant data points, statistics, or insights from the research
-6. Use a clean, readable design suitable for presentations
-7. Ensure the slide is self-contained with scoped CSS that won't affect parent elements
-8. Make it responsive and well-structured
-9. CRITICAL: Design for 16:9 aspect ratio (PowerPoint slide dimensions) - the slide will be displayed in a container with 16:9 proportions
+ALTERNATIVE STRUCTURE (Option 2 - Container div):
+<div class="slide-container" style="width: 100%; height: 100%; background: white; padding: 40px; box-sizing: border-box; font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center;">
+  <style>
+    .slide-container h1 {{ color: #1a1a1a; font-size: 2.5rem; margin-bottom: 1rem; }}
+    .slide-container p {{ color: #333333; font-size: 1.1rem; line-height: 1.6; }}
+  </style>
+  <!-- Your slide content here -->
+</div>"""
 
 ASPECT RATIO REQUIREMENTS:
 // ============================================================================

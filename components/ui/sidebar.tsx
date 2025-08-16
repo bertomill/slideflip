@@ -115,6 +115,29 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
       return email?.slice(0, 2).toUpperCase() || 'U';
     };
 
+    const getStepName = (currentStep: number) => {
+      switch (currentStep) {
+        case 1: return 'Upload';
+        case 2: return 'Theme';
+        case 3: return 'Preview';
+        default: return 'Draft';
+      }
+    };
+
+    const getTimeAgo = (dateString: string) => {
+      const now = new Date();
+      const date = new Date(dateString);
+      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+      
+      if (diffInHours < 1) return 'Just now';
+      if (diffInHours < 24) return `${diffInHours}h ago`;
+      
+      const diffInDays = Math.floor(diffInHours / 24);
+      if (diffInDays < 7) return `${diffInDays}d ago`;
+      
+      return date.toLocaleDateString();
+    };
+
     const toggleCollapsed = () => onCollapsedChange?.(!collapsed);
 
     return (
@@ -288,7 +311,7 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
             )}
 
             {/* Navigation Menu */}
-            <nav className="flex-1 p-4">
+            <nav className="flex-1 p-4 overflow-y-auto">
               <div className="space-y-1">
                 <Button
                   variant="ghost"
@@ -304,6 +327,52 @@ const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
                   <FileText className={cn("h-4 w-4", !collapsed && "mr-3")} />
                   {!collapsed && "Presentations"}
                 </Button>
+
+                {/* Recent Presentations */}
+                {!collapsed && user && (
+                  <div className="ml-2 mt-2 space-y-1">
+                    {loadingRecent ? (
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin"></div>
+                        Loading...
+                      </div>
+                    ) : recentPresentations.length > 0 ? (
+                      recentPresentations.map((presentation) => (
+                        <button
+                          key={presentation.id}
+                          onClick={() => {
+                            router.push(`/build?presentation_id=${presentation.id}`);
+                            onToggle?.();
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-md hover:bg-accent/50 transition-colors group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-foreground truncate">
+                                {presentation.title || 'Untitled'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                  Step {presentation.current_step || 1} - {getStepName(presentation.current_step || 1)}
+                                </span>
+                                <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
+                                <span className="text-xs text-muted-foreground">
+                                  {getTimeAgo(presentation.updated_at)}
+                                </span>
+                              </div>
+                            </div>
+                            <Clock className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        No recent presentations
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Button
                   variant="ghost"
                   className={cn(

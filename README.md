@@ -165,9 +165,14 @@ All variables are demonstrated in `.env.example` at the repo root. Copy it to `.
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# Backend URLs used by the app (required for local dev)
+# Backend URLs used by the app
+# For local development:
 NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
 NEXT_PUBLIC_BACKEND_WS_URL=ws://localhost:8000
+
+# For production (using deployed Google Cloud Run backend):
+# NEXT_PUBLIC_BACKEND_URL=https://slideflip-backend-167734449742.us-central1.run.app
+# NEXT_PUBLIC_BACKEND_WS_URL=wss://slideflip-backend-167734449742.us-central1.run.app
 
 # AI keys
 OPENAI_API_KEY=your_openai_api_key            # required for AI features
@@ -300,7 +305,33 @@ webpack: (config, { isServer }) => {
 
 This ensures successful builds on Vercel while keeping runtime behavior unchanged in the browser.
 
-### Backend (Docker)
+### Backend Deployment
+
+#### Local Development
+```bash
+cd backend
+source venv/bin/activate
+python main.py
+```
+
+#### Google Cloud Run (Production)
+The backend is deployed to Google Cloud Run at:
+**https://slideflip-backend-167734449742.us-central1.run.app**
+
+To deploy updates:
+```bash
+cd backend
+gcloud builds submit --config cloudbuild.yaml .
+```
+
+Configuration:
+- **Docker**: Uses `backend/Dockerfile` for containerization
+- **Cloud Build**: Automated deployment via `backend/cloudbuild.yaml`
+- **Environment**: Production variables set via Google Secret Manager
+- **Secrets**: OpenAI API key stored securely in Secret Manager
+- **Resources**: 2GB memory, 4 CPU, auto-scaling 1-2 instances
+
+#### Docker (Alternative)
 ```dockerfile
 FROM python:3.11-slim
 WORKDIR /app

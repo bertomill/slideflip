@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8b9594f2-b583-42f0-ac98-67e9bb9f0d46" name="Changes" comment="" />
+    <list default="true" id="8b9594f2-b583-42f0-ac98-67e9bb9f0d46" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/components/builder/preview-step-fabric.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/builder/preview-step-fabric.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/ui/sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/ui/sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/slide-to-fabric.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/slide-to-fabric.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -71,6 +75,7 @@
       <option name="presentableId" value="Default" />
       <updated>1754573234096</updated>
       <workItem from="1754573235596" duration="651000" />
+      <workItem from="1755274139982" duration="1259000" />
     </task>
     <servers />
   </component>

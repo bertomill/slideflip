@@ -10,13 +10,9 @@
 
 **Introduction (10-15 seconds)**
 - "Hi, I'm Robert, and this is Soumil and Shiv. We're the founders of Slideo"
-- "We're building the AI presentation maker for the workplace"
-- "We turn any document into professional slides in under 2 minutes"
-
-**Problem (15-20 seconds)**
-- "Finance directors, consultants, and business teams waste hours every week wrestling with PowerPoint"
-- "A finance director at a $300M company needs to create quarterly board slides from 5 PDFs and a CSV file—it takes them 3 hours of manual work"
-- "They're copying and pasting, fighting formatting, and recreating the same templates every quarter"
+- "We're building the AI that turns any documents into borad-ready slides in under 2 minutes"
+- "Financial directors, consultants, and teams waste hours every week dragging and dropping shapes and ext onto slides.
+- "A financial director of a billion dollar company needs to spend three hours of manual work each week putting together tedious slides to display the information they already know.
 
 ---
 
